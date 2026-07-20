@@ -4,7 +4,9 @@ GO_DOCKER = docker run --rm --user "$$(id -u):$$(id -g)" -e GOCACHE=/tmp/go-cach
 .PHONY: gofmt go-test go-test-race go-build
 
 gofmt:
-	@files="$$(find cmd internal -type f -name '*.go')"; test -z "$$($(GO_DOCKER) gofmt -l $$files)"
+	@files="$$(find cmd internal -type f -name '*.go')"; \
+	unformatted="$$($(GO_DOCKER) gofmt -l $$files)" || exit $$?; \
+	test -z "$$unformatted"
 
 go-test:
 	$(GO_DOCKER) go test ./...

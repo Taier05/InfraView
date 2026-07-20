@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -33,14 +34,14 @@ func Load(getenv func(string) string) (Config, error) {
 	cfg.ListenAddr = valueOrDefault(getenv, "INFRAVIEW_LISTEN_ADDR", ":8080")
 	cfg.Username = getenv("INFRAVIEW_USERNAME")
 	if strings.TrimSpace(cfg.Username) == "" {
-		return Config{}, fmt.Errorf("INFRAVIEW_USERNAME is required")
+		return Config{}, fmt.Errorf("INFRAVIEW_USERNAME 必填")
 	}
 	cfg.Password = getenv("INFRAVIEW_PASSWORD")
 	if cfg.Password == "" {
-		return Config{}, fmt.Errorf("INFRAVIEW_PASSWORD is required")
+		return Config{}, fmt.Errorf("INFRAVIEW_PASSWORD 必填")
 	}
 	if len(cfg.Password) < 12 {
-		return Config{}, fmt.Errorf("INFRAVIEW_PASSWORD must be at least 12 characters")
+		return Config{}, fmt.Errorf("INFRAVIEW_PASSWORD 长度必须至少为 12 个字符")
 	}
 
 	if cfg.SessionTTL, err = durationValue(getenv, "INFRAVIEW_SESSION_TTL", "12h"); err != nil {
@@ -51,13 +52,13 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	cfg.DataSource = valueOrDefault(getenv, "INFRAVIEW_DATA_SOURCE", "mock")
 	if cfg.DataSource != "mock" {
-		return Config{}, fmt.Errorf("INFRAVIEW_DATA_SOURCE %q is unsupported; only mock is supported", cfg.DataSource)
+		return Config{}, fmt.Errorf("INFRAVIEW_DATA_SOURCE 仅支持 %q，当前值为 %q", "mock", cfg.DataSource)
 	}
 	if cfg.MockHostCount, err = intValue(getenv, "INFRAVIEW_MOCK_HOST_COUNT", "32"); err != nil {
 		return Config{}, err
 	}
 	if cfg.MockHostCount < 1 || cfg.MockHostCount > 100 {
-		return Config{}, fmt.Errorf("INFRAVIEW_MOCK_HOST_COUNT must be between 1 and 100")
+		return Config{}, fmt.Errorf("INFRAVIEW_MOCK_HOST_COUNT 必须在 1 到 100 之间")
 	}
 
 	if cfg.RefreshInterval, err = durationValue(getenv, "INFRAVIEW_REFRESH_INTERVAL", "30s"); err != nil {
@@ -78,6 +79,9 @@ func Load(getenv func(string) string) (Config, error) {
 	if cfg.MaxStale, err = durationValue(getenv, "INFRAVIEW_MAX_STALE", "5m"); err != nil {
 		return Config{}, err
 	}
+	if cfg.MaxStale > 5*time.Minute {
+		return Config{}, fmt.Errorf("INFRAVIEW_MAX_STALE 不得超过 5m，当前值为 %q", valueOrDefault(getenv, "INFRAVIEW_MAX_STALE", "5m"))
+	}
 	if cfg.UpstreamTimeout, err = durationValue(getenv, "INFRAVIEW_UPSTREAM_TIMEOUT", "10s"); err != nil {
 		return Config{}, err
 	}
@@ -88,7 +92,7 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	if cfg.WarningPercent >= cfg.CriticalPercent {
-		return Config{}, fmt.Errorf("INFRAVIEW_WARNING_PERCENT must be lower than INFRAVIEW_CRITICAL_PERCENT")
+		return Config{}, fmt.Errorf("INFRAVIEW_WARNING_PERCENT 必须低于 INFRAVIEW_CRITICAL_PERCENT")
 	}
 
 	return cfg, nil
@@ -105,10 +109,10 @@ func durationValue(getenv func(string) string, key, fallback string) (time.Durat
 	raw := valueOrDefault(getenv, key, fallback)
 	value, err := time.ParseDuration(raw)
 	if err != nil {
-		return 0, fmt.Errorf("%s must be a valid duration: %w", key, err)
+		return 0, fmt.Errorf("%s 必须是有效时长，当前值为 %q", key, raw)
 	}
 	if value <= 0 {
-		return 0, fmt.Errorf("%s must be greater than zero", key)
+		return 0, fmt.Errorf("%s 必须大于 0，当前值为 %q", key, raw)
 	}
 	return value, nil
 }
@@ -117,7 +121,7 @@ func boolValue(getenv func(string) string, key, fallback string) (bool, error) {
 	raw := valueOrDefault(getenv, key, fallback)
 	value, err := strconv.ParseBool(raw)
 	if err != nil {
-		return false, fmt.Errorf("%s must be a valid boolean: %w", key, err)
+		return false, fmt.Errorf("%s 必须是布尔值（true 或 false），当前值为 %q", key, raw)
 	}
 	return value, nil
 }
@@ -126,7 +130,7 @@ func intValue(getenv func(string) string, key, fallback string) (int, error) {
 	raw := valueOrDefault(getenv, key, fallback)
 	value, err := strconv.Atoi(raw)
 	if err != nil {
-		return 0, fmt.Errorf("%s must be a valid integer: %w", key, err)
+		return 0, fmt.Errorf("%s 必须是整数，当前值为 %q", key, raw)
 	}
 	return value, nil
 }
@@ -134,11 +138,8 @@ func intValue(getenv func(string) string, key, fallback string) (int, error) {
 func percentageValue(getenv func(string) string, key, fallback string) (float64, error) {
 	raw := valueOrDefault(getenv, key, fallback)
 	value, err := strconv.ParseFloat(raw, 64)
-	if err != nil {
-		return 0, fmt.Errorf("%s must be a valid percentage: %w", key, err)
-	}
-	if value < 0 || value > 100 {
-		return 0, fmt.Errorf("%s must be between 0 and 100", key)
+	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 100 {
+		return 0, fmt.Errorf("%s 必须是 0 到 100 之间的有限数值，当前值为 %q", key, raw)
 	}
 	return value, nil
 }

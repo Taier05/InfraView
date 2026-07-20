@@ -25,6 +25,24 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.SessionTTL != 12*time.Hour {
 		t.Fatalf("session = %s", cfg.SessionTTL)
 	}
+	if cfg.CookieSecure {
+		t.Fatal("cookie secure = true")
+	}
+	if cfg.MockHostCount != 32 {
+		t.Fatalf("mock hosts = %d", cfg.MockHostCount)
+	}
+	if cfg.RefreshInterval != 30*time.Second {
+		t.Fatalf("refresh = %s", cfg.RefreshInterval)
+	}
+	if cfg.InventoryTTL != 60*time.Second || cfg.CurrentMetricsTTL != 20*time.Second {
+		t.Fatalf("inventory/current TTL = %s/%s", cfg.InventoryTTL, cfg.CurrentMetricsTTL)
+	}
+	if cfg.RangeTTL != 60*time.Second || cfg.HealthTTL != 15*time.Second {
+		t.Fatalf("range/health TTL = %s/%s", cfg.RangeTTL, cfg.HealthTTL)
+	}
+	if cfg.MaxStale != 5*time.Minute || cfg.UpstreamTimeout != 10*time.Second {
+		t.Fatalf("max stale/upstream timeout = %s/%s", cfg.MaxStale, cfg.UpstreamTimeout)
+	}
 	if cfg.WarningPercent != 80 || cfg.CriticalPercent != 90 {
 		t.Fatalf("thresholds = %v/%v", cfg.WarningPercent, cfg.CriticalPercent)
 	}
@@ -44,7 +62,7 @@ func TestLoadAllValues(t *testing.T) {
 		"INFRAVIEW_CURRENT_METRICS_TTL": "25s",
 		"INFRAVIEW_RANGE_TTL":           "90s",
 		"INFRAVIEW_HEALTH_TTL":          "20s",
-		"INFRAVIEW_MAX_STALE":           "10m",
+		"INFRAVIEW_MAX_STALE":           "4m",
 		"INFRAVIEW_UPSTREAM_TIMEOUT":    "15s",
 		"INFRAVIEW_WARNING_PERCENT":     "75.5",
 		"INFRAVIEW_CRITICAL_PERCENT":    "95.5",
@@ -61,7 +79,7 @@ func TestLoadAllValues(t *testing.T) {
 	if cfg.RefreshInterval != 45*time.Second || cfg.InventoryTTL != 2*time.Minute || cfg.CurrentMetricsTTL != 25*time.Second {
 		t.Fatalf("short durations = %#v", cfg)
 	}
-	if cfg.RangeTTL != 90*time.Second || cfg.HealthTTL != 20*time.Second || cfg.MaxStale != 10*time.Minute || cfg.UpstreamTimeout != 15*time.Second {
+	if cfg.RangeTTL != 90*time.Second || cfg.HealthTTL != 20*time.Second || cfg.MaxStale != 4*time.Minute || cfg.UpstreamTimeout != 15*time.Second {
 		t.Fatalf("cache durations = %#v", cfg)
 	}
 	if cfg.WarningPercent != 75.5 || cfg.CriticalPercent != 95.5 {
@@ -75,16 +93,23 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		overrides map[string]string
 		wantError string
 	}{
-		{name: "missing username", overrides: map[string]string{"INFRAVIEW_USERNAME": ""}, wantError: "INFRAVIEW_USERNAME"},
-		{name: "missing password", overrides: map[string]string{"INFRAVIEW_PASSWORD": ""}, wantError: "INFRAVIEW_PASSWORD"},
-		{name: "short password", overrides: map[string]string{"INFRAVIEW_PASSWORD": "too-short"}, wantError: "INFRAVIEW_PASSWORD"},
-		{name: "invalid duration", overrides: map[string]string{"INFRAVIEW_SESSION_TTL": "later"}, wantError: "INFRAVIEW_SESSION_TTL"},
-		{name: "unsupported source", overrides: map[string]string{"INFRAVIEW_DATA_SOURCE": "nightingale"}, wantError: "INFRAVIEW_DATA_SOURCE"},
-		{name: "zero mock hosts", overrides: map[string]string{"INFRAVIEW_MOCK_HOST_COUNT": "0"}, wantError: "INFRAVIEW_MOCK_HOST_COUNT"},
-		{name: "too many mock hosts", overrides: map[string]string{"INFRAVIEW_MOCK_HOST_COUNT": "101"}, wantError: "INFRAVIEW_MOCK_HOST_COUNT"},
-		{name: "invalid warning percentage", overrides: map[string]string{"INFRAVIEW_WARNING_PERCENT": "101"}, wantError: "INFRAVIEW_WARNING_PERCENT"},
-		{name: "invalid critical percentage", overrides: map[string]string{"INFRAVIEW_CRITICAL_PERCENT": "invalid"}, wantError: "INFRAVIEW_CRITICAL_PERCENT"},
-		{name: "warning equals critical", overrides: map[string]string{"INFRAVIEW_WARNING_PERCENT": "90"}, wantError: "lower"},
+		{name: "missing username", overrides: map[string]string{"INFRAVIEW_USERNAME": ""}, wantError: "INFRAVIEW_USERNAME 必填"},
+		{name: "missing password", overrides: map[string]string{"INFRAVIEW_PASSWORD": ""}, wantError: "INFRAVIEW_PASSWORD 必填"},
+		{name: "short password", overrides: map[string]string{"INFRAVIEW_PASSWORD": "too-short"}, wantError: "INFRAVIEW_PASSWORD 长度必须至少为 12 个字符"},
+		{name: "invalid duration", overrides: map[string]string{"INFRAVIEW_SESSION_TTL": "later"}, wantError: `INFRAVIEW_SESSION_TTL 必须是有效时长，当前值为 "later"`},
+		{name: "non-positive duration", overrides: map[string]string{"INFRAVIEW_REFRESH_INTERVAL": "0s"}, wantError: `INFRAVIEW_REFRESH_INTERVAL 必须大于 0，当前值为 "0s"`},
+		{name: "invalid boolean", overrides: map[string]string{"INFRAVIEW_COOKIE_SECURE": "sometimes"}, wantError: `INFRAVIEW_COOKIE_SECURE 必须是布尔值（true 或 false），当前值为 "sometimes"`},
+		{name: "unsupported source", overrides: map[string]string{"INFRAVIEW_DATA_SOURCE": "nightingale"}, wantError: `INFRAVIEW_DATA_SOURCE 仅支持 "mock"，当前值为 "nightingale"`},
+		{name: "invalid mock host count", overrides: map[string]string{"INFRAVIEW_MOCK_HOST_COUNT": "many"}, wantError: `INFRAVIEW_MOCK_HOST_COUNT 必须是整数，当前值为 "many"`},
+		{name: "zero mock hosts", overrides: map[string]string{"INFRAVIEW_MOCK_HOST_COUNT": "0"}, wantError: "INFRAVIEW_MOCK_HOST_COUNT 必须在 1 到 100 之间"},
+		{name: "too many mock hosts", overrides: map[string]string{"INFRAVIEW_MOCK_HOST_COUNT": "101"}, wantError: "INFRAVIEW_MOCK_HOST_COUNT 必须在 1 到 100 之间"},
+		{name: "max stale over limit", overrides: map[string]string{"INFRAVIEW_MAX_STALE": "5m1s"}, wantError: `INFRAVIEW_MAX_STALE 不得超过 5m，当前值为 "5m1s"`},
+		{name: "invalid warning percentage", overrides: map[string]string{"INFRAVIEW_WARNING_PERCENT": "101"}, wantError: `INFRAVIEW_WARNING_PERCENT 必须是 0 到 100 之间的有限数值，当前值为 "101"`},
+		{name: "invalid critical percentage", overrides: map[string]string{"INFRAVIEW_CRITICAL_PERCENT": "invalid"}, wantError: `INFRAVIEW_CRITICAL_PERCENT 必须是 0 到 100 之间的有限数值，当前值为 "invalid"`},
+		{name: "warning is NaN", overrides: map[string]string{"INFRAVIEW_WARNING_PERCENT": "NaN"}, wantError: `INFRAVIEW_WARNING_PERCENT 必须是 0 到 100 之间的有限数值，当前值为 "NaN"`},
+		{name: "warning is positive infinity", overrides: map[string]string{"INFRAVIEW_WARNING_PERCENT": "+Inf"}, wantError: `INFRAVIEW_WARNING_PERCENT 必须是 0 到 100 之间的有限数值，当前值为 "+Inf"`},
+		{name: "critical is negative infinity", overrides: map[string]string{"INFRAVIEW_CRITICAL_PERCENT": "-Inf"}, wantError: `INFRAVIEW_CRITICAL_PERCENT 必须是 0 到 100 之间的有限数值，当前值为 "-Inf"`},
+		{name: "warning equals critical", overrides: map[string]string{"INFRAVIEW_WARNING_PERCENT": "90"}, wantError: "INFRAVIEW_WARNING_PERCENT 必须低于 INFRAVIEW_CRITICAL_PERCENT"},
 	}
 
 	for _, tt := range tests {
@@ -101,8 +126,11 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected an error")
 			}
-			if !strings.Contains(err.Error(), tt.wantError) {
-				t.Fatalf("error = %q, want it to contain %q", err, tt.wantError)
+			if err.Error() != tt.wantError {
+				t.Fatalf("error = %q, want %q", err, tt.wantError)
+			}
+			if password := env["INFRAVIEW_PASSWORD"]; password != "" && strings.Contains(err.Error(), password) {
+				t.Fatalf("error leaks password: %q", err)
 			}
 		})
 	}
