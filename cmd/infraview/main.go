@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -11,8 +12,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Taier05/InfraView/internal/adapters/mock"
+	"github.com/Taier05/InfraView/internal/adapters/nightingale"
+	"github.com/Taier05/InfraView/internal/auth"
+	"github.com/Taier05/InfraView/internal/cache"
 	"github.com/Taier05/InfraView/internal/config"
+	"github.com/Taier05/InfraView/internal/datasource"
 	"github.com/Taier05/InfraView/internal/httpapi"
+	"github.com/Taier05/InfraView/internal/service"
 )
 
 type commandDependencies struct {
@@ -62,9 +69,10 @@ func runCommand(args []string, dependencies commandDependencies) error {
 }
 
 func serve(cfg config.Config) error {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           httpapi.New(httpapi.Dependencies{}),
+		Handler:           buildHandler(cfg, time.Now, logger),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	shutdownSignals := make(chan os.Signal, 1)
@@ -72,6 +80,78 @@ func serve(cfg config.Config) error {
 	defer signal.Stop(shutdownSignals)
 	return serveUntilSignal(server, shutdownSignals)
 }
+
+func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger) http.Handler {
+	var provider datasource.Provider
+	switch cfg.DataSource {
+	case "mock":
+		provider = mock.New(cfg.MockHostCount, clock)
+	case "nightingale":
+		provider = nightingale.New()
+	default:
+		provider = nightingale.New()
+	}
+	provider = withUpstreamTimeout(provider, cfg.UpstreamTimeout)
+	store := cache.New(clock)
+	queryService := service.New(provider, store, service.Options{
+		InventoryTTL:      cfg.InventoryTTL,
+		CurrentMetricsTTL: cfg.CurrentMetricsTTL,
+		RangeTTL:          cfg.RangeTTL,
+		HealthTTL:         cfg.HealthTTL,
+		MaxStale:          cfg.MaxStale,
+		WarningPercent:    cfg.WarningPercent,
+		CriticalPercent:   cfg.CriticalPercent,
+		Clock:             clock,
+	})
+	return httpapi.New(httpapi.Dependencies{
+		Config:  cfg,
+		Auth:    auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, clock),
+		Limiter: auth.NewLimiter(5, time.Minute, clock),
+		Service: queryService,
+		Logger:  logger,
+	})
+}
+
+type timeoutProvider struct {
+	provider datasource.Provider
+	timeout  time.Duration
+}
+
+func withUpstreamTimeout(provider datasource.Provider, timeout time.Duration) datasource.Provider {
+	return &timeoutProvider{provider: provider, timeout: timeout}
+}
+
+func (p *timeoutProvider) Health(ctx context.Context) (datasource.Health, error) {
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+	return p.provider.Health(ctx)
+}
+
+func (p *timeoutProvider) ListHosts(ctx context.Context) ([]datasource.Host, error) {
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+	return p.provider.ListHosts(ctx)
+}
+
+func (p *timeoutProvider) GetHost(ctx context.Context, id string) (datasource.Host, error) {
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+	return p.provider.GetHost(ctx, id)
+}
+
+func (p *timeoutProvider) GetCurrentMetrics(ctx context.Context, ids []string) (map[string]datasource.CurrentMetrics, error) {
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+	return p.provider.GetCurrentMetrics(ctx, ids)
+}
+
+func (p *timeoutProvider) QueryRange(ctx context.Context, request datasource.RangeRequest) ([]datasource.Series, error) {
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+	return p.provider.QueryRange(ctx, request)
+}
+
+var _ datasource.Provider = (*timeoutProvider)(nil)
 
 func serveUntilSignal(server httpServer, shutdownSignals <-chan os.Signal) error {
 	serverErr := make(chan error, 1)

@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Taier05/InfraView/internal/config"
+	"github.com/Taier05/InfraView/internal/datasource"
 )
 
 func TestRunCommandRequiresExactlyOneCommand(t *testing.T) {
@@ -160,6 +163,54 @@ func TestHealthcheckReportsNonOKStatusInChinese(t *testing.T) {
 	}
 }
 
+func TestBuildHandlerWiresAuthenticatedMockAPI(t *testing.T) {
+	cfg := config.Config{
+		Username:          "admin",
+		Password:          "correct-password",
+		SessionTTL:        12 * time.Hour,
+		DataSource:        "mock",
+		MockHostCount:     3,
+		InventoryTTL:      time.Minute,
+		CurrentMetricsTTL: 20 * time.Second,
+		RangeTTL:          time.Minute,
+		HealthTTL:         15 * time.Second,
+		MaxStale:          5 * time.Minute,
+		UpstreamTimeout:   10 * time.Second,
+		WarningPercent:    80,
+		CriticalPercent:   90,
+	}
+	handler := buildHandler(cfg, time.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/session", strings.NewReader(`{"username":"admin","password":"correct-password"}`))
+	login := httptest.NewRecorder()
+	handler.ServeHTTP(login, loginRequest)
+	if login.Code != http.StatusNoContent || len(login.Result().Cookies()) != 1 {
+		t.Fatalf("login response = %d, cookies = %#v, body = %s", login.Code, login.Result().Cookies(), login.Body.String())
+	}
+
+	overviewRequest := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/overview?range=24h", nil)
+	overviewRequest.AddCookie(login.Result().Cookies()[0])
+	overview := httptest.NewRecorder()
+	handler.ServeHTTP(overview, overviewRequest)
+	if overview.Code != http.StatusOK || !strings.Contains(overview.Body.String(), `"total":3`) {
+		t.Fatalf("overview response = %d %s", overview.Code, overview.Body.String())
+	}
+}
+
+func TestUpstreamTimeoutProviderAddsDeadlineToEveryCall(t *testing.T) {
+	provider := &deadlineCheckingProvider{t: t}
+	timed := withUpstreamTimeout(provider, time.Hour)
+	ctx := context.Background()
+	_, _ = timed.Health(ctx)
+	_, _ = timed.ListHosts(ctx)
+	_, _ = timed.GetHost(ctx, "host-1")
+	_, _ = timed.GetCurrentMetrics(ctx, []string{"host-1"})
+	_, _ = timed.QueryRange(ctx, datasource.RangeRequest{HostIDs: []string{"host-1"}})
+	if provider.calls != 5 {
+		t.Fatalf("provider calls = %d, want 5", provider.calls)
+	}
+}
+
 func TestServeUntilSignalReportsStartupErrorInChinese(t *testing.T) {
 	server := &controlledServer{listenErr: errors.New("bind: address already in use")}
 	err := serveUntilSignal(server, make(chan os.Signal))
@@ -232,6 +283,51 @@ type controlledServer struct {
 	shutdownErr     error
 	stopOnce        sync.Once
 }
+
+type deadlineCheckingProvider struct {
+	t     *testing.T
+	calls int
+}
+
+func (p *deadlineCheckingProvider) check(ctx context.Context) {
+	p.t.Helper()
+	p.calls++
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		p.t.Fatal("provider context has no deadline")
+	}
+	remaining := time.Until(deadline)
+	if remaining < 59*time.Minute || remaining > time.Hour {
+		p.t.Fatalf("provider deadline remaining = %s", remaining)
+	}
+}
+
+func (p *deadlineCheckingProvider) Health(ctx context.Context) (datasource.Health, error) {
+	p.check(ctx)
+	return datasource.Health{}, nil
+}
+
+func (p *deadlineCheckingProvider) ListHosts(ctx context.Context) ([]datasource.Host, error) {
+	p.check(ctx)
+	return nil, nil
+}
+
+func (p *deadlineCheckingProvider) GetHost(ctx context.Context, _ string) (datasource.Host, error) {
+	p.check(ctx)
+	return datasource.Host{}, nil
+}
+
+func (p *deadlineCheckingProvider) GetCurrentMetrics(ctx context.Context, _ []string) (map[string]datasource.CurrentMetrics, error) {
+	p.check(ctx)
+	return nil, nil
+}
+
+func (p *deadlineCheckingProvider) QueryRange(ctx context.Context, _ datasource.RangeRequest) ([]datasource.Series, error) {
+	p.check(ctx)
+	return nil, nil
+}
+
+var _ datasource.Provider = (*deadlineCheckingProvider)(nil)
 
 func newControlledServer() *controlledServer {
 	return &controlledServer{

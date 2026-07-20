@@ -1,20 +1,340 @@
 package httpapi
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/Taier05/InfraView/internal/adapters/mock"
+	"github.com/Taier05/InfraView/internal/auth"
+	"github.com/Taier05/InfraView/internal/cache"
+	"github.com/Taier05/InfraView/internal/config"
+	"github.com/Taier05/InfraView/internal/datasource"
+	"github.com/Taier05/InfraView/internal/service"
 )
 
-func TestHealthz(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
-	rec := httptest.NewRecorder()
-	New(Dependencies{}).ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d", rec.Code)
+func TestHealthzRemainsPublic(t *testing.T) {
+	response := request(t, newTestAPI(t, mock.New(3, testNow)), http.MethodGet, "/healthz", "", nil)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d", response.Code)
 	}
-	if strings.TrimSpace(rec.Body.String()) != `{"status":"ok"}` {
-		t.Fatalf("body = %q", rec.Body.String())
+	if strings.TrimSpace(response.Body.String()) != `{"status":"ok"}` {
+		t.Fatalf("body = %q", response.Body.String())
+	}
+	assertSecurityHeaders(t, response)
+}
+
+func TestProtectedRoutesRequireAuthentication(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	paths := []string{
+		"/api/v1/session",
+		"/api/v1/overview?range=24h",
+		"/api/v1/hosts?q=linux&status=online&sort=cpu&order=desc&page=1&page_size=20",
+		"/api/v1/hosts/mock-host-001",
+		"/api/v1/hosts/mock-host-001/metrics?range=6h",
+		"/api/v1/datasource/status",
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			response := request(t, handler, http.MethodGet, path, "", nil)
+			assertError(t, response, http.StatusUnauthorized, "unauthorized", "请先登录")
+			assertSecurityHeaders(t, response)
+			if response.Header().Get("Cache-Control") != "no-store" {
+				t.Fatalf("Cache-Control = %q", response.Header().Get("Cache-Control"))
+			}
+		})
 	}
 }
+
+func TestLoginSessionAndLogout(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	login := request(t, handler, http.MethodPost, "/api/v1/session", `{"username":"admin","password":"correct-password"}`, nil)
+	if login.Code != http.StatusNoContent || login.Body.Len() != 0 {
+		t.Fatalf("login response = %d %q", login.Code, login.Body.String())
+	}
+	cookies := login.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("cookies = %#v", cookies)
+	}
+	cookie := cookies[0]
+	if cookie.Name != sessionCookieName || cookie.Value == "" || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode || cookie.Path != "/api/v1" {
+		t.Fatalf("session cookie = %#v", cookie)
+	}
+
+	session := request(t, handler, http.MethodGet, "/api/v1/session", "", cookie)
+	if session.Code != http.StatusOK {
+		t.Fatalf("session status = %d, body = %s", session.Code, session.Body.String())
+	}
+	var body struct {
+		Data struct {
+			Authenticated bool   `json:"authenticated"`
+			Username      string `json:"username"`
+		} `json:"data"`
+		Meta ResponseMeta `json:"meta"`
+	}
+	decodeJSON(t, session, &body)
+	if !body.Data.Authenticated || body.Data.Username != "admin" || body.Meta.RequestID == "" || body.Meta.Stale || !body.Meta.CollectedAt.IsZero() {
+		t.Fatalf("session body = %#v", body)
+	}
+
+	logoutRequest := httptest.NewRequest(http.MethodDelete, "http://example.com/api/v1/session", nil)
+	logoutRequest.AddCookie(cookie)
+	logout := httptest.NewRecorder()
+	handler.ServeHTTP(logout, logoutRequest)
+	if logout.Code != http.StatusNoContent || logout.Body.Len() != 0 {
+		t.Fatalf("logout response = %d %q", logout.Code, logout.Body.String())
+	}
+	cleared := logout.Result().Cookies()
+	if len(cleared) != 1 || cleared[0].MaxAge >= 0 || cleared[0].Value != "" {
+		t.Fatalf("cleared cookie = %#v", cleared)
+	}
+	assertError(t, request(t, handler, http.MethodGet, "/api/v1/session", "", cookie), http.StatusUnauthorized, "unauthorized", "请先登录")
+}
+
+func TestLoginRejectsCrossOriginAndMalformedBodies(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+
+	crossOriginRequest := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/session", strings.NewReader(`{"username":"admin","password":"correct-password"}`))
+	crossOriginRequest.Header.Set("Origin", "https://evil.example")
+	crossOrigin := httptest.NewRecorder()
+	handler.ServeHTTP(crossOrigin, crossOriginRequest)
+	assertError(t, crossOrigin, http.StatusForbidden, "cross_origin_forbidden", "不允许跨域请求")
+
+	unknown := request(t, handler, http.MethodPost, "/api/v1/session", `{"username":"admin","password":"correct-password","token":"secret"}`, nil)
+	assertError(t, unknown, http.StatusBadRequest, "invalid_request", "登录请求格式无效")
+	if strings.Contains(unknown.Body.String(), "token") || strings.Contains(unknown.Body.String(), "secret") {
+		t.Fatalf("response leaks submitted field: %s", unknown.Body.String())
+	}
+
+	oversized := request(t, handler, http.MethodPost, "/api/v1/session", strings.Repeat("x", 4097), nil)
+	assertError(t, oversized, http.StatusBadRequest, "invalid_request", "登录请求格式无效")
+}
+
+func TestLoginRateLimitBlocksSixthFailure(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	for attempt := 1; attempt <= 5; attempt++ {
+		response := request(t, handler, http.MethodPost, "/api/v1/session", `{"username":"admin","password":"wrong-password"}`, nil)
+		assertError(t, response, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
+	}
+	sixth := request(t, handler, http.MethodPost, "/api/v1/session", `{"username":"admin","password":"wrong-password"}`, nil)
+	assertError(t, sixth, http.StatusTooManyRequests, "rate_limited", "登录尝试过于频繁，请稍后重试")
+}
+
+func TestAuthenticatedReadOnlyQueriesUseApprovedSnakeCaseViews(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	cookie := loginCookie(t, handler)
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "overview", path: "/api/v1/overview?range=24h"},
+		{name: "hosts", path: "/api/v1/hosts?q=linux&status=online&sort=cpu&order=desc&page=1&page_size=20"},
+		{name: "host", path: "/api/v1/hosts/mock-host-001"},
+		{name: "metrics", path: "/api/v1/hosts/mock-host-001/metrics?range=6h"},
+		{name: "datasource", path: "/api/v1/datasource/status"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			response := request(t, handler, http.MethodGet, test.path, "", cookie)
+			if response.Code != http.StatusOK {
+				t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+			}
+			var envelope map[string]json.RawMessage
+			decodeJSON(t, response, &envelope)
+			if len(envelope) != 2 || envelope["data"] == nil || envelope["meta"] == nil {
+				t.Fatalf("envelope = %s", response.Body.String())
+			}
+			if strings.Contains(response.Body.String(), `"HostID"`) || strings.Contains(response.Body.String(), `"CPUUsage"`) || strings.Contains(response.Body.String(), `"Uptime"`) {
+				t.Fatalf("response contains Go field names: %s", response.Body.String())
+			}
+			assertSecurityHeaders(t, response)
+		})
+	}
+
+	hosts := request(t, handler, http.MethodGet, tests[1].path, "", cookie)
+	var hostPage struct {
+		Data struct {
+			Hosts []struct {
+				ID            string `json:"id"`
+				UptimeSeconds int64  `json:"uptime_seconds"`
+			} `json:"hosts"`
+			Page       int `json:"page"`
+			PageSize   int `json:"page_size"`
+			Total      int `json:"total"`
+			TotalPages int `json:"total_pages"`
+		} `json:"data"`
+	}
+	decodeJSON(t, hosts, &hostPage)
+	if len(hostPage.Data.Hosts) != 3 || hostPage.Data.Page != 1 || hostPage.Data.PageSize != 20 || hostPage.Data.Total != 3 || hostPage.Data.TotalPages != 1 || hostPage.Data.Hosts[0].UptimeSeconds <= 0 {
+		t.Fatalf("host page = %#v", hostPage.Data)
+	}
+}
+
+func TestQueryValidationAndMissingHost(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	cookie := loginCookie(t, handler)
+	tests := []struct {
+		path    string
+		status  int
+		code    string
+		message string
+	}{
+		{path: "/api/v1/overview?range=2h", status: http.StatusBadRequest, code: "invalid_range", message: "时间范围无效"},
+		{path: "/api/v1/hosts?page=0&page_size=20", status: http.StatusBadRequest, code: "invalid_query", message: "查询参数无效"},
+		{path: "/api/v1/hosts?sort=password&page=1&page_size=20", status: http.StatusBadRequest, code: "invalid_query", message: "查询参数无效"},
+		{path: "/api/v1/hosts/mock-host-001/metrics?range=2h", status: http.StatusBadRequest, code: "invalid_range", message: "时间范围无效"},
+		{path: "/api/v1/hosts/unknown-host", status: http.StatusNotFound, code: "host_not_found", message: "该主机当前不在数据源中"},
+	}
+	for _, test := range tests {
+		response := request(t, handler, http.MethodGet, test.path, "", cookie)
+		assertError(t, response, test.status, test.code, test.message)
+	}
+}
+
+func TestUnavailableSourceReturnsSanitized503WithoutStaleData(t *testing.T) {
+	handler := newTestAPI(t, unavailableProvider{})
+	cookie := loginCookie(t, handler)
+	response := request(t, handler, http.MethodGet, "/api/v1/overview?range=24h", "", cookie)
+	assertError(t, response, http.StatusServiceUnavailable, "datasource_unavailable", "数据源暂时不可用，请稍后重试")
+	if strings.Contains(response.Body.String(), "upstream-secret") {
+		t.Fatalf("response leaks upstream error: %s", response.Body.String())
+	}
+}
+
+func TestBusinessWriteRoutesAreNotRegistered(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	cookie := loginCookie(t, handler)
+	for _, path := range []string{"/api/v1/overview", "/api/v1/hosts", "/api/v1/hosts/mock-host-001", "/api/v1/proxy", "/api/v1/query"} {
+		response := request(t, handler, http.MethodPost, path, `{}`, cookie)
+		if response.Code != http.StatusMethodNotAllowed && response.Code != http.StatusNotFound {
+			t.Fatalf("POST %s status = %d", path, response.Code)
+		}
+		if strings.Contains(response.Body.String(), "Method Not Allowed") || strings.Contains(response.Body.String(), "404 page not found") {
+			t.Fatalf("POST %s has non-Chinese error: %q", path, response.Body.String())
+		}
+	}
+}
+
+func newTestAPI(t *testing.T, provider datasource.Provider) http.Handler {
+	t.Helper()
+	cfg := config.Config{
+		Username:          "admin",
+		Password:          "correct-password",
+		SessionTTL:        12 * time.Hour,
+		DataSource:        "mock",
+		InventoryTTL:      time.Minute,
+		CurrentMetricsTTL: 20 * time.Second,
+		RangeTTL:          time.Minute,
+		HealthTTL:         15 * time.Second,
+		MaxStale:          5 * time.Minute,
+		WarningPercent:    80,
+		CriticalPercent:   90,
+	}
+	return New(Dependencies{
+		Config:  cfg,
+		Auth:    auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, testNow),
+		Limiter: auth.NewLimiter(5, time.Minute, testNow),
+		Service: service.New(provider, cache.New(testNow), service.Options{
+			InventoryTTL:      cfg.InventoryTTL,
+			CurrentMetricsTTL: cfg.CurrentMetricsTTL,
+			RangeTTL:          cfg.RangeTTL,
+			HealthTTL:         cfg.HealthTTL,
+			MaxStale:          cfg.MaxStale,
+			WarningPercent:    cfg.WarningPercent,
+			CriticalPercent:   cfg.CriticalPercent,
+			Clock:             testNow,
+		}),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+}
+
+func loginCookie(t *testing.T, handler http.Handler) *http.Cookie {
+	t.Helper()
+	response := request(t, handler, http.MethodPost, "/api/v1/session", `{"username":"admin","password":"correct-password"}`, nil)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("login status = %d, body = %s", response.Code, response.Body.String())
+	}
+	return response.Result().Cookies()[0]
+}
+
+func request(t *testing.T, handler http.Handler, method, path, body string, cookie *http.Cookie) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(method, "http://example.com"+path, strings.NewReader(body))
+	req.RemoteAddr = "192.0.2.10:12345"
+	if cookie != nil {
+		req.AddCookie(cookie)
+	}
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	return recorder
+}
+
+func decodeJSON(t *testing.T, response *httptest.ResponseRecorder, target any) {
+	t.Helper()
+	if err := json.Unmarshal(response.Body.Bytes(), target); err != nil {
+		t.Fatalf("decode %q: %v", response.Body.String(), err)
+	}
+}
+
+func assertError(t *testing.T, response *httptest.ResponseRecorder, status int, code, message string) {
+	t.Helper()
+	if response.Code != status {
+		t.Fatalf("status = %d, want %d, body = %s", response.Code, status, response.Body.String())
+	}
+	var body ErrorBody
+	decodeJSON(t, response, &body)
+	if body.Code != code || body.Message != message || body.RequestID == "" {
+		t.Fatalf("error body = %#v", body)
+	}
+}
+
+func assertSecurityHeaders(t *testing.T, response *httptest.ResponseRecorder) {
+	t.Helper()
+	want := map[string]string{
+		"Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'",
+		"X-Content-Type-Options":  "nosniff",
+		"X-Frame-Options":         "DENY",
+		"Referrer-Policy":         "no-referrer",
+	}
+	for name, value := range want {
+		if got := response.Header().Get(name); got != value {
+			t.Fatalf("%s = %q, want %q", name, got, value)
+		}
+	}
+}
+
+func testNow() time.Time {
+	return time.Date(2026, 7, 20, 10, 0, 0, 0, time.UTC)
+}
+
+type unavailableProvider struct{}
+
+func (unavailableProvider) Health(context.Context) (datasource.Health, error) {
+	return datasource.Health{}, errors.Join(datasource.ErrUnavailable, errors.New("upstream-secret"))
+}
+
+func (unavailableProvider) ListHosts(context.Context) ([]datasource.Host, error) {
+	return nil, errors.Join(datasource.ErrUnavailable, errors.New("upstream-secret"))
+}
+
+func (unavailableProvider) GetHost(context.Context, string) (datasource.Host, error) {
+	return datasource.Host{}, errors.Join(datasource.ErrUnavailable, errors.New("upstream-secret"))
+}
+
+func (unavailableProvider) GetCurrentMetrics(context.Context, []string) (map[string]datasource.CurrentMetrics, error) {
+	return nil, errors.Join(datasource.ErrUnavailable, errors.New("upstream-secret"))
+}
+
+func (unavailableProvider) QueryRange(context.Context, datasource.RangeRequest) ([]datasource.Series, error) {
+	return nil, errors.Join(datasource.ErrUnavailable, errors.New("upstream-secret"))
+}
+
+var _ datasource.Provider = unavailableProvider{}
