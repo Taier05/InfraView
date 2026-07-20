@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -130,11 +131,21 @@ func TestLoginRateLimitBlocksSixthFailure(t *testing.T) {
 }
 
 func TestConcurrentInvalidLoginsCannotBypassFailureLimit(t *testing.T) {
-	handler := newTestAPI(t, mock.New(3, testNow))
-	for attempt := 1; attempt <= 4; attempt++ {
-		response := request(t, handler, http.MethodPost, "/api/v1/session", `{"username":"admin","password":"wrong-password"}`, nil)
-		assertError(t, response, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
+	limiter := auth.NewLimiter(5, time.Minute, testNow)
+	for range 4 {
+		limiter.RecordFailure("192.0.2.10")
 	}
+	var verifications atomic.Int64
+	server := &api{
+		config:  config.Config{DataSource: "mock"},
+		limiter: limiter,
+		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+		verifyLogin: func(string, string) (auth.Session, bool) {
+			verifications.Add(1)
+			return auth.Session{}, false
+		},
+	}
+	handler := server.middleware(server.sameOrigin(http.HandlerFunc(server.login)))
 
 	const concurrentAttempts = 64
 	start := make(chan struct{})
@@ -170,6 +181,9 @@ func TestConcurrentInvalidLoginsCannotBypassFailureLimit(t *testing.T) {
 	}
 	if unauthorized != 1 || rateLimited != concurrentAttempts-1 {
 		t.Fatalf("concurrent statuses: 401=%d, 429=%d; want 1 and %d", unauthorized, rateLimited, concurrentAttempts-1)
+	}
+	if got := verifications.Load(); got != 1 {
+		t.Fatalf("credential verifications = %d, want 1", got)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Taier05/InfraView/internal/auth"
 	"github.com/Taier05/InfraView/internal/service"
 )
 
@@ -23,12 +24,6 @@ type sessionView struct {
 
 func (a *api) login(w http.ResponseWriter, r *http.Request) {
 	ip := clientIP(r)
-	if !a.limiter.Allow(ip) {
-		w.Header().Set("Retry-After", "60")
-		writeError(w, r, http.StatusTooManyRequests, "rate_limited", "登录尝试过于频繁，请稍后重试", true)
-		return
-	}
-
 	var submitted loginRequest
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxLoginBodyBytes))
 	decoder.DisallowUnknownFields()
@@ -41,17 +36,21 @@ func (a *api) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, ok := a.auth.Login(submitted.Username, submitted.Password)
-	if !ok {
-		if !a.limiter.RecordFailure(ip) {
-			w.Header().Set("Retry-After", "60")
-			writeError(w, r, http.StatusTooManyRequests, "rate_limited", "登录尝试过于频繁，请稍后重试", true)
-			return
-		}
+	var session auth.Session
+	allowed, success := a.limiter.Attempt(ip, func() bool {
+		var verified bool
+		session, verified = a.verifyLogin(submitted.Username, submitted.Password)
+		return verified
+	})
+	if !allowed {
+		w.Header().Set("Retry-After", "60")
+		writeError(w, r, http.StatusTooManyRequests, "rate_limited", "登录尝试过于频繁，请稍后重试", true)
+		return
+	}
+	if !success {
 		writeError(w, r, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误", false)
 		return
 	}
-	a.limiter.Reset(ip)
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    session.Token,

@@ -23,11 +23,12 @@ type Dependencies struct {
 }
 
 type api struct {
-	config  config.Config
-	auth    *auth.Manager
-	limiter *auth.Limiter
-	service *service.Service
-	logger  *slog.Logger
+	config      config.Config
+	auth        *auth.Manager
+	limiter     *auth.Limiter
+	service     *service.Service
+	logger      *slog.Logger
+	verifyLogin func(string, string) (auth.Session, bool)
 }
 
 func New(dependencies Dependencies) http.Handler {
@@ -47,11 +48,12 @@ func New(dependencies Dependencies) http.Handler {
 		dependencies.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	server := &api{
-		config:  dependencies.Config,
-		auth:    dependencies.Auth,
-		limiter: dependencies.Limiter,
-		service: dependencies.Service,
-		logger:  dependencies.Logger,
+		config:      dependencies.Config,
+		auth:        dependencies.Auth,
+		limiter:     dependencies.Limiter,
+		service:     dependencies.Service,
+		logger:      dependencies.Logger,
+		verifyLogin: dependencies.Auth.Login,
 	}
 
 	mux := http.NewServeMux()
