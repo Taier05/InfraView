@@ -61,6 +61,10 @@ func TestProviderIsDeterministicWithFixedClock(t *testing.T) {
 	secondHosts, secondHostsErr := provider.ListHosts(ctx)
 	assertDeepEqual(t, "ListHosts result", []any{firstHosts, firstHostsErr}, []any{secondHosts, secondHostsErr})
 
+	firstHost, firstHostErr := provider.GetHost(ctx, hostIDs[0])
+	secondHost, secondHostErr := provider.GetHost(ctx, hostIDs[0])
+	assertDeepEqual(t, "GetHost result", []any{firstHost, firstHostErr}, []any{secondHost, secondHostErr})
+
 	firstMetrics, firstMetricsErr := provider.GetCurrentMetrics(ctx, hostIDs)
 	secondMetrics, secondMetricsErr := provider.GetCurrentMetrics(ctx, hostIDs)
 	assertDeepEqual(t, "GetCurrentMetrics result", []any{firstMetrics, firstMetricsErr}, []any{secondMetrics, secondMetricsErr})

@@ -3,7 +3,6 @@ package datasource_test
 import (
 	"context"
 	"errors"
-	"reflect"
 	"testing"
 	"time"
 
@@ -11,6 +10,19 @@ import (
 	"github.com/Taier05/InfraView/internal/adapters/nightingale"
 	"github.com/Taier05/InfraView/internal/datasource"
 )
+
+func TestHostStatusValues(t *testing.T) {
+	statuses := map[datasource.HostStatus]string{
+		datasource.StatusOnline:  "online",
+		datasource.StatusOffline: "offline",
+		datasource.StatusUnknown: "unknown",
+	}
+	for status, want := range statuses {
+		if string(status) != want {
+			t.Fatalf("status = %q, want %q", status, want)
+		}
+	}
+}
 
 func RunContract(t *testing.T, provider datasource.Provider) {
 	t.Helper()
@@ -24,31 +36,28 @@ func RunContract(t *testing.T, provider datasource.Provider) {
 		t.Fatal("ListHosts() returned an empty inventory")
 	}
 
-	seen := make(map[string]struct{}, len(hosts))
-	for _, host := range hosts {
-		if host.ID == "" {
-			t.Fatal("ListHosts() returned a host with an empty ID")
-		}
-		if _, exists := seen[host.ID]; exists {
-			t.Fatalf("ListHosts() returned duplicate ID %q", host.ID)
-		}
-		seen[host.ID] = struct{}{}
-	}
+	firstIDs := collectHostIDs(t, hosts)
 
 	again, err := provider.ListHosts(ctx)
 	if err != nil {
 		t.Fatalf("second ListHosts() error = %v", err)
 	}
-	if !reflect.DeepEqual(hosts, again) {
-		t.Fatal("ListHosts() returned unstable inventory")
+	againIDs := collectHostIDs(t, again)
+	if len(firstIDs) != len(againIDs) {
+		t.Fatalf("ListHosts() returned %d stable IDs, then %d", len(firstIDs), len(againIDs))
+	}
+	for hostID := range firstIDs {
+		if _, ok := againIDs[hostID]; !ok {
+			t.Fatalf("ListHosts() did not preserve host ID %q", hostID)
+		}
 	}
 
 	gotHost, err := provider.GetHost(ctx, hosts[0].ID)
 	if err != nil {
 		t.Fatalf("GetHost(%q) error = %v", hosts[0].ID, err)
 	}
-	if !reflect.DeepEqual(gotHost, hosts[0]) {
-		t.Fatalf("GetHost(%q) = %#v, want %#v", hosts[0].ID, gotHost, hosts[0])
+	if gotHost.ID != hosts[0].ID {
+		t.Fatalf("GetHost(%q) returned ID %q", hosts[0].ID, gotHost.ID)
 	}
 
 	batchSize := min(3, len(hosts))
@@ -106,9 +115,67 @@ func RunContract(t *testing.T, provider datasource.Provider) {
 	}
 }
 
+func collectHostIDs(t *testing.T, hosts []datasource.Host) map[string]struct{} {
+	t.Helper()
+	ids := make(map[string]struct{}, len(hosts))
+	for _, host := range hosts {
+		if host.ID == "" {
+			t.Fatal("ListHosts() returned a host with an empty ID")
+		}
+		if _, exists := ids[host.ID]; exists {
+			t.Fatalf("ListHosts() returned duplicate ID %q", host.ID)
+		}
+		ids[host.ID] = struct{}{}
+	}
+	return ids
+}
+
 func TestMockProviderContract(t *testing.T) {
 	fixed := time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC)
 	RunContract(t, mock.New(20, func() time.Time { return fixed }))
+}
+
+func TestProviderContractAllowsDynamicHostFields(t *testing.T) {
+	fixed := time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC)
+	RunContract(t, &dynamicHostProvider{
+		Provider: mock.New(3, func() time.Time { return fixed }),
+	})
+}
+
+type dynamicHostProvider struct {
+	datasource.Provider
+	listCalls int
+	getCalls  int
+}
+
+func (p *dynamicHostProvider) ListHosts(ctx context.Context) ([]datasource.Host, error) {
+	hosts, err := p.Provider.ListHosts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	p.listCalls++
+	for i := range hosts {
+		hosts[i].StatusTime = hosts[i].StatusTime.Add(time.Duration(p.listCalls) * time.Minute)
+		hosts[i].Uptime += time.Duration(p.listCalls) * time.Minute
+	}
+	if p.listCalls%2 == 0 {
+		for left, right := 0, len(hosts)-1; left < right; left, right = left+1, right-1 {
+			hosts[left], hosts[right] = hosts[right], hosts[left]
+		}
+	}
+	return hosts, nil
+}
+
+func (p *dynamicHostProvider) GetHost(ctx context.Context, hostID string) (datasource.Host, error) {
+	host, err := p.Provider.GetHost(ctx, hostID)
+	if err != nil {
+		return datasource.Host{}, err
+	}
+	p.getCalls++
+	dynamicOffset := time.Hour + time.Duration(p.getCalls)*time.Minute
+	host.StatusTime = host.StatusTime.Add(dynamicOffset)
+	host.Uptime += dynamicOffset
+	return host, nil
 }
 
 func TestNightingaleProviderIsNotConfigured(t *testing.T) {

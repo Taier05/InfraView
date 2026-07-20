@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-type Status string
+type HostStatus string
 
 const (
-	StatusOnline  Status = "online"
-	StatusOffline Status = "offline"
-	StatusUnknown Status = "unknown"
+	StatusOnline  HostStatus = "online"
+	StatusOffline HostStatus = "offline"
+	StatusUnknown HostStatus = "unknown"
 )
 
 type MetricKey string
@@ -36,7 +36,7 @@ type Host struct {
 	Name       string
 	IP         string
 	OS         string
-	Status     Status
+	Status     HostStatus
 	StatusTime time.Time
 	Uptime     time.Duration
 }
