@@ -94,3 +94,22 @@ func TestManagerSupportsConcurrentValidation(t *testing.T) {
 	}
 	wait.Wait()
 }
+
+func TestManagerInvalidLoginPrunesExpiredSessions(t *testing.T) {
+	now := time.Date(2026, 7, 20, 10, 0, 0, 0, time.UTC)
+	manager := NewManager("admin", "correct-password", time.Hour, nil, func() time.Time { return now })
+	if _, ok := manager.Login("admin", "correct-password"); !ok {
+		t.Fatal("login failed")
+	}
+	if len(manager.sessions) != 1 {
+		t.Fatalf("sessions before expiry = %d, want 1", len(manager.sessions))
+	}
+
+	now = now.Add(time.Hour)
+	if _, ok := manager.Login("admin", "wrong-password"); ok {
+		t.Fatal("invalid password was accepted")
+	}
+	if len(manager.sessions) != 0 {
+		t.Fatalf("sessions after invalid login = %d, want 0", len(manager.sessions))
+	}
+}

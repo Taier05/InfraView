@@ -49,6 +49,10 @@ func (m *Manager) Login(username, password string) (Session, bool) {
 	passwordHash := sha256.Sum256([]byte(password))
 	usernameOK := subtle.ConstantTimeCompare(usernameHash[:], m.usernameHash[:])
 	passwordOK := subtle.ConstantTimeCompare(passwordHash[:], m.passwordHash[:])
+	now := m.clock()
+	m.mu.Lock()
+	m.pruneExpired(now)
+	m.mu.Unlock()
 	if usernameOK&passwordOK != 1 {
 		return Session{}, false
 	}
@@ -59,7 +63,7 @@ func (m *Manager) Login(username, password string) (Session, bool) {
 	}
 	token := base64.RawURLEncoding.EncodeToString(raw)
 	tokenHash := sha256.Sum256([]byte(token))
-	now := m.clock()
+	now = m.clock()
 	expiresAt := now.Add(m.ttl)
 
 	m.mu.Lock()

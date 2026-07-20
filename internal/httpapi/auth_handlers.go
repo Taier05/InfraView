@@ -43,7 +43,11 @@ func (a *api) login(w http.ResponseWriter, r *http.Request) {
 
 	session, ok := a.auth.Login(submitted.Username, submitted.Password)
 	if !ok {
-		a.limiter.RecordFailure(ip)
+		if !a.limiter.RecordFailure(ip) {
+			w.Header().Set("Retry-After", "60")
+			writeError(w, r, http.StatusTooManyRequests, "rate_limited", "登录尝试过于频繁，请稍后重试", true)
+			return
+		}
 		writeError(w, r, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误", false)
 		return
 	}

@@ -73,7 +73,7 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("/api/", server.notFound)
 	mux.HandleFunc("/", server.notFound)
 
-	return server.withRequestID(server.withSecurityHeaders(server.withRecovery(server.withLogging(mux))))
+	return server.middleware(mux)
 }
 
 func (a *api) healthz(w http.ResponseWriter, _ *http.Request) {

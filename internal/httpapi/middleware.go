@@ -20,6 +20,10 @@ type requestState struct {
 	stale bool
 }
 
+func (a *api) middleware(next http.Handler) http.Handler {
+	return a.withRequestID(a.withSecurityHeaders(a.withLogging(a.withRecovery(next))))
+}
+
 func (a *api) withRequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		state := &requestState{id: newRequestID()}

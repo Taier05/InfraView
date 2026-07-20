@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const maxLimiterEntries = 4096
+
 type Limiter struct {
 	mu       sync.Mutex
 	limit    int
@@ -34,36 +36,61 @@ func (l *Limiter) Allow(ip string) bool {
 	now := l.clock()
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	failures, ok := l.current(ip, now)
+	l.pruneExpired(now)
+	failures, ok := l.current(ip)
 	return !ok || failures.count < l.limit
 }
 
-func (l *Limiter) RecordFailure(ip string) {
+func (l *Limiter) RecordFailure(ip string) bool {
 	now := l.clock()
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	failures, ok := l.current(ip, now)
+	l.pruneExpired(now)
+	failures, ok := l.current(ip)
 	if !ok {
 		failures.startedAt = now
+		l.ensureCapacity()
+	}
+	if failures.count >= l.limit {
+		return false
 	}
 	failures.count++
 	l.failures[ip] = failures
+	return true
 }
 
 func (l *Limiter) Reset(ip string) {
+	now := l.clock()
 	l.mu.Lock()
+	l.pruneExpired(now)
 	delete(l.failures, ip)
 	l.mu.Unlock()
 }
 
-func (l *Limiter) current(ip string, now time.Time) (failureWindow, bool) {
+func (l *Limiter) current(ip string) (failureWindow, bool) {
 	failures, ok := l.failures[ip]
-	if !ok {
-		return failureWindow{}, false
+	return failures, ok
+}
+
+func (l *Limiter) pruneExpired(now time.Time) {
+	for ip, failures := range l.failures {
+		if now.Sub(failures.startedAt) >= l.window {
+			delete(l.failures, ip)
+		}
 	}
-	if now.Sub(failures.startedAt) >= l.window {
-		delete(l.failures, ip)
-		return failureWindow{}, false
+}
+
+func (l *Limiter) ensureCapacity() {
+	if len(l.failures) < maxLimiterEntries {
+		return
 	}
-	return failures, true
+	var oldestIP string
+	var oldestStartedAt time.Time
+	for ip, failures := range l.failures {
+		if oldestIP == "" || failures.startedAt.Before(oldestStartedAt) {
+			oldestIP = ip
+			oldestStartedAt = failures.startedAt
+		}
+	}
+	delete(l.failures, oldestIP)
 }

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -127,6 +129,50 @@ func TestLoginRateLimitBlocksSixthFailure(t *testing.T) {
 	assertError(t, sixth, http.StatusTooManyRequests, "rate_limited", "登录尝试过于频繁，请稍后重试")
 }
 
+func TestConcurrentInvalidLoginsCannotBypassFailureLimit(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	for attempt := 1; attempt <= 4; attempt++ {
+		response := request(t, handler, http.MethodPost, "/api/v1/session", `{"username":"admin","password":"wrong-password"}`, nil)
+		assertError(t, response, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
+	}
+
+	const concurrentAttempts = 64
+	start := make(chan struct{})
+	statuses := make(chan int, concurrentAttempts)
+	var wait sync.WaitGroup
+	wait.Add(concurrentAttempts)
+	for range concurrentAttempts {
+		go func() {
+			defer wait.Done()
+			<-start
+			req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/session", strings.NewReader(`{"username":"admin","password":"wrong-password"}`))
+			req.RemoteAddr = "192.0.2.10:12345"
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, req)
+			statuses <- recorder.Code
+		}()
+	}
+	close(start)
+	wait.Wait()
+	close(statuses)
+
+	unauthorized := 0
+	rateLimited := 0
+	for status := range statuses {
+		switch status {
+		case http.StatusUnauthorized:
+			unauthorized++
+		case http.StatusTooManyRequests:
+			rateLimited++
+		default:
+			t.Fatalf("unexpected concurrent login status = %d", status)
+		}
+	}
+	if unauthorized != 1 || rateLimited != concurrentAttempts-1 {
+		t.Fatalf("concurrent statuses: 401=%d, 429=%d; want 1 and %d", unauthorized, rateLimited, concurrentAttempts-1)
+	}
+}
+
 func TestAuthenticatedReadOnlyQueriesUseApprovedSnakeCaseViews(t *testing.T) {
 	handler := newTestAPI(t, mock.New(3, testNow))
 	cookie := loginCookie(t, handler)
@@ -220,6 +266,40 @@ func TestBusinessWriteRoutesAreNotRegistered(t *testing.T) {
 		if strings.Contains(response.Body.String(), "Method Not Allowed") || strings.Contains(response.Body.String(), "404 page not found") {
 			t.Fatalf("POST %s has non-Chinese error: %q", path, response.Body.String())
 		}
+	}
+}
+
+func TestMiddlewareLogsRecoveredPanicAs500(t *testing.T) {
+	var logs bytes.Buffer
+	server := &api{
+		config: config.Config{DataSource: "mock"},
+		logger: slog.New(slog.NewJSONHandler(&logs, nil)),
+	}
+	handler := server.middleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic("sensitive-panic-value")
+	}))
+
+	response := request(t, handler, http.MethodGet, "/api/v1/overview", "", nil)
+	assertError(t, response, http.StatusInternalServerError, "internal_error", "服务暂时无法处理请求")
+	if strings.Contains(response.Body.String(), "sensitive-panic-value") || strings.Contains(logs.String(), "sensitive-panic-value") {
+		t.Fatalf("panic value leaked: response=%s logs=%s", response.Body.String(), logs.String())
+	}
+
+	requestLogFound := false
+	for _, line := range strings.Split(strings.TrimSpace(logs.String()), "\n") {
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatalf("decode log %q: %v", line, err)
+		}
+		if entry["msg"] == "HTTP 请求完成" {
+			requestLogFound = true
+			if entry["status"] != float64(http.StatusInternalServerError) {
+				t.Fatalf("logged status = %#v, want 500; logs=%s", entry["status"], logs.String())
+			}
+		}
+	}
+	if !requestLogFound {
+		t.Fatalf("request completion log not found: %s", logs.String())
 	}
 }
 
