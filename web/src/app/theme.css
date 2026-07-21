@@ -208,6 +208,10 @@ h1 {
   font-size: 0.88rem;
 }
 
+.shell-error {
+  margin: 1rem clamp(1.2rem, 4vw, 3rem) 0;
+}
+
 .loading-screen {
   display: grid;
   min-height: 100vh;

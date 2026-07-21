@@ -1,11 +1,27 @@
 import { useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
+import { APIError } from '../api/client'
 import { useAuth } from '../auth/AuthProvider'
 
 export function AppShell() {
   const { logout, username } = useAuth()
   const queryClient = useQueryClient()
+  const [logoutError, setLogoutError] = useState<string | null>(null)
+
+  async function handleLogout() {
+    setLogoutError(null)
+    try {
+      await logout()
+    } catch (cause) {
+      setLogoutError(
+        cause instanceof APIError
+          ? cause.message
+          : '退出登录失败，请稍后重试',
+      )
+    }
+  }
 
   return (
     <div className="app-shell">
@@ -67,12 +83,18 @@ export function AppShell() {
             <button
               className="secondary-button"
               type="button"
-              onClick={() => void logout()}
+              onClick={handleLogout}
             >
               退出登录
             </button>
           </div>
         </header>
+
+        {logoutError !== null && (
+          <p className="shell-error form-error" role="alert">
+            {logoutError}
+          </p>
+        )}
 
         <main id="main-content" className="content" tabIndex={-1}>
           <Outlet />

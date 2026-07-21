@@ -71,13 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    try {
-      await apiRequest<void>('/api/v1/session', { method: 'DELETE' })
-    } finally {
-      queryClient.clear()
-      setUsername(null)
-      setStatus('unauthenticated')
-    }
+    await apiRequest<void>('/api/v1/session', { method: 'DELETE' })
+    queryClient.clear()
+    setUsername(null)
+    setStatus('unauthenticated')
   }
 
   const value = useMemo<AuthContextValue>(

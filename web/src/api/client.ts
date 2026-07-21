@@ -106,5 +106,15 @@ export async function apiRequest<T>(
     )
   }
 
-  return (await response.json()) as T
+  try {
+    return (await response.json()) as T
+  } catch {
+    throw new APIError(
+      response.status,
+      'invalid_response',
+      '服务器响应格式无效',
+      '',
+      false,
+    )
+  }
 }

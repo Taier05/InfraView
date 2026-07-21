@@ -40,6 +40,13 @@ function ProtectedShell() {
 
 function LoginRoute() {
   const { status } = useAuth()
+  if (status === 'loading') {
+    return (
+      <div className="loading-screen" role="status">
+        正在验证登录状态…
+      </div>
+    )
+  }
   if (status === 'authenticated') return <Navigate to="/" replace />
   return <LoginPage />
 }
