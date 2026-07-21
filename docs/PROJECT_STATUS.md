@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动和测试驱动方式实施。后端基础、数据源契约、缓存查询服务、固定登录、只读 API、React 基础与基础设施总览已实现；当前完成 Task 6 总览聚合趋势的正式审查修复。
+Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动和测试驱动方式实施。Task 1–7 已实现并通过任务级规格与质量审查。当前按用户要求暂停在 Task 8 主机详情页的 RED 阶段，等待下次会话继续。
 
 ## 已确认范围
 
@@ -44,30 +44,41 @@ Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动�
 - Task 4：固定账号登录、内存会话、登录限速与只读 HTTP API。
 - Task 5：React/Vite 基础、深色中文主题、API 客户端、登录与会话加固。
 - Task 6：基础设施总览、四档真实聚合趋势、共享展示组件、30 秒刷新与 stale/error 展示。
+- Task 7：主机名/IP 搜索、状态筛选、服务端排序、URL 状态与分页规范化。
 
 ## 当前任务
 
-完成 Task 6 正式审查修复：总览 CPU/内存趋势由服务端单次多指标聚合查询提供，避免按主机 N+1 和浏览器伪造历史。
+Task 8 已完成 RED 准备，尚未写生产页面：
+
+- 已修改但未提交：`web/src/test/fixtures.ts`
+- 已新增但未提交：`web/src/features/hosts/HostDetailPage.test.tsx`
+- 已确认聚焦测试因 `./HostDetailPage` 不存在而失败，属于预期 RED。
+- `HostDetailPage.tsx` 尚未创建，没有需要回滚的部分生产实现。
+- 当前分支：`feature/infraview-mock-mvp`
+- 当前 HEAD：`900d62f fix: canonicalize host list pagination`
+- 隔离 worktree：`/root/github/InfraView/.worktrees/infraview-mock-mvp`
 
 - [Mock MVP 实施计划](superpowers/plans/2026-07-20-infraview-mock-mvp.md)
-- 聚合趋势架构决策见 [ADR 0003](decisions/0003-aggregate-overview-trends.md)。
+- 持久子代理进度账本：`.superpowers/sdd/progress.md`（本地忽略文件）。
 
 ## 下一步
 
-1. 实现并审查 Task 7 主机搜索、筛选、排序和分页。
-2. 实现并审查主机详情与历史指标页面。
-3. 完成单容器 Docker Compose、E2E、性能与资源占用验证。
-4. 夜莺测试环境就绪后，进入真实适配器集成阶段。
+1. 从现有 Task 8 RED 测试继续，创建 `HostDetailPage.tsx` 并实现独立 current/history 查询。
+2. 完成 Task 8 unit/typecheck/build/audit、任务提交与独立审查。
+3. 完成 Task 9 单容器 Docker Compose 与冒烟验证。
+4. 完成 Task 10 E2E、性能、资源占用和最终文档验收。
+5. 夜莺测试环境就绪后，进入真实适配器集成阶段。
 
 ## 当前阻塞项
 
 - Nightingale 的版本、API 地址与认证方式尚未确定。因此当前阶段不实现或猜测真实 Nightingale API，只保留适配接口与配置边界。
+- 本次暂停是用户主动要求的上下文/token 检查点，不是代码或测试阻塞。
 
 ## 验证状态
 
-- 应用代码：Task 1–6 已实现；Task 6 聚合趋势正式审查修复已完成，等待复审。
-- 自动化测试：全仓 Go 普通测试、race、vet、build、gofmt 检查与前端 unit、typecheck、build 均通过；生产和全量 npm audit 均为 0 漏洞。
+- 应用代码：Task 1–7 已实现并审查通过；Task 8 只有未提交测试与 fixture，生产页面尚未创建。
+- 自动化测试：截至 Task 7，前端 unit 32/32、typecheck、build 通过；全仓 Go 普通测试、race、vet、build、gofmt 检查通过；生产和全量 npm audit 均为 0 漏洞。Task 8 聚焦测试当前为预期 RED。
 - Docker 镜像：尚未创建。
 - 设计规格：已确认并提交。
 - 实施计划：已编写并处于执行中。
-- 已知非阻塞项：jsdom 单元测试不执行 ECharts canvas 初始化生命周期，计划在 Task 10 Playwright E2E 覆盖真实浏览器渲染。
+- 已知非阻塞项：Task 3 缺少 current TTL 20 秒的直接服务级默认值回归；ECharts 应在最终阶段考虑懒加载并优化重复生命周期；jsdom 不执行 canvas 初始化生命周期，计划在 Task 10 Playwright 覆盖。
