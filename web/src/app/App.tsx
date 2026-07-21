@@ -8,6 +8,7 @@ import {
 
 import { AuthProvider, useAuth } from '../auth/AuthProvider'
 import { LoginPage } from '../auth/LoginPage'
+import { OverviewPage } from '../features/overview/OverviewPage'
 import { AppShell } from './AppShell'
 import './theme.css'
 
@@ -49,17 +50,6 @@ function LoginRoute() {
   }
   if (status === 'authenticated') return <Navigate to="/" replace />
   return <LoginPage />
-}
-
-function OverviewPage() {
-  return (
-    <section aria-labelledby="overview-title">
-      <p className="eyebrow">运行态势</p>
-      <h1 id="overview-title">基础设施总览</h1>
-      <p className="page-description">集中查看主机健康、资源用量与近期趋势。</p>
-      <div className="empty-panel">概览数据将在此展示</div>
-    </section>
-  )
 }
 
 function HostsPage() {

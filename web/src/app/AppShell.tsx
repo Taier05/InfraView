@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
@@ -7,7 +6,6 @@ import { useAuth } from '../auth/AuthProvider'
 
 export function AppShell() {
   const { logout, username } = useAuth()
-  const queryClient = useQueryClient()
   const [logoutError, setLogoutError] = useState<string | null>(null)
 
   async function handleLogout() {
@@ -64,22 +62,6 @@ export function AppShell() {
             <strong>{username}</strong>
           </div>
           <div className="toolbar" aria-label="页面控制">
-            <label className="range-control">
-              <span>时间范围</span>
-              <select defaultValue="24h">
-                <option value="1h">1小时</option>
-                <option value="24h">24小时</option>
-                <option value="7d">7天</option>
-                <option value="30d">30天</option>
-              </select>
-            </label>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => void queryClient.invalidateQueries()}
-            >
-              刷新
-            </button>
             <button
               className="secondary-button"
               type="button"

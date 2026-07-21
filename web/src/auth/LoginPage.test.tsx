@@ -1,11 +1,12 @@
 import { QueryClient } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, delay, http } from 'msw'
 import { afterEach, vi } from 'vitest'
 
 import { App } from '../app/App'
 import {
+  overviewFixture,
   SESSION_PATH,
   sessionFixture,
   unauthenticatedFixture,
@@ -22,6 +23,30 @@ function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+function requestPath(input: RequestInfo | URL) {
+  const rawURL =
+    typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.href
+        : input.url
+  return new URL(rawURL, 'http://localhost').pathname
+}
+
+function mockAuthenticatedRequests(
+  logoutResponse: () => Response = () => new Response(null, { status: 204 }),
+) {
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+    if (requestPath(input) === '/api/v1/overview') {
+      return Promise.resolve(jsonResponse(overviewFixture()))
+    }
+    if (init?.method === 'DELETE') {
+      return Promise.resolve(logoutResponse())
+    }
+    return Promise.resolve(jsonResponse(sessionFixture('admin')))
   })
 }
 
@@ -48,15 +73,33 @@ it('会话 bootstrap 完成前不显示登录表单', async () => {
 })
 
 it('已认证会话 bootstrap 后直接进入基础设施总览', async () => {
-  vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-    jsonResponse(sessionFixture('admin')),
-  )
+  mockAuthenticatedRequests()
   render(<App />)
 
   expect(
     await screen.findByRole('heading', { name: '基础设施总览' }),
   ).toBeInTheDocument()
   expect(screen.queryByLabelText('用户名')).not.toBeInTheDocument()
+})
+
+it('已认证总览只显示页面提供的四档时间范围控制', async () => {
+  mockAuthenticatedRequests()
+  render(<App />)
+
+  const overviewControls = await screen.findByRole('group', {
+    name: '总览控制',
+  })
+  const rangeGroup = within(overviewControls).getByRole('group', {
+    name: '时间范围',
+  })
+  expect(within(rangeGroup).getAllByRole('button')).toHaveLength(4)
+  expect(
+    within(overviewControls).getByRole('button', { name: '刷新' }),
+  ).toBeInTheDocument()
+  expect(screen.getAllByRole('button', { name: '刷新' })).toHaveLength(1)
+  expect(
+    screen.queryByRole('combobox', { name: '时间范围' }),
+  ).not.toBeInTheDocument()
 })
 
 it('登录后进入基础设施总览', async () => {
@@ -125,19 +168,17 @@ it('未认证访问受保护页面时重定向到登录页', async () => {
 
 it('注销失败时保留应用壳和查询缓存并显示可重试错误', async () => {
   const clear = vi.spyOn(QueryClient.prototype, 'clear')
-  vi.spyOn(globalThis, 'fetch')
-    .mockResolvedValueOnce(jsonResponse(sessionFixture('admin')))
-    .mockResolvedValueOnce(
-      jsonResponse(
-        {
-          code: 'logout_failed',
-          message: '退出登录失败，请稍后重试',
-          request_id: 'req-logout-failed-001',
-          retryable: true,
-        },
-        503,
-      ),
-    )
+  mockAuthenticatedRequests(() =>
+    jsonResponse(
+      {
+        code: 'logout_failed',
+        message: '退出登录失败，请稍后重试',
+        request_id: 'req-logout-failed-001',
+        retryable: true,
+      },
+      503,
+    ),
+  )
   window.history.pushState({}, '', '/')
   const user = userEvent.setup()
   render(<App />)
@@ -160,9 +201,7 @@ it('注销失败时保留应用壳和查询缓存并显示可重试错误', asyn
 
 it('注销成功后清空查询缓存并回到登录页', async () => {
   const clear = vi.spyOn(QueryClient.prototype, 'clear')
-  vi.spyOn(globalThis, 'fetch')
-    .mockResolvedValueOnce(jsonResponse(sessionFixture('admin')))
-    .mockResolvedValueOnce(new Response(null, { status: 204 }))
+  mockAuthenticatedRequests()
   window.history.pushState({}, '', '/')
   const user = userEvent.setup()
   render(<App />)

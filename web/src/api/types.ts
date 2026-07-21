@@ -25,3 +25,21 @@ export interface LoginCredentials {
   username: string
   password: string
 }
+
+export type MetricLevel = 'normal' | 'warning' | 'critical' | 'unknown'
+
+export interface MetricValue {
+  value: number | null
+  level: MetricLevel
+}
+
+export interface OverviewData {
+  total: number
+  online: number
+  offline: number
+  unknown: number
+  cpu_average: MetricValue
+  memory_average: MetricValue
+}
+
+export type OverviewResponse = ApiResponse<OverviewData>
