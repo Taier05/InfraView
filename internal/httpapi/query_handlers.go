@@ -144,7 +144,7 @@ func (a *api) hosts(w http.ResponseWriter, r *http.Request) {
 	value, meta, err := a.service.Hosts(r.Context(), service.HostQuery{
 		Search:   r.URL.Query().Get("q"),
 		Status:   datasource.HostStatus(r.URL.Query().Get("status")),
-		Sort:     r.URL.Query().Get("sort"),
+		Sort:     normalizedHostSort(r.URL.Query().Get("sort")),
 		Order:    r.URL.Query().Get("order"),
 		Page:     page,
 		PageSize: pageSize,
@@ -168,6 +168,13 @@ func (a *api) hosts(w http.ResponseWriter, r *http.Request) {
 		PageSize:   value.PageSize,
 		TotalPages: totalPages,
 	}, meta)
+}
+
+func normalizedHostSort(sortField string) string {
+	if sortField == "load_1" {
+		return "load"
+	}
+	return sortField
 }
 
 func (a *api) host(w http.ResponseWriter, r *http.Request) {

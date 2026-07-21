@@ -104,7 +104,7 @@ func normalizeHostQuery(query HostQuery) (HostQuery, error) {
 		query.Sort = "name"
 	}
 	switch query.Sort {
-	case "id", "name", "ip", "status", "cpu", "cpu_usage", "memory", "memory_usage", "uptime":
+	case "id", "name", "ip", "status", "cpu", "cpu_usage", "memory", "memory_usage", "load", "uptime":
 	default:
 		return HostQuery{}, fmt.Errorf("%w: unsupported sort %q", ErrInvalidQuery, query.Sort)
 	}
@@ -119,6 +119,13 @@ func normalizeHostQuery(query HostQuery) (HostQuery, error) {
 
 func sortHosts(hosts []HostSummary, field, order string) {
 	sort.SliceStable(hosts, func(i, j int) bool {
+		if field == "load" {
+			leftMissing := hosts[i].Metrics.Load1.Value == nil
+			rightMissing := hosts[j].Metrics.Load1.Value == nil
+			if leftMissing != rightMissing {
+				return !leftMissing
+			}
+		}
 		comparison := compareHosts(hosts[i], hosts[j], field)
 		if comparison == 0 {
 			return hosts[i].ID < hosts[j].ID
@@ -144,6 +151,8 @@ func compareHosts(left, right HostSummary, field string) int {
 		return compareMetricValues(left.Metrics.CPUUsage.Value, right.Metrics.CPUUsage.Value)
 	case "memory", "memory_usage":
 		return compareMetricValues(left.Metrics.MemoryUsage.Value, right.Metrics.MemoryUsage.Value)
+	case "load":
+		return compareMetricValues(left.Metrics.Load1.Value, right.Metrics.Load1.Value)
 	case "uptime":
 		if left.Uptime < right.Uptime {
 			return -1

@@ -57,6 +57,69 @@ export interface OverviewFixture {
   }
 }
 
+export type HostStatusFixture = 'online' | 'offline' | 'unknown'
+
+export interface HostPageFixture {
+  data: {
+    hosts: Array<{
+      id: string
+      name: string
+      ip: string
+      os: string
+      status: HostStatusFixture
+      status_time: string
+      uptime_seconds: number
+      metrics: {
+        timestamp: string
+        cpu_usage: {
+          value: number | null
+          level: MetricLevelFixture
+        }
+        memory_usage: {
+          value: number | null
+          level: MetricLevelFixture
+        }
+        load_1: {
+          value: number | null
+          level: MetricLevelFixture
+        }
+        disk_read_bytes_per_second: {
+          value: number | null
+          level: MetricLevelFixture
+        }
+        disk_write_bytes_per_second: {
+          value: number | null
+          level: MetricLevelFixture
+        }
+        network_receive_bytes_per_second: {
+          value: number | null
+          level: MetricLevelFixture
+        }
+        network_transmit_bytes_per_second: {
+          value: number | null
+          level: MetricLevelFixture
+        }
+        filesystems: Array<{
+          mountpoint: string
+          usage: {
+            value: number | null
+            level: MetricLevelFixture
+          }
+        }>
+      }
+    }>
+    total: number
+    page: number
+    page_size: number
+    total_pages: number
+  }
+  meta: {
+    request_id: string
+    stale: boolean
+    collected_at: string
+  }
+}
+
 let authenticatedUsername: string | null = null
 
 export function sessionFixture(username = 'admin'): SessionFixture {
@@ -116,6 +179,82 @@ export function overviewFixture(
     },
     meta: {
       request_id: 'req-overview-001',
+      stale: false,
+      collected_at: '2026-07-21T00:30:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
+export function hostPageFixture(
+  overrides: {
+    data?: Partial<HostPageFixture['data']>
+    meta?: Partial<HostPageFixture['meta']>
+  } = {},
+): HostPageFixture {
+  const availableMetric = (value: number, level: MetricLevelFixture) => ({
+    value,
+    level,
+  })
+  const missingMetric = { value: null, level: 'unknown' as const }
+
+  return {
+    data: {
+      hosts: [
+        {
+          id: 'host-001',
+          name: 'linux-app-01',
+          ip: '192.0.2.11',
+          os: 'Ubuntu 24.04',
+          status: 'online',
+          status_time: '2026-07-21T00:30:00.000Z',
+          uptime_seconds: 93_600,
+          metrics: {
+            timestamp: '2026-07-21T00:30:00.000Z',
+            cpu_usage: availableMetric(23.46, 'normal'),
+            memory_usage: availableMetric(67.04, 'warning'),
+            load_1: availableMetric(1.25, 'normal'),
+            disk_read_bytes_per_second: availableMetric(1024, 'normal'),
+            disk_write_bytes_per_second: availableMetric(2048, 'normal'),
+            network_receive_bytes_per_second: availableMetric(4096, 'normal'),
+            network_transmit_bytes_per_second: availableMetric(8192, 'normal'),
+            filesystems: [
+              {
+                mountpoint: '/',
+                usage: availableMetric(51.2, 'normal'),
+              },
+            ],
+          },
+        },
+        {
+          id: 'host-002',
+          name: 'linux-db-02',
+          ip: '192.0.2.22',
+          os: 'Debian 13',
+          status: 'offline',
+          status_time: '2026-07-20T22:30:00.000Z',
+          uptime_seconds: 7_200,
+          metrics: {
+            timestamp: '2026-07-20T22:30:00.000Z',
+            cpu_usage: missingMetric,
+            memory_usage: missingMetric,
+            load_1: missingMetric,
+            disk_read_bytes_per_second: missingMetric,
+            disk_write_bytes_per_second: missingMetric,
+            network_receive_bytes_per_second: missingMetric,
+            network_transmit_bytes_per_second: missingMetric,
+            filesystems: [],
+          },
+        },
+      ],
+      total: 41,
+      page: 1,
+      page_size: 20,
+      total_pages: 3,
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-hosts-001',
       stale: false,
       collected_at: '2026-07-21T00:30:00.000Z',
       ...overrides.meta,

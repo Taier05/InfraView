@@ -8,6 +8,7 @@ import {
 
 import { AuthProvider, useAuth } from '../auth/AuthProvider'
 import { LoginPage } from '../auth/LoginPage'
+import { HostListPage } from '../features/hosts/HostListPage'
 import { OverviewPage } from '../features/overview/OverviewPage'
 import { AppShell } from './AppShell'
 import './theme.css'
@@ -52,17 +53,6 @@ function LoginRoute() {
   return <LoginPage />
 }
 
-function HostsPage() {
-  return (
-    <section aria-labelledby="hosts-title">
-      <p className="eyebrow">资产清单</p>
-      <h1 id="hosts-title">主机</h1>
-      <p className="page-description">查看纳入观测范围的 Linux 主机。</p>
-      <div className="empty-panel">主机列表将在此展示</div>
-    </section>
-  )
-}
-
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -72,7 +62,7 @@ export function App() {
             <Route path="/login" element={<LoginRoute />} />
             <Route element={<ProtectedShell />}>
               <Route index element={<OverviewPage />} />
-              <Route path="hosts" element={<HostsPage />} />
+              <Route path="hosts" element={<HostListPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

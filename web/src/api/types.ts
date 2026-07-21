@@ -55,3 +55,43 @@ export interface OverviewTrend {
 }
 
 export type OverviewResponse = ApiResponse<OverviewData>
+
+export type HostStatus = 'online' | 'offline' | 'unknown'
+
+export interface FilesystemMetric {
+  mountpoint: string
+  usage: MetricValue
+}
+
+export interface CurrentMetrics {
+  timestamp: string
+  cpu_usage: MetricValue
+  memory_usage: MetricValue
+  load_1: MetricValue
+  disk_read_bytes_per_second: MetricValue
+  disk_write_bytes_per_second: MetricValue
+  network_receive_bytes_per_second: MetricValue
+  network_transmit_bytes_per_second: MetricValue
+  filesystems: FilesystemMetric[]
+}
+
+export interface HostSummary {
+  id: string
+  name: string
+  ip: string
+  os: string
+  status: HostStatus
+  status_time: string
+  uptime_seconds: number
+  metrics: CurrentMetrics
+}
+
+export interface HostPageData {
+  hosts: HostSummary[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export type HostPageResponse = ApiResponse<HostPageData>

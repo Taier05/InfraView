@@ -190,6 +190,53 @@ func TestHostsSearchFilterStableSortAndPaginate(t *testing.T) {
 	}
 }
 
+func TestHostsSortsLoadWithMissingValuesLastAndStableTies(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	provider.hosts = []datasource.Host{
+		{ID: "h4", Name: "missing", IP: "192.0.2.4", Status: datasource.StatusOnline},
+		{ID: "h2", Name: "load-b", IP: "192.0.2.2", Status: datasource.StatusOnline},
+		{ID: "h3", Name: "load-low", IP: "192.0.2.3", Status: datasource.StatusOnline},
+		{ID: "h1", Name: "load-a", IP: "192.0.2.1", Status: datasource.StatusOnline},
+	}
+	provider.metrics = map[string]datasource.CurrentMetrics{
+		"h1": {Timestamp: clock.Now(), Load1: float64Pointer(5)},
+		"h2": {Timestamp: clock.Now(), Load1: float64Pointer(5)},
+		"h3": {Timestamp: clock.Now(), Load1: float64Pointer(1)},
+		"h4": {Timestamp: clock.Now(), Load1: nil},
+	}
+	svc := newService(provider, clock)
+
+	for _, test := range []struct {
+		name  string
+		sort  string
+		order string
+		want  []string
+	}{
+		{name: "ascending", sort: "load", order: "asc", want: []string{"h3", "h1", "h2", "h4"}},
+		{name: "descending", sort: "load", order: "desc", want: []string{"h1", "h2", "h3", "h4"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			page, _, err := svc.Hosts(context.Background(), service.HostQuery{
+				Sort:     test.sort,
+				Order:    test.order,
+				Page:     1,
+				PageSize: 20,
+			})
+			if err != nil {
+				t.Fatalf("Hosts() error = %v", err)
+			}
+			got := make([]string, len(page.Hosts))
+			for i, host := range page.Hosts {
+				got[i] = host.ID
+			}
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("host IDs = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestHostsRejectsPageSizesOutsideOneToOneHundred(t *testing.T) {
 	clock := newServiceClock()
 	for _, pageSize := range []int{0, 101} {

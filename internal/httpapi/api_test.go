@@ -333,6 +333,17 @@ func TestQueryValidationAndMissingHost(t *testing.T) {
 	}
 }
 
+func TestHostListAcceptsLoadSortAliases(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	cookie := loginCookie(t, handler)
+	for _, sortField := range []string{"load", "load_1"} {
+		response := request(t, handler, http.MethodGet, "/api/v1/hosts?sort="+sortField+"&order=desc&page=1&page_size=20", "", cookie)
+		if response.Code != http.StatusOK {
+			t.Fatalf("sort=%s status = %d, body = %s", sortField, response.Code, response.Body.String())
+		}
+	}
+}
+
 func TestUnavailableSourceReturnsSanitized503WithoutStaleData(t *testing.T) {
 	handler := newTestAPI(t, unavailableProvider{})
 	cookie := loginCookie(t, handler)
