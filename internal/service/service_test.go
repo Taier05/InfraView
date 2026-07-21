@@ -38,6 +38,103 @@ func TestOverviewCountsHostsAndAveragesAvailableMetrics(t *testing.T) {
 	if got, want := provider.currentRequests[0], []string{"h1", "h2", "h3"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("GetCurrentMetrics() IDs = %v, want %v", got, want)
 	}
+	if len(provider.aggregateRequests) != 1 {
+		t.Fatalf("QueryAggregateRange() calls = %d, want 1", len(provider.aggregateRequests))
+	}
+	if got, want := provider.aggregateRequests[0].Keys, []datasource.MetricKey{datasource.MetricCPUUsage, datasource.MetricMemoryUsage}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("aggregate keys = %v, want %v", got, want)
+	}
+	if len(overview.Trends) != 2 {
+		t.Fatalf("overview trends = %#v", overview.Trends)
+	}
+	for i, key := range []datasource.MetricKey{datasource.MetricCPUUsage, datasource.MetricMemoryUsage} {
+		if overview.Trends[i].Key != key || overview.Trends[i].Unit != "%" || len(overview.Trends[i].Points) == 0 || len(overview.Trends[i].Points) > 600 {
+			t.Fatalf("trend %d = %#v", i, overview.Trends[i])
+		}
+	}
+}
+
+func TestOverviewTrendsSupportNamedRangesWithOneAggregateQuery(t *testing.T) {
+	clock := newServiceClock()
+	ranges := map[string]time.Duration{
+		"1h":  time.Hour,
+		"6h":  6 * time.Hour,
+		"24h": 24 * time.Hour,
+		"7d":  7 * 24 * time.Hour,
+	}
+	for rangeName, duration := range ranges {
+		t.Run(rangeName, func(t *testing.T) {
+			provider := fixtureProvider(clock.Now())
+			svc := newService(provider, clock)
+
+			overview, _, err := svc.Overview(context.Background(), rangeName)
+			if err != nil {
+				t.Fatalf("Overview() error = %v", err)
+			}
+			if len(provider.aggregateRequests) != 1 {
+				t.Fatalf("aggregate requests = %d, want 1", len(provider.aggregateRequests))
+			}
+			request := provider.aggregateRequests[0]
+			if !request.Start.Equal(clock.Now().Add(-duration)) || !request.End.Equal(clock.Now()) || request.Step <= 0 {
+				t.Fatalf("aggregate request = %#v", request)
+			}
+			if int(request.End.Sub(request.Start)/request.Step)+1 > 600 {
+				t.Fatalf("aggregate request exceeds 600 points: %#v", request)
+			}
+			if len(overview.Trends) != 2 {
+				t.Fatalf("trends = %#v", overview.Trends)
+			}
+		})
+	}
+}
+
+func TestOverviewReturnsIndependentCopyOfCachedTrends(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	svc := newService(provider, clock)
+
+	first, _, err := svc.Overview(context.Background(), "1h")
+	if err != nil {
+		t.Fatalf("first Overview() error = %v", err)
+	}
+	first.Trends[0].Key = datasource.MetricLoad1
+	first.Trends[0].Points[0].Timestamp = time.Time{}
+	*first.Trends[0].Points[0].Value = -1
+
+	second, _, err := svc.Overview(context.Background(), "1h")
+	if err != nil {
+		t.Fatalf("second Overview() error = %v", err)
+	}
+	if second.Trends[0].Key != datasource.MetricCPUUsage || second.Trends[0].Points[0].Timestamp.IsZero() || second.Trends[0].Points[0].Value == nil || *second.Trends[0].Points[0].Value != 42 {
+		t.Fatalf("cached trends were mutated: %#v", second.Trends)
+	}
+	if len(provider.aggregateRequests) != 1 {
+		t.Fatalf("aggregate requests = %d, want one cached load", len(provider.aggregateRequests))
+	}
+}
+
+func TestOverviewPropagatesStaleAggregateTrendMetadata(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	svc := newService(provider, clock)
+
+	_, firstMeta, err := svc.Overview(context.Background(), "1h")
+	if err != nil {
+		t.Fatalf("first Overview() error = %v", err)
+	}
+	clock.Advance(2 * time.Minute)
+	provider.aggregateErr = datasource.ErrUnavailable
+
+	_, staleMeta, err := svc.Overview(context.Background(), "1h")
+	if err != nil {
+		t.Fatalf("stale Overview() error = %v", err)
+	}
+	if !staleMeta.Stale || !staleMeta.CollectedAt.Equal(firstMeta.CollectedAt) {
+		t.Fatalf("stale meta = %#v, first = %#v", staleMeta, firstMeta)
+	}
+	if len(provider.aggregateRequests) != 2 {
+		t.Fatalf("aggregate requests = %d, want failed refresh after cache expiry", len(provider.aggregateRequests))
+	}
 }
 
 func TestHostsSearchFilterStableSortAndPaginate(t *testing.T) {
@@ -317,19 +414,21 @@ func fixtureProvider(now time.Time) *recordingProvider {
 }
 
 type recordingProvider struct {
-	now             time.Time
-	hosts           []datasource.Host
-	metrics         map[string]datasource.CurrentMetrics
-	listErr         error
-	getHostErr      error
-	currentErr      error
-	healthErr       error
-	healthCalls     int
-	listCalls       int
-	getHostCalls    int
-	currentCalls    int
-	currentRequests [][]string
-	rangeRequests   []datasource.RangeRequest
+	now               time.Time
+	hosts             []datasource.Host
+	metrics           map[string]datasource.CurrentMetrics
+	listErr           error
+	getHostErr        error
+	currentErr        error
+	aggregateErr      error
+	healthErr         error
+	healthCalls       int
+	listCalls         int
+	getHostCalls      int
+	currentCalls      int
+	currentRequests   [][]string
+	rangeRequests     []datasource.RangeRequest
+	aggregateRequests []datasource.AggregateRangeRequest
 }
 
 func (p *recordingProvider) Health(context.Context) (datasource.Health, error) {
@@ -383,6 +482,22 @@ func (p *recordingProvider) QueryRange(_ context.Context, request datasource.Ran
 		points = append(points, datasource.Point{Timestamp: timestamp, Value: float64Pointer(42)})
 	}
 	return []datasource.Series{{HostID: request.HostIDs[0], Metric: request.Metric, Points: points}}, nil
+}
+
+func (p *recordingProvider) QueryAggregateRange(_ context.Context, request datasource.AggregateRangeRequest) ([]datasource.Series, error) {
+	p.aggregateRequests = append(p.aggregateRequests, request)
+	if p.aggregateErr != nil {
+		return nil, p.aggregateErr
+	}
+	series := make([]datasource.Series, len(request.Keys))
+	for i, key := range request.Keys {
+		points := make([]datasource.Point, 0, int(request.End.Sub(request.Start)/request.Step)+1)
+		for timestamp := request.Start; !timestamp.After(request.End); timestamp = timestamp.Add(request.Step) {
+			points = append(points, datasource.Point{Timestamp: timestamp, Value: float64Pointer(42 + float64(i))})
+		}
+		series[i] = datasource.Series{Metric: key, Points: points}
+	}
+	return series, nil
 }
 
 func assertMetric(t *testing.T, name string, got service.MetricValue, wantValue float64, wantLevel service.Level) {

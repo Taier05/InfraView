@@ -116,6 +116,64 @@ it('默认请求 24 小时并提供全部四个范围', async () => {
   }
 })
 
+it('渲染服务端聚合趋势并在切换范围后展示对应序列摘要', async () => {
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const range = requestedRange(input)
+    const recentCPU = range === '7d' ? 77 : 52
+    const recentMemory = range === '7d' ? 68 : 61
+    return Promise.resolve(
+      jsonResponse(
+        overviewFixture({
+          data: {
+            trends: [
+              {
+                key: 'cpu_usage',
+                unit: '%',
+                points: [
+                  { timestamp: '2026-07-14T00:30:00.000Z', value: 31 },
+                  {
+                    timestamp: '2026-07-21T00:30:00.000Z',
+                    value: recentCPU,
+                  },
+                ],
+              },
+              {
+                key: 'memory_usage',
+                unit: '%',
+                points: [
+                  { timestamp: '2026-07-14T00:30:00.000Z', value: 45 },
+                  {
+                    timestamp: '2026-07-21T00:30:00.000Z',
+                    value: recentMemory,
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      ),
+    )
+  })
+  const user = userEvent.setup()
+  renderOverview()
+
+  expect(
+    await screen.findByRole('heading', { name: '资源使用趋势' }),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByText(
+      'CPU 使用率趋势：最低 31%，最高 52%，最近值 52%。内存使用率趋势：最低 45%，最高 61%，最近值 61%。',
+    ),
+  ).toHaveClass('sr-only')
+
+  await user.click(screen.getByRole('button', { name: '7天' }))
+  expect(
+    await screen.findByText(
+      'CPU 使用率趋势：最低 31%，最高 77%，最近值 77%。内存使用率趋势：最低 45%，最高 68%，最近值 68%。',
+    ),
+  ).toHaveClass('sr-only')
+})
+
 it('手动刷新会重新请求当前范围', async () => {
   const user = userEvent.setup()
   renderOverview()

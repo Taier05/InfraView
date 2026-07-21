@@ -110,6 +110,33 @@ func RunContract(t *testing.T, provider datasource.Provider) {
 		}
 	}
 
+	aggregate, err := provider.QueryAggregateRange(ctx, datasource.AggregateRangeRequest{
+		Keys:  []datasource.MetricKey{datasource.MetricCPUUsage, datasource.MetricMemoryUsage},
+		Start: start,
+		End:   end,
+		Step:  time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("QueryAggregateRange() error = %v", err)
+	}
+	if len(aggregate) != 2 {
+		t.Fatalf("QueryAggregateRange() returned %d series, want 2", len(aggregate))
+	}
+	for i, metric := range []datasource.MetricKey{datasource.MetricCPUUsage, datasource.MetricMemoryUsage} {
+		if aggregate[i].HostID != "" || aggregate[i].Metric != metric {
+			t.Fatalf("aggregate series %d = %#v", i, aggregate[i])
+		}
+		if len(aggregate[i].Points) != 61 {
+			t.Fatalf("aggregate %s points = %d, want 61", metric, len(aggregate[i].Points))
+		}
+		for pointIndex, point := range aggregate[i].Points {
+			wantTimestamp := start.Add(time.Duration(pointIndex) * time.Minute)
+			if !point.Timestamp.Equal(wantTimestamp) || point.Value == nil {
+				t.Fatalf("aggregate %s point %d = %#v, want timestamp %s and value", metric, pointIndex, point, wantTimestamp)
+			}
+		}
+	}
+
 	if _, err := provider.GetHost(ctx, "unknown-host"); !errors.Is(err, datasource.ErrNotFound) {
 		t.Fatalf("GetHost(unknown) error = %v, want ErrNotFound", err)
 	}
@@ -182,6 +209,7 @@ func TestNightingaleProviderIsNotConfigured(t *testing.T) {
 	provider := nightingale.New()
 	ctx := context.Background()
 	request := datasource.RangeRequest{}
+	aggregateRequest := datasource.AggregateRangeRequest{}
 
 	checks := []struct {
 		name string
@@ -192,6 +220,7 @@ func TestNightingaleProviderIsNotConfigured(t *testing.T) {
 		{name: "GetHost", call: func() error { _, err := provider.GetHost(ctx, "host"); return err }},
 		{name: "GetCurrentMetrics", call: func() error { _, err := provider.GetCurrentMetrics(ctx, []string{"host"}); return err }},
 		{name: "QueryRange", call: func() error { _, err := provider.QueryRange(ctx, request); return err }},
+		{name: "QueryAggregateRange", call: func() error { _, err := provider.QueryAggregateRange(ctx, aggregateRequest); return err }},
 	}
 
 	for _, check := range checks {

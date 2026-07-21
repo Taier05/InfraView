@@ -238,6 +238,80 @@ func TestAuthenticatedReadOnlyQueriesUseApprovedSnakeCaseViews(t *testing.T) {
 	}
 }
 
+func TestOverviewReturnsNormalizedAggregateTrends(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	cookie := loginCookie(t, handler)
+	response := request(t, handler, http.MethodGet, "/api/v1/overview?range=6h", "", cookie)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+
+	var body struct {
+		Data struct {
+			Trends []struct {
+				Key    datasource.MetricKey `json:"key"`
+				Unit   string               `json:"unit"`
+				Points []struct {
+					Timestamp string   `json:"timestamp"`
+					Value     *float64 `json:"value"`
+				} `json:"points"`
+			} `json:"trends"`
+		} `json:"data"`
+		Meta ResponseMeta `json:"meta"`
+	}
+	decodeJSON(t, response, &body)
+	if len(body.Data.Trends) != 2 || body.Meta.RequestID == "" || body.Meta.Stale || body.Meta.CollectedAt.IsZero() {
+		t.Fatalf("overview body = %#v", body)
+	}
+	for i, key := range []datasource.MetricKey{datasource.MetricCPUUsage, datasource.MetricMemoryUsage} {
+		trend := body.Data.Trends[i]
+		if trend.Key != key || trend.Unit != "%" || len(trend.Points) == 0 || len(trend.Points) > 600 {
+			t.Fatalf("trend %d = %#v", i, trend)
+		}
+		for pointIndex, point := range trend.Points {
+			if _, err := time.Parse(time.RFC3339Nano, point.Timestamp); err != nil || point.Value == nil {
+				t.Fatalf("trend %s point %d = %#v, parse error = %v", key, pointIndex, point, err)
+			}
+		}
+	}
+	if strings.Contains(response.Body.String(), `"metric"`) {
+		t.Fatalf("overview trend must use key, not metric: %s", response.Body.String())
+	}
+}
+
+func TestOverviewReturnsStaleAggregateTrendsWithCollectionTime(t *testing.T) {
+	now := testNow()
+	provider := &aggregateFailureProvider{Provider: mock.New(3, func() time.Time { return now })}
+	handler := newTestAPIAt(t, provider, func() time.Time { return now })
+	cookie := loginCookie(t, handler)
+
+	first := request(t, handler, http.MethodGet, "/api/v1/overview?range=24h", "", cookie)
+	if first.Code != http.StatusOK {
+		t.Fatalf("first status = %d, body = %s", first.Code, first.Body.String())
+	}
+	var firstBody struct {
+		Meta ResponseMeta `json:"meta"`
+	}
+	decodeJSON(t, first, &firstBody)
+
+	now = now.Add(2 * time.Minute)
+	provider.fail = true
+	stale := request(t, handler, http.MethodGet, "/api/v1/overview?range=24h", "", cookie)
+	if stale.Code != http.StatusOK {
+		t.Fatalf("stale status = %d, body = %s", stale.Code, stale.Body.String())
+	}
+	var staleBody struct {
+		Data struct {
+			Trends []json.RawMessage `json:"trends"`
+		} `json:"data"`
+		Meta ResponseMeta `json:"meta"`
+	}
+	decodeJSON(t, stale, &staleBody)
+	if !staleBody.Meta.Stale || !staleBody.Meta.CollectedAt.Equal(firstBody.Meta.CollectedAt) || len(staleBody.Data.Trends) != 2 {
+		t.Fatalf("stale body = %#v, first meta = %#v", staleBody, firstBody.Meta)
+	}
+}
+
 func TestQueryValidationAndMissingHost(t *testing.T) {
 	handler := newTestAPI(t, mock.New(3, testNow))
 	cookie := loginCookie(t, handler)
@@ -318,6 +392,10 @@ func TestMiddlewareLogsRecoveredPanicAs500(t *testing.T) {
 }
 
 func newTestAPI(t *testing.T, provider datasource.Provider) http.Handler {
+	return newTestAPIAt(t, provider, testNow)
+}
+
+func newTestAPIAt(t *testing.T, provider datasource.Provider, clock func() time.Time) http.Handler {
 	t.Helper()
 	cfg := config.Config{
 		Username:          "admin",
@@ -334,9 +412,9 @@ func newTestAPI(t *testing.T, provider datasource.Provider) http.Handler {
 	}
 	return New(Dependencies{
 		Config:  cfg,
-		Auth:    auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, testNow),
-		Limiter: auth.NewLimiter(5, time.Minute, testNow),
-		Service: service.New(provider, cache.New(testNow), service.Options{
+		Auth:    auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, clock),
+		Limiter: auth.NewLimiter(5, time.Minute, clock),
+		Service: service.New(provider, cache.New(clock), service.Options{
 			InventoryTTL:      cfg.InventoryTTL,
 			CurrentMetricsTTL: cfg.CurrentMetricsTTL,
 			RangeTTL:          cfg.RangeTTL,
@@ -344,7 +422,7 @@ func newTestAPI(t *testing.T, provider datasource.Provider) http.Handler {
 			MaxStale:          cfg.MaxStale,
 			WarningPercent:    cfg.WarningPercent,
 			CriticalPercent:   cfg.CriticalPercent,
-			Clock:             testNow,
+			Clock:             clock,
 		}),
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
@@ -411,6 +489,18 @@ func testNow() time.Time {
 
 type unavailableProvider struct{}
 
+type aggregateFailureProvider struct {
+	datasource.Provider
+	fail bool
+}
+
+func (p *aggregateFailureProvider) QueryAggregateRange(ctx context.Context, request datasource.AggregateRangeRequest) ([]datasource.Series, error) {
+	if p.fail {
+		return nil, datasource.ErrUnavailable
+	}
+	return p.Provider.QueryAggregateRange(ctx, request)
+}
+
 func (unavailableProvider) Health(context.Context) (datasource.Health, error) {
 	return datasource.Health{}, errors.Join(datasource.ErrUnavailable, errors.New("upstream-secret"))
 }
@@ -428,6 +518,10 @@ func (unavailableProvider) GetCurrentMetrics(context.Context, []string) (map[str
 }
 
 func (unavailableProvider) QueryRange(context.Context, datasource.RangeRequest) ([]datasource.Series, error) {
+	return nil, errors.Join(datasource.ErrUnavailable, errors.New("upstream-secret"))
+}
+
+func (unavailableProvider) QueryAggregateRange(context.Context, datasource.AggregateRangeRequest) ([]datasource.Series, error) {
 	return nil, errors.Join(datasource.ErrUnavailable, errors.New("upstream-secret"))
 }
 

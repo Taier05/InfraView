@@ -76,6 +76,7 @@ type Overview struct {
 	Unknown       int
 	CPUAverage    MetricValue
 	MemoryAverage MetricValue
+	Trends        []TrendSeries
 }
 
 type HostSummary struct {
@@ -110,6 +111,12 @@ type HostDetail struct {
 type MetricPoint struct {
 	Timestamp time.Time
 	Value     *float64
+}
+
+type TrendSeries struct {
+	Key    datasource.MetricKey
+	Unit   string
+	Points []MetricPoint
 }
 
 type MetricSeries struct {

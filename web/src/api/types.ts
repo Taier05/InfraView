@@ -40,6 +40,18 @@ export interface OverviewData {
   unknown: number
   cpu_average: MetricValue
   memory_average: MetricValue
+  trends: OverviewTrend[]
+}
+
+export interface TrendPoint {
+  timestamp: string
+  value: number | null
+}
+
+export interface OverviewTrend {
+  key: 'cpu_usage' | 'memory_usage'
+  unit: string
+  points: TrendPoint[]
 }
 
 export type OverviewResponse = ApiResponse<OverviewData>

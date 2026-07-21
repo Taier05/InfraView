@@ -151,6 +151,12 @@ func (p *timeoutProvider) QueryRange(ctx context.Context, request datasource.Ran
 	return p.provider.QueryRange(ctx, request)
 }
 
+func (p *timeoutProvider) QueryAggregateRange(ctx context.Context, request datasource.AggregateRangeRequest) ([]datasource.Series, error) {
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+	return p.provider.QueryAggregateRange(ctx, request)
+}
+
 var _ datasource.Provider = (*timeoutProvider)(nil)
 
 func serveUntilSignal(server httpServer, shutdownSignals <-chan os.Signal) error {

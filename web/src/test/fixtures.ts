@@ -41,6 +41,14 @@ export interface OverviewFixture {
       value: number | null
       level: MetricLevelFixture
     }
+    trends: Array<{
+      key: 'cpu_usage' | 'memory_usage'
+      unit: '%'
+      points: Array<{
+        timestamp: string
+        value: number | null
+      }>
+    }>
   }
   meta: {
     request_id: string
@@ -86,6 +94,24 @@ export function overviewFixture(
       unknown: 1,
       cpu_average: { value: 73.5, level: 'critical' },
       memory_average: { value: 42, level: 'warning' },
+      trends: [
+        {
+          key: 'cpu_usage',
+          unit: '%',
+          points: [
+            { timestamp: '2026-07-20T00:30:00.000Z', value: 31 },
+            { timestamp: '2026-07-21T00:30:00.000Z', value: 52 },
+          ],
+        },
+        {
+          key: 'memory_usage',
+          unit: '%',
+          points: [
+            { timestamp: '2026-07-20T00:30:00.000Z', value: 45 },
+            { timestamp: '2026-07-21T00:30:00.000Z', value: 61 },
+          ],
+        },
+      ],
       ...overrides.data,
     },
     meta: {

@@ -206,8 +206,9 @@ func TestUpstreamTimeoutProviderAddsDeadlineToEveryCall(t *testing.T) {
 	_, _ = timed.GetHost(ctx, "host-1")
 	_, _ = timed.GetCurrentMetrics(ctx, []string{"host-1"})
 	_, _ = timed.QueryRange(ctx, datasource.RangeRequest{HostIDs: []string{"host-1"}})
-	if provider.calls != 5 {
-		t.Fatalf("provider calls = %d, want 5", provider.calls)
+	_, _ = timed.QueryAggregateRange(ctx, datasource.AggregateRangeRequest{Keys: []datasource.MetricKey{datasource.MetricCPUUsage}})
+	if provider.calls != 6 {
+		t.Fatalf("provider calls = %d, want 6", provider.calls)
 	}
 }
 
@@ -323,6 +324,11 @@ func (p *deadlineCheckingProvider) GetCurrentMetrics(ctx context.Context, _ []st
 }
 
 func (p *deadlineCheckingProvider) QueryRange(ctx context.Context, _ datasource.RangeRequest) ([]datasource.Series, error) {
+	p.check(ctx)
+	return nil, nil
+}
+
+func (p *deadlineCheckingProvider) QueryAggregateRange(ctx context.Context, _ datasource.AggregateRangeRequest) ([]datasource.Series, error) {
 	p.check(ctx)
 	return nil, nil
 }

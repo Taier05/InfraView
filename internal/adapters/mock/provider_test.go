@@ -52,6 +52,12 @@ func TestProviderIsDeterministicWithFixedClock(t *testing.T) {
 		To:      fixed,
 		Step:    time.Minute,
 	}
+	aggregateRequest := datasource.AggregateRangeRequest{
+		Keys:  []datasource.MetricKey{datasource.MetricCPUUsage, datasource.MetricMemoryUsage},
+		Start: fixed.Add(-10 * time.Minute),
+		End:   fixed,
+		Step:  time.Minute,
+	}
 
 	firstHealth, firstHealthErr := provider.Health(ctx)
 	secondHealth, secondHealthErr := provider.Health(ctx)
@@ -72,6 +78,40 @@ func TestProviderIsDeterministicWithFixedClock(t *testing.T) {
 	firstSeries, firstSeriesErr := provider.QueryRange(ctx, request)
 	secondSeries, secondSeriesErr := provider.QueryRange(ctx, request)
 	assertDeepEqual(t, "QueryRange result", []any{firstSeries, firstSeriesErr}, []any{secondSeries, secondSeriesErr})
+
+	firstAggregate, firstAggregateErr := provider.QueryAggregateRange(ctx, aggregateRequest)
+	secondAggregate, secondAggregateErr := provider.QueryAggregateRange(ctx, aggregateRequest)
+	assertDeepEqual(t, "QueryAggregateRange result", []any{firstAggregate, firstAggregateErr}, []any{secondAggregate, secondAggregateErr})
+}
+
+func TestProviderAggregatesAtMostOneHundredConfiguredHosts(t *testing.T) {
+	fixed := time.Date(2026, time.February, 3, 4, 5, 6, 0, time.UTC)
+	provider := mock.New(150, func() time.Time { return fixed })
+	boundedProvider := mock.New(100, func() time.Time { return fixed })
+	request := datasource.AggregateRangeRequest{
+		Keys:  []datasource.MetricKey{datasource.MetricCPUUsage, datasource.MetricMemoryUsage},
+		Start: fixed,
+		End:   fixed,
+		Step:  time.Minute,
+	}
+
+	series, err := provider.QueryAggregateRange(context.Background(), request)
+	if err != nil {
+		t.Fatalf("QueryAggregateRange() error = %v", err)
+	}
+	if len(series) != 2 || len(series[0].Points) != 1 || len(series[1].Points) != 1 {
+		t.Fatalf("aggregate series = %#v", series)
+	}
+	boundedSeries, err := boundedProvider.QueryAggregateRange(context.Background(), request)
+	if err != nil {
+		t.Fatalf("bounded QueryAggregateRange() error = %v", err)
+	}
+	assertDeepEqual(t, "aggregate host cap", series, boundedSeries)
+	for _, candidate := range series {
+		if candidate.HostID != "" || candidate.Points[0].Value == nil || *candidate.Points[0].Value < 0 || *candidate.Points[0].Value > 100 {
+			t.Fatalf("aggregate series = %#v", candidate)
+		}
+	}
 }
 
 func TestProviderReturnsBoundedCurrentPercentages(t *testing.T) {

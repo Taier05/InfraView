@@ -8,4 +8,5 @@ type Provider interface {
 	GetHost(context.Context, string) (Host, error)
 	GetCurrentMetrics(context.Context, []string) (map[string]CurrentMetrics, error)
 	QueryRange(context.Context, RangeRequest) ([]Series, error)
+	QueryAggregateRange(context.Context, AggregateRangeRequest) ([]Series, error)
 }

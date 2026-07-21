@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动和测试驱动方式实施。后端基础、数据源契约、缓存查询服务、固定登录和只读 API 已实现并通过任务级规格与质量审查；当前进行 React 前端基础与登录流程。
+Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动和测试驱动方式实施。后端基础、数据源契约、缓存查询服务、固定登录、只读 API、React 基础与基础设施总览已实现；当前完成 Task 6 总览聚合趋势的正式审查修复。
 
 ## 已确认范围
 
@@ -42,18 +42,20 @@ Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动�
 - Task 2：规范化数据模型、确定性 Mock 与 Nightingale 未配置空壳。
 - Task 3：TTL 缓存、请求合并、旧数据降级与只读查询服务。
 - Task 4：固定账号登录、内存会话、登录限速与只读 HTTP API。
+- Task 5：React/Vite 基础、深色中文主题、API 客户端、登录与会话加固。
+- Task 6：基础设施总览、四档真实聚合趋势、共享展示组件、30 秒刷新与 stale/error 展示。
 
 ## 当前任务
 
-执行 Task 5：React/Vite 基础、现代深色中文主题、API 客户端和登录流程。
+完成 Task 6 正式审查修复：总览 CPU/内存趋势由服务端单次多指标聚合查询提供，避免按主机 N+1 和浏览器伪造历史。
 
 - [Mock MVP 实施计划](superpowers/plans/2026-07-20-infraview-mock-mvp.md)
-- 因生产依赖审计发现 High 风险，已获用户批准升级 React Router DOM 至 `7.18.1`、ECharts 至 `6.1.0`，并同步升级受影响开发工具。
+- 聚合趋势架构决策见 [ADR 0003](decisions/0003-aggregate-overview-trends.md)。
 
 ## 下一步
 
-1. 完成并审查 Task 5 前端基础与登录。
-2. 实现并审查总览、主机列表和主机详情页面。
+1. 实现并审查 Task 7 主机搜索、筛选、排序和分页。
+2. 实现并审查主机详情与历史指标页面。
 3. 完成单容器 Docker Compose、E2E、性能与资源占用验证。
 4. 夜莺测试环境就绪后，进入真实适配器集成阶段。
 
@@ -63,9 +65,9 @@ Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动�
 
 ## 验证状态
 
-- 应用代码：后端 Task 1–4 已实现并提交。
-- 自动化测试：Go 单元、集成与 race 测试通过；前端 Task 5 测试正在进行。
+- 应用代码：Task 1–6 已实现；Task 6 聚合趋势正式审查修复已完成，等待复审。
+- 自动化测试：全仓 Go 普通测试、race、vet、build、gofmt 检查与前端 unit、typecheck、build 均通过；生产和全量 npm audit 均为 0 漏洞。
 - Docker 镜像：尚未创建。
 - 设计规格：已确认并提交。
 - 实施计划：已编写并处于执行中。
-- 已知非阻塞项：Task 3 最终整枝审查需复核服务默认 current TTL 20 秒的直接回归覆盖。
+- 已知非阻塞项：jsdom 单元测试不执行 ECharts canvas 初始化生命周期，计划在 Task 10 Playwright E2E 覆盖真实浏览器渲染。

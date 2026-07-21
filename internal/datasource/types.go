@@ -77,6 +77,13 @@ type RangeRequest struct {
 	Step    time.Duration
 }
 
+type AggregateRangeRequest struct {
+	Keys  []MetricKey
+	Start time.Time
+	End   time.Time
+	Step  time.Duration
+}
+
 var (
 	ErrNotFound      = errors.New("data source: not found")
 	ErrUnavailable   = errors.New("data source: unavailable")

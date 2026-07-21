@@ -32,4 +32,8 @@ func (*Provider) QueryRange(context.Context, datasource.RangeRequest) ([]datasou
 	return nil, datasource.ErrNotConfigured
 }
 
+func (*Provider) QueryAggregateRange(context.Context, datasource.AggregateRangeRequest) ([]datasource.Series, error) {
+	return nil, datasource.ErrNotConfigured
+}
+
 var _ datasource.Provider = (*Provider)(nil)

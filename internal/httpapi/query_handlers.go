@@ -17,12 +17,19 @@ type metricValueView struct {
 }
 
 type overviewView struct {
-	Total         int             `json:"total"`
-	Online        int             `json:"online"`
-	Offline       int             `json:"offline"`
-	Unknown       int             `json:"unknown"`
-	CPUAverage    metricValueView `json:"cpu_average"`
-	MemoryAverage metricValueView `json:"memory_average"`
+	Total         int               `json:"total"`
+	Online        int               `json:"online"`
+	Offline       int               `json:"offline"`
+	Unknown       int               `json:"unknown"`
+	CPUAverage    metricValueView   `json:"cpu_average"`
+	MemoryAverage metricValueView   `json:"memory_average"`
+	Trends        []trendSeriesView `json:"trends"`
+}
+
+type trendSeriesView struct {
+	Key    datasource.MetricKey `json:"key"`
+	Unit   string               `json:"unit"`
+	Points []metricPointView    `json:"points"`
 }
 
 type filesystemView struct {
@@ -103,7 +110,20 @@ func (a *api) overview(w http.ResponseWriter, r *http.Request) {
 		Unknown:       value.Unknown,
 		CPUAverage:    metricView(value.CPUAverage),
 		MemoryAverage: metricView(value.MemoryAverage),
+		Trends:        trendViews(value.Trends),
 	}, meta)
+}
+
+func trendViews(source []service.TrendSeries) []trendSeriesView {
+	trends := make([]trendSeriesView, len(source))
+	for i, series := range source {
+		points := make([]metricPointView, len(series.Points))
+		for j, point := range series.Points {
+			points[j] = metricPointView{Timestamp: point.Timestamp, Value: point.Value}
+		}
+		trends[i] = trendSeriesView{Key: series.Key, Unit: series.Unit, Points: points}
+	}
+	return trends
 }
 
 func (a *api) hosts(w http.ResponseWriter, r *http.Request) {

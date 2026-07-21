@@ -89,6 +89,39 @@ func (p *provider) QueryRange(_ context.Context, request datasource.RangeRequest
 	return series, nil
 }
 
+func (p *provider) QueryAggregateRange(_ context.Context, request datasource.AggregateRangeRequest) ([]datasource.Series, error) {
+	if request.Step <= 0 || request.End.Before(request.Start) {
+		return []datasource.Series{}, nil
+	}
+
+	hostCount := min(p.hostCount, 100)
+	pointCount := int(request.End.Sub(request.Start)/request.Step) + 1
+	series := make([]datasource.Series, len(request.Keys))
+	for keyIndex, key := range request.Keys {
+		points := make([]datasource.Point, 0, pointCount)
+		for timestamp := request.Start; !timestamp.After(request.End); timestamp = timestamp.Add(request.Step) {
+			var total float64
+			count := 0
+			for hostIndex := 1; hostIndex <= hostCount; hostIndex++ {
+				value := metricValue(key, hostIndex, timestamp)
+				if value == nil {
+					continue
+				}
+				total += *value
+				count++
+			}
+			var average *float64
+			if count > 0 {
+				value := total / float64(count)
+				average = &value
+			}
+			points = append(points, datasource.Point{Timestamp: timestamp, Value: average})
+		}
+		series[keyIndex] = datasource.Series{Metric: key, Points: points}
+	}
+	return series, nil
+}
+
 func (p *provider) hostIndex(hostID string) (int, bool) {
 	var index int
 	if _, err := fmt.Sscanf(hostID, "mock-host-%03d", &index); err != nil {

@@ -2,11 +2,16 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { APIError, apiRequest } from '../../api/client'
-import type { MetricValue, OverviewResponse } from '../../api/types'
+import type {
+  MetricValue,
+  OverviewResponse,
+  OverviewTrend,
+} from '../../api/types'
 import { ErrorPanel } from '../../components/ErrorPanel'
 import { MetricCard } from '../../components/MetricCard'
 import { StaleBanner } from '../../components/StaleBanner'
 import { StatusBadge } from '../../components/StatusBadge'
+import { TrendChart } from '../../components/TrendChart'
 import {
   TimeRangeSelector,
   type TimeRange,
@@ -17,6 +22,38 @@ function percentage(value: MetricValue) {
   return new Intl.NumberFormat('zh-CN', {
     maximumFractionDigits: 1,
   }).format(value.value)
+}
+
+const trendLabels: Record<OverviewTrend['key'], string> = {
+  cpu_usage: 'CPU 使用率',
+  memory_usage: '内存使用率',
+}
+
+function formatTrendValue(value: number) {
+  return new Intl.NumberFormat('zh-CN', {
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
+function trendSummary(trends: OverviewTrend[]) {
+  return trends
+    .map((trend) => {
+      const values = trend.points.flatMap((point) =>
+        point.value === null ? [] : [point.value],
+      )
+      if (values.length === 0) {
+        return `${trendLabels[trend.key]}趋势：暂无数据。`
+      }
+      let recent: number | null = null
+      for (let index = trend.points.length - 1; index >= 0; index -= 1) {
+        if (trend.points[index].value !== null) {
+          recent = trend.points[index].value
+          break
+        }
+      }
+      return `${trendLabels[trend.key]}趋势：最低 ${formatTrendValue(Math.min(...values))}${trend.unit}，最高 ${formatTrendValue(Math.max(...values))}${trend.unit}，最近值 ${recent === null || recent === undefined ? '暂无数据' : `${formatTrendValue(recent)}${trend.unit}`}。`
+    })
+    .join('')
 }
 
 export function OverviewPage() {
@@ -73,40 +110,51 @@ export function OverviewPage() {
           onRetry={() => void overview.refetch()}
         />
       ) : (
-        <div className="metric-grid">
-          <MetricCard label="主机总数" value={overview.data.data.total}>
-            <StatusBadge
+        <>
+          <div className="metric-grid">
+            <MetricCard label="主机总数" value={overview.data.data.total}>
+              <StatusBadge
+                level="normal"
+                label={`在线 ${overview.data.data.online}`}
+              />
+              <StatusBadge
+                level="critical"
+                label={`离线 ${overview.data.data.offline}`}
+              />
+              <StatusBadge
+                level="unknown"
+                label={`未知 ${overview.data.data.unknown}`}
+              />
+            </MetricCard>
+            <MetricCard
+              label="在线主机"
+              value={overview.data.data.online}
               level="normal"
-              label={`在线 ${overview.data.data.online}`}
+              statusLabel="在线"
             />
-            <StatusBadge
-              level="critical"
-              label={`离线 ${overview.data.data.offline}`}
+            <MetricCard
+              label="CPU 平均使用率"
+              value={percentage(overview.data.data.cpu_average)}
+              unit="%"
+              level={overview.data.data.cpu_average.level}
             />
-            <StatusBadge
-              level="unknown"
-              label={`未知 ${overview.data.data.unknown}`}
+            <MetricCard
+              label="内存平均使用率"
+              value={percentage(overview.data.data.memory_average)}
+              unit="%"
+              level={overview.data.data.memory_average.level}
             />
-          </MetricCard>
-          <MetricCard
-            label="在线主机"
-            value={overview.data.data.online}
-            level="normal"
-            statusLabel="在线"
-          />
-          <MetricCard
-            label="CPU 平均使用率"
-            value={percentage(overview.data.data.cpu_average)}
+          </div>
+          <TrendChart
+            title="资源使用趋势"
+            summary={trendSummary(overview.data.data.trends)}
             unit="%"
-            level={overview.data.data.cpu_average.level}
+            series={overview.data.data.trends.map((trend) => ({
+              name: trendLabels[trend.key],
+              points: trend.points,
+            }))}
           />
-          <MetricCard
-            label="内存平均使用率"
-            value={percentage(overview.data.data.memory_average)}
-            unit="%"
-            level={overview.data.data.memory_average.level}
-          />
-        </div>
+        </>
       )}
     </section>
   )

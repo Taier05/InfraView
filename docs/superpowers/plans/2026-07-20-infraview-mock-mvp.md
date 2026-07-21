@@ -187,10 +187,11 @@ type Provider interface {
 	GetHost(context.Context, string) (Host, error)
 	GetCurrentMetrics(context.Context, []string) (map[string]CurrentMetrics, error)
 	QueryRange(context.Context, RangeRequest) ([]Series, error)
+	QueryAggregateRange(context.Context, AggregateRangeRequest) ([]Series, error)
 }
 ```
 
-`RunContract` checks non-empty inventory, unique stable IDs, one-host lookup, batch current metrics, 61 points for a one-hour query at one-minute steps, valid timestamps, and `ErrNotFound` for an unknown host.
+`AggregateRangeRequest` contains `Keys`, `Start`, `End`, and `Step`; it is independent from the single-host `RangeRequest` and does not use an empty-host sentinel. `RunContract` checks non-empty inventory, unique stable IDs, one-host lookup, batch current metrics, 61 points for a one-hour query at one-minute steps, one multi-key aggregate range query, valid timestamps, and `ErrNotFound` for an unknown host.
 
 - [ ] **Step 2: Prove provider tests fail**
 
@@ -202,11 +203,11 @@ Expected: FAIL because provider types do not exist.
 
 - [ ] **Step 3: Define normalized types**
 
-Define statuses `online`, `offline`, `unknown`; metric keys for CPU, memory, load 1, disk usage, disk read/write bytes per second, and network receive/transmit bytes per second. `Host` contains ID, name, IP, OS, status, status time, uptime. `CurrentMetrics` uses `*float64` fields and contains filesystems. `Point` has a nullable value. Define `Health`, `Series`, `RangeRequest`, and errors `ErrNotFound`, `ErrUnavailable`, `ErrNotConfigured`.
+Define statuses `online`, `offline`, `unknown`; metric keys for CPU, memory, load 1, disk usage, disk read/write bytes per second, and network receive/transmit bytes per second. `Host` contains ID, name, IP, OS, status, status time, uptime. `CurrentMetrics` uses `*float64` fields and contains filesystems. `Point` has a nullable value. Define `Health`, `Series`, `RangeRequest`, `AggregateRangeRequest`, and errors `ErrNotFound`, `ErrUnavailable`, `ErrNotConfigured`.
 
 - [ ] **Step 4: Implement deterministic Mock behavior**
 
-Generate hosts `mock-host-001` through the configured count, names `linux-001`, IPs in `192.0.2.0/24`, and stable Linux metadata. Every seventeenth host is offline. Generate values from host index and timestamp with bounded arithmetic and `math.Sin`; never use random numbers. Identical calls with a fixed clock must be deeply equal.
+Generate hosts `mock-host-001` through the configured count, names `linux-001`, IPs in `192.0.2.0/24`, and stable Linux metadata. Every seventeenth host is offline. Generate values from host index and timestamp with bounded arithmetic and `math.Sin`; never use random numbers. Aggregate CPU/memory history deterministically averages at most 100 configured hosts in one request. Identical calls with a fixed clock must be deeply equal.
 
 The Nightingale provider compiles and returns `ErrNotConfigured` for every method; do not add upstream endpoint guesses.
 
@@ -274,6 +275,7 @@ Use a mutex-protected entry map and a separate in-flight map with a `done` chann
 Test:
 
 - overview total/online/offline counts and non-null CPU/memory averages;
+- overview CPU/memory aggregate trends for `1h`, `6h`, `24h`, and `7d`, at most 600 points, one multi-key provider call, range-cache copies, and stale metadata;
 - search by name/IP, status filter, stable sort, page size `1..100`;
 - host detail, filesystems, thresholds, and not-found mapping;
 - ranges `1h`, `6h`, `24h`, `7d` and at most 600 points;
@@ -323,7 +325,7 @@ type HostQuery struct {
 }
 ```
 
-`Overview`, `HostPage`, `HostDetail`, `MetricRange`, and `DataSourceStatus` must use only normalized datasource fields plus server-computed levels and pagination metadata; none may expose provider-specific raw payloads.
+`Overview`, `HostPage`, `HostDetail`, `MetricRange`, and `DataSourceStatus` must use only normalized datasource fields plus server-computed levels and pagination metadata; none may expose provider-specific raw payloads. Overview trends use the range TTL (default 60 seconds), call `QueryAggregateRange` once for CPU and memory, and merge stale/collection metadata with inventory and current metrics.
 
 - [ ] **Step 7: Verify and commit**
 
@@ -548,7 +550,7 @@ Expected: tests, typecheck, and build pass; `web/dist/index.html` exists.
 
 - [ ] **Step 1: Write failing overview tests**
 
-Assert four primary cards, default `24小时`, all four ranges, 30-second refetch without overlap, stale banner with timestamp, `暂无数据` for null values, retryable Chinese error panel, and text labels in addition to colors.
+Assert four primary cards, default `24小时`, all four ranges, 30-second refetch without overlap, stale banner with timestamp, `暂无数据` for null values, retryable Chinese error panel, text labels in addition to colors, and CPU/memory trend summaries that change with the selected server response.
 
 - [ ] **Step 2: Prove overview tests fail**
 
@@ -565,7 +567,7 @@ Expected: FAIL because overview components do not exist.
 
 - [ ] **Step 4: Implement overview query behavior**
 
-Use query key `['overview', range]`, `refetchInterval: 30000`, `refetchIntervalInBackground: false`, and cancellation on range change. Render server-provided levels instead of recalculating authoritative thresholds in the browser.
+Use query key `['overview', range]`, `refetchInterval: 30000`, `refetchIntervalInBackground: false`, and cancellation on range change. Render server-provided levels and aggregate trend points instead of recalculating authoritative thresholds, aggregating hosts, or generating history in the browser.
 
 - [ ] **Step 5: Verify and commit**
 
