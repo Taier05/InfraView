@@ -58,7 +58,7 @@ function renderHostList(initialEntry = '/hosts') {
       queries: { retry: false, gcTime: Infinity },
     },
   })
-  window.history.pushState({}, '', initialEntry)
+  window.history.replaceState({}, '', initialEntry)
 
   render(
     <QueryClientProvider client={queryClient}>
@@ -270,4 +270,108 @@ it('使用服务端分页且每页固定请求 20 条', async () => {
   await user.click(screen.getByRole('button', { name: '上一页' }))
   await waitFor(() => expect(lastRequest().searchParams.get('page')).toBe('2'))
   expect(lastRequest().searchParams.get('page_size')).toBe('20')
+})
+
+it('把超出服务端总页数的 URL 替换为末页并直接重新请求', async () => {
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const url = requestURL(input)
+    requestedURLs.push(url)
+    const page = Number(url.searchParams.get('page') ?? '1')
+    if (page === 999) {
+      return Promise.resolve(
+        jsonResponse(
+          hostPageFixture({
+            data: { hosts: [], page: 999, total_pages: 3 },
+          }),
+        ),
+      )
+    }
+    return Promise.resolve(jsonResponse(hostPageFixture({ data: { page } })))
+  })
+
+  const historyLength = window.history.length
+  renderHostList('/hosts?page=999')
+
+  expect(await screen.findByText('第 3 / 3 页，共 41 台')).toBeInTheDocument()
+  expect(requestedURLs.map((url) => url.searchParams.get('page'))).toEqual([
+    '999',
+    '3',
+  ])
+  expect(window.location.search).toContain('page=3')
+  expect(window.history.length).toBe(historyLength)
+  expect(screen.queryByText(/第 999 \/ 3 页/)).not.toBeInTheDocument()
+})
+
+it('零结果时规范为第一页并显示空状态而不是 1/0 页', async () => {
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const url = requestURL(input)
+    requestedURLs.push(url)
+    const page = Number(url.searchParams.get('page') ?? '1')
+    return Promise.resolve(
+      jsonResponse(
+        hostPageFixture({
+          data: { hosts: [], total: 0, page, total_pages: 0 },
+        }),
+      ),
+    )
+  })
+
+  const historyLength = window.history.length
+  renderHostList('/hosts?page=4')
+
+  expect(await screen.findByText('没有符合条件的主机')).toBeInTheDocument()
+  expect(requestedURLs.map((url) => url.searchParams.get('page'))).toEqual([
+    '4',
+    '1',
+  ])
+  expect(window.location.search).toContain('page=1')
+  expect(window.history.length).toBe(historyLength)
+  expect(screen.queryByText(/第 1 \/ 0 页/)).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: '上一页' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: '下一页' })).toBeDisabled()
+})
+
+it('用 replace 规范非法 URL 参数并保留搜索词', async () => {
+  const historyLength = window.history.length
+  renderHostList(
+    '/hosts?q=keep&status=broken&sort=password&order=sideways&page=nope',
+  )
+
+  await screen.findByRole('link', { name: 'linux-app-01' })
+  await waitFor(() =>
+    expect(window.location.search).toBe(
+      '?q=keep&status=&sort=name&order=asc&page=1',
+    ),
+  )
+  expect(window.history.length).toBe(historyLength)
+  expectRequestParameters(lastRequest(), {
+    q: 'keep',
+    status: '',
+    sort: 'name',
+    order: 'asc',
+    page: '1',
+    page_size: '20',
+  })
+})
+
+it('连续快速输入只在最后一次变更 300ms 后请求最终搜索词', async () => {
+  vi.useFakeTimers()
+  renderHostList()
+  await act(async () => vi.advanceTimersByTimeAsync(0))
+  expect(requestedURLs).toHaveLength(1)
+
+  const search = screen.getByRole('searchbox', { name: '搜索主机名或 IP' })
+  fireEvent.change(search, { target: { value: 'a' } })
+  await act(async () => vi.advanceTimersByTimeAsync(100))
+  fireEvent.change(search, { target: { value: 'ab' } })
+  await act(async () => vi.advanceTimersByTimeAsync(100))
+  fireEvent.change(search, { target: { value: 'abc' } })
+
+  await act(async () => vi.advanceTimersByTimeAsync(299))
+  expect(requestedURLs).toHaveLength(1)
+  await act(async () => vi.advanceTimersByTimeAsync(1))
+
+  expect(requestedURLs).toHaveLength(2)
+  expect(lastRequest().searchParams.get('q')).toBe('abc')
+  expect(window.location.search).toContain('q=abc')
 })

@@ -656,6 +656,14 @@ h1 {
   overflow-x: auto;
 }
 
+.host-empty {
+  display: grid;
+  min-height: 12rem;
+  padding: 1.5rem;
+  color: var(--text-muted);
+  place-items: center;
+}
+
 .host-table {
   width: 100%;
   min-width: 54rem;

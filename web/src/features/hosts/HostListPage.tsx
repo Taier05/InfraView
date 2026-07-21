@@ -78,6 +78,18 @@ export function HostListPage() {
   const [searchText, setSearchText] = useState(querySearch)
 
   useEffect(() => {
+    const canonical = new URLSearchParams(searchParams)
+    canonical.set('q', querySearch)
+    canonical.set('status', status)
+    canonical.set('sort', sort)
+    canonical.set('order', order)
+    canonical.set('page', String(page))
+    if (canonical.toString() !== searchParams.toString()) {
+      setSearchParams(canonical, { replace: true })
+    }
+  }, [order, page, querySearch, searchParams, setSearchParams, sort, status])
+
+  useEffect(() => {
     setSearchText(querySearch)
   }, [querySearch])
 
@@ -85,8 +97,7 @@ export function HostListPage() {
     if (searchText === querySearch) return
     const timeout = window.setTimeout(() => {
       const next = new URLSearchParams(searchParams)
-      if (searchText === '') next.delete('q')
-      else next.set('q', searchText)
+      next.set('q', searchText)
       next.set('page', '1')
       setSearchParams(next)
     }, 300)
@@ -117,6 +128,28 @@ export function HostListPage() {
         { signal },
       ),
   })
+  const responsePage = hosts.data?.data.page
+  const responseTotalPages = hosts.data?.data.total_pages
+  const canonicalResponsePage =
+    responsePage === undefined || responseTotalPages === undefined
+      ? page
+      : responseTotalPages === 0
+        ? 1
+        : Math.min(Math.max(responsePage, 1), responseTotalPages)
+  const responseNeedsPageNormalization =
+    hosts.data !== undefined && canonicalResponsePage !== page
+
+  useEffect(() => {
+    if (!responseNeedsPageNormalization) return
+    const next = new URLSearchParams(searchParams)
+    next.set('page', String(canonicalResponsePage))
+    setSearchParams(next, { replace: true })
+  }, [
+    canonicalResponsePage,
+    responseNeedsPageNormalization,
+    searchParams,
+    setSearchParams,
+  ])
 
   function updateParameters(
     updates: Record<string, string>,
@@ -124,8 +157,7 @@ export function HostListPage() {
   ) {
     const next = new URLSearchParams(searchParams)
     for (const [key, value] of Object.entries(updates)) {
-      if (value === '') next.delete(key)
-      else next.set(key, value)
+      next.set(key, value)
     }
     if (resetPage) next.set('page', '1')
     setSearchParams(next)
@@ -249,52 +281,67 @@ export function HostListPage() {
           retryable={apiError?.retryable ?? false}
           onRetry={() => void hosts.refetch()}
         />
+      ) : responseNeedsPageNormalization ? (
+        <div className="host-list-loading" role="status">
+          正在调整主机列表页码…
+        </div>
       ) : (
         <div className="host-table-panel">
-          <div className="host-table-scroll">
-            <table className="host-table">
-              <thead>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <th key={header.id} scope="col">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
-                            )}
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {table.getRowModel().rows.map((row) => (
-                  <tr key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {hosts.data.data.total === 0 ? (
+            <div className="host-empty">没有符合条件的主机</div>
+          ) : (
+            <div className="host-table-scroll">
+              <table className="host-table">
+                <thead>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <tr key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <th key={header.id} scope="col">
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext(),
+                              )}
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {table.getRowModel().rows.map((row) => (
+                    <tr key={row.id}>
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id}>
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <div className="host-pagination" aria-label="主机列表分页">
-            <span>
-              第 {hosts.data.data.page} / {hosts.data.data.total_pages} 页，共{' '}
-              {hosts.data.data.total} 台
-            </span>
+            {hosts.data.data.total_pages === 0 ? (
+              <span>共 0 台</span>
+            ) : (
+              <span>
+                第 {hosts.data.data.page} / {hosts.data.data.total_pages}{' '}
+                页，共 {hosts.data.data.total} 台
+              </span>
+            )}
             <div>
               <button
                 className="secondary-button"
                 type="button"
-                disabled={hosts.data.data.page <= 1}
+                disabled={
+                  hosts.data.data.total_pages === 0 ||
+                  hosts.data.data.page <= 1
+                }
                 onClick={() =>
                   updateParameters(
                     { page: String(hosts.data.data.page - 1) },
