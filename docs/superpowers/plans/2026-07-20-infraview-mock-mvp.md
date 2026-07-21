@@ -6,7 +6,7 @@
 
 **Architecture:** A Go HTTP service owns immutable configuration, authentication, in-memory sessions, read-only APIs, cache, aggregation, and data-source adapters. A React/TypeScript SPA calls only same-origin InfraView APIs; Vite builds the SPA and the production Go service serves its static assets. Production runs as one non-root InfraView container with no database and no writable business-data volume.
 
-**Tech Stack:** Go 1.24, standard `net/http` and `log/slog`, React 19, TypeScript 5, Vite 7, React Router DOM 7, TanStack Query 5, TanStack Table 8, Apache ECharts 5, Vitest, Testing Library, Playwright, Docker 26+, Docker Compose v5.
+**Tech Stack:** Go 1.24, standard `net/http` and `log/slog`, React 19, TypeScript 5, Vite 7, React Router DOM 7, TanStack Query 5, TanStack Table 8, Apache ECharts 6, Vitest, Testing Library, Playwright, Docker 26+, Docker Compose v5.
 
 ## Global Constraints
 
@@ -469,7 +469,9 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 
 - [ ] **Step 1: Create package scripts and install the lockfile**
 
-Use runtime versions React `19.1.0`, React DOM `19.1.0`, React Router DOM `7.6.2`, TanStack Query `5.80.7`, TanStack Table `8.21.3`, and ECharts `5.6.0`. Use development versions TypeScript `5.8.3`, Vite `7.0.0`, Vitest `3.2.4`, jsdom `26.1.0`, Testing Library React `16.3.0`, user-event `14.6.1`, MSW `2.10.2`, and Playwright `1.53.1`. Set Node engine `>=22` and scripts `dev`, `build`, `test`, `test:run`, `typecheck`, `e2e`.
+Use runtime versions React `19.1.0`, React DOM `19.1.0`, React Router DOM `7.18.1`, TanStack Query `5.80.7`, TanStack Table `8.21.3`, and ECharts `6.1.0`. Use development versions TypeScript `5.8.3`, Vite `7.3.6`, Vitest `3.2.7`, jsdom `26.1.0`, Testing Library React `16.3.0`, user-event `14.6.1`, MSW `2.10.2`, and Playwright `1.61.1`. Set Node engine `>=22` and scripts `dev`, `build`, `test`, `test:run`, `typecheck`, `e2e`.
+
+These versions supersede the original pins after `npm audit --omit=dev` found production vulnerabilities in React Router DOM `7.6.2` and ECharts `5.6.0`. Do not downgrade to the superseded versions.
 
 Run:
 
