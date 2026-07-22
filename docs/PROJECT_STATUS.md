@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动和测试驱动方式实施。Task 1–8 已实现并通过任务级规格与质量审查。当前正在进行 Task 9：Go 托管 SPA 与安全单容器 Docker Compose 交付。
+Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动和测试驱动方式实施。Task 1–9 已实现并通过任务级规格与质量审查。当前正在进行 Task 10：浏览器 E2E、缓存延迟与资源验证、完整部署和维护文档。
 
 ## 已确认范围
 
@@ -46,17 +46,18 @@ Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动�
 - Task 6：基础设施总览、四档真实聚合趋势、共享展示组件、30 秒刷新与 stale/error 展示。
 - Task 7：主机名/IP 搜索、状态筛选、服务端排序、URL 状态与分页规范化。
 - Task 8：主机详情、当前指标、文件系统容量、四类历史趋势、独立查询错误隔离与缓存保留。
+- Task 9：Go 同源托管 SPA、安全单容器 Docker Compose、冒烟测试与运行时资源验证。
 
 ## 当前任务
 
-Task 9 正在启动：
+Task 10 正在启动：
 
-- 目标：由 Go 同源托管 SPA 与只读 API。
-- 交付：单一 InfraView 容器和 Docker Compose，可直接通过 `IP:端口` 访问。
-- 安全：非 root、只读根文件系统、删除全部 capabilities、禁止权限提升、不挂载 Docker Socket 或业务写卷。
-- 验证：静态路由与安全边界测试、容器冒烟测试、健康检查、空闲内存低于 256 MiB。
+- 目标：在真实浏览器覆盖登录、总览、主机列表、详情、刷新和图表渲染。
+- 性能：验证缓存 API P95、容器内存与镜像体积并记录可复现方法。
+- 文档：完成部署、配置、架构、安全边界、开发、测试、故障排查、进度和 TODO。
+- 收尾：处理 Task 9 审查 minor，执行完整分支最终审查。
 - 当前分支：`feature/infraview-mock-mvp`
-- Task 8 完成 HEAD：`ad74f54 fix: preserve cached host history`
+- Task 9 完成 HEAD：`952a6a5 feat: add secure single-container deployment`
 - 隔离 worktree：`/root/github/InfraView/.worktrees/infraview-mock-mvp`
 
 - [Mock MVP 实施计划](superpowers/plans/2026-07-20-infraview-mock-mvp.md)
@@ -64,21 +65,20 @@ Task 9 正在启动：
 
 ## 下一步
 
-1. 完成 Task 9 Go 静态资源托管、安全单容器 Docker Compose 与冒烟验证。
-2. 完成 Task 10 E2E、缓存 API 延迟、资源占用和最终文档验收。
-3. 对完整 Mock MVP 分支进行最终代码审查并处理发现项。
-4. 夜莺测试环境就绪后，进入真实适配器集成阶段。
+1. 完成 Task 10 E2E、缓存 API 延迟、资源占用和最终文档验收。
+2. 对完整 Mock MVP 分支进行最终代码审查并处理发现项。
+3. 夜莺测试环境就绪后，进入真实适配器集成阶段。
 
 ## 当前阻塞项
 
 - Nightingale 的版本、API 地址与认证方式尚未确定。因此当前阶段不实现或猜测真实 Nightingale API，只保留适配接口与配置边界。
-- 当前无 Task 9 代码阻塞；需要本机 Docker 能正常构建并运行 Compose 以完成交付验收。
+- 当前无 Task 10 代码阻塞；Nightingale 测试环境仍不属于 Mock MVP 验收前置条件。
 
 ## 验证状态
 
-- 应用代码：Task 1–8 已实现并通过独立规格与质量审查。
-- 自动化测试：截至 Task 8，前端 unit 50/50、typecheck、build 通过；全仓 Go 测试通过；生产和全量 npm audit 均为 0 漏洞。
-- Docker 镜像：尚未创建。
+- 应用代码：Task 1–9 已实现并通过独立规格与质量审查。
+- 自动化测试：截至 Task 9，前端 unit 50/50、typecheck、build 通过；全仓 Go 普通及 race 测试通过；生产和全量 npm audit 均为 0 漏洞。
+- Docker 镜像：多阶段镜像已构建并通过 Compose 冒烟；约 16.4 MB，运行内存约 9.43 MiB，健康检查和安全约束生效。
 - 设计规格：已确认并提交。
 - 实施计划：已编写并处于执行中。
-- 已知非阻塞项：Task 3 缺少 current TTL 20 秒的直接服务级默认值回归；ECharts 应在最终阶段考虑懒加载并优化重复生命周期；jsdom 不执行 canvas 初始化生命周期，计划在 Task 10 Playwright 覆盖；当前生产主 JS chunk 约 826 kB，超过 Vite 500 kB 警告阈值。
+- 已知非阻塞项：Task 3 缺少 current TTL 20 秒的直接服务级默认值回归；ECharts 应在最终阶段考虑懒加载并优化重复生命周期；jsdom 不执行 canvas 初始化生命周期，计划在 Task 10 Playwright 覆盖；当前生产主 JS chunk 约 826 kB，超过 Vite 500 kB 警告阈值；静态资源 immutable 应显式限制为指纹文件；smoke 登录 JSON 需支持特殊字符凭据；本地忽略的 `.env` 当前仍为示例凭据，正式部署前必须修改。
