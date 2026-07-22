@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,9 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.CookieSecure {
 		t.Fatal("cookie secure = true")
+	}
+	if len(cfg.TrustedProxyCIDRs) != 0 {
+		t.Fatalf("trusted proxy CIDRs = %v, want none", cfg.TrustedProxyCIDRs)
 	}
 	if cfg.MockHostCount != 32 {
 		t.Fatalf("mock hosts = %d", cfg.MockHostCount)
@@ -55,6 +59,7 @@ func TestLoadAllValues(t *testing.T) {
 		"INFRAVIEW_PASSWORD":            "long-password",
 		"INFRAVIEW_SESSION_TTL":         "24h",
 		"INFRAVIEW_COOKIE_SECURE":       "true",
+		"INFRAVIEW_TRUSTED_PROXY_CIDRS": "127.0.0.1/32, 10.23.4.5/8",
 		"INFRAVIEW_DATA_SOURCE":         "mock",
 		"INFRAVIEW_MOCK_HOST_COUNT":     "100",
 		"INFRAVIEW_REFRESH_INTERVAL":    "45s",
@@ -75,6 +80,15 @@ func TestLoadAllValues(t *testing.T) {
 	}
 	if cfg.SessionTTL != 24*time.Hour || !cfg.CookieSecure || cfg.DataSource != "mock" || cfg.MockHostCount != 100 {
 		t.Fatalf("service values = %#v", cfg)
+	}
+	wantTrustedProxies := []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32"), netip.MustParsePrefix("10.0.0.0/8")}
+	if len(cfg.TrustedProxyCIDRs) != len(wantTrustedProxies) {
+		t.Fatalf("trusted proxy CIDRs = %v, want %v", cfg.TrustedProxyCIDRs, wantTrustedProxies)
+	}
+	for index := range wantTrustedProxies {
+		if cfg.TrustedProxyCIDRs[index] != wantTrustedProxies[index] {
+			t.Fatalf("trusted proxy CIDR %d = %v, want %v", index, cfg.TrustedProxyCIDRs[index], wantTrustedProxies[index])
+		}
 	}
 	if cfg.RefreshInterval != 45*time.Second || cfg.InventoryTTL != 2*time.Minute || cfg.CurrentMetricsTTL != 25*time.Second {
 		t.Fatalf("short durations = %#v", cfg)
@@ -99,6 +113,8 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{name: "invalid duration", overrides: map[string]string{"INFRAVIEW_SESSION_TTL": "later"}, wantError: `INFRAVIEW_SESSION_TTL 必须是有效时长，当前值为 "later"`},
 		{name: "non-positive duration", overrides: map[string]string{"INFRAVIEW_REFRESH_INTERVAL": "0s"}, wantError: `INFRAVIEW_REFRESH_INTERVAL 必须大于 0，当前值为 "0s"`},
 		{name: "invalid boolean", overrides: map[string]string{"INFRAVIEW_COOKIE_SECURE": "sometimes"}, wantError: `INFRAVIEW_COOKIE_SECURE 必须是布尔值（true 或 false），当前值为 "sometimes"`},
+		{name: "invalid trusted proxy CIDR", overrides: map[string]string{"INFRAVIEW_TRUSTED_PROXY_CIDRS": "10.0.0.1"}, wantError: `INFRAVIEW_TRUSTED_PROXY_CIDRS 必须是逗号分隔的有效 CIDR，非法值为 "10.0.0.1"`},
+		{name: "empty trusted proxy CIDR", overrides: map[string]string{"INFRAVIEW_TRUSTED_PROXY_CIDRS": "10.0.0.0/8,,127.0.0.1/32"}, wantError: `INFRAVIEW_TRUSTED_PROXY_CIDRS 不得包含空的 CIDR`},
 		{name: "unsupported source", overrides: map[string]string{"INFRAVIEW_DATA_SOURCE": "nightingale"}, wantError: `INFRAVIEW_DATA_SOURCE 仅支持 "mock"，当前值为 "nightingale"`},
 		{name: "invalid mock host count", overrides: map[string]string{"INFRAVIEW_MOCK_HOST_COUNT": "many"}, wantError: `INFRAVIEW_MOCK_HOST_COUNT 必须是整数，当前值为 "many"`},
 		{name: "zero mock hosts", overrides: map[string]string{"INFRAVIEW_MOCK_HOST_COUNT": "0"}, wantError: "INFRAVIEW_MOCK_HOST_COUNT 必须在 1 到 100 之间"},

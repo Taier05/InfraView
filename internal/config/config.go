@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"math"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ type Config struct {
 	Password          string
 	SessionTTL        time.Duration
 	CookieSecure      bool
+	TrustedProxyCIDRs []netip.Prefix
 	DataSource        string
 	MockHostCount     int
 	RefreshInterval   time.Duration
@@ -48,6 +50,9 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	if cfg.CookieSecure, err = boolValue(getenv, "INFRAVIEW_COOKIE_SECURE", "false"); err != nil {
+		return Config{}, err
+	}
+	if cfg.TrustedProxyCIDRs, err = trustedProxyCIDRsValue(getenv, "INFRAVIEW_TRUSTED_PROXY_CIDRS"); err != nil {
 		return Config{}, err
 	}
 	cfg.DataSource = valueOrDefault(getenv, "INFRAVIEW_DATA_SOURCE", "mock")
@@ -124,6 +129,28 @@ func boolValue(getenv func(string) string, key, fallback string) (bool, error) {
 		return false, fmt.Errorf("%s 必须是布尔值（true 或 false），当前值为 %q", key, raw)
 	}
 	return value, nil
+}
+
+func trustedProxyCIDRsValue(getenv func(string) string, key string) ([]netip.Prefix, error) {
+	raw := strings.TrimSpace(getenv(key))
+	if raw == "" {
+		return nil, nil
+	}
+
+	parts := strings.Split(raw, ",")
+	prefixes := make([]netip.Prefix, 0, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		if value == "" {
+			return nil, fmt.Errorf("%s 不得包含空的 CIDR", key)
+		}
+		prefix, err := netip.ParsePrefix(value)
+		if err != nil {
+			return nil, fmt.Errorf("%s 必须是逗号分隔的有效 CIDR，非法值为 %q", key, value)
+		}
+		prefixes = append(prefixes, prefix.Masked())
+	}
+	return prefixes, nil
 }
 
 func intValue(getenv func(string) string, key, fallback string) (int, error) {

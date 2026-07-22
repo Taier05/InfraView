@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
@@ -116,12 +116,44 @@ func isSameOrigin(r *http.Request) bool {
 	return strings.EqualFold(parsed.Scheme, scheme) && strings.EqualFold(parsed.Host, r.Host)
 }
 
-func clientIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil {
-		return host
+func clientIP(r *http.Request, trustedProxyCIDRs []netip.Prefix) string {
+	remoteIP, ok := parseRemoteIP(r.RemoteAddr)
+	if !ok {
+		return strings.TrimSpace(r.RemoteAddr)
 	}
-	return r.RemoteAddr
+	if !isTrustedProxy(remoteIP, trustedProxyCIDRs) {
+		return remoteIP.String()
+	}
+
+	realIPHeaders := r.Header.Values("X-Real-IP")
+	if len(realIPHeaders) != 1 {
+		return remoteIP.String()
+	}
+	realIP, err := netip.ParseAddr(strings.TrimSpace(realIPHeaders[0]))
+	if err != nil || realIP.Zone() != "" {
+		return remoteIP.String()
+	}
+	return realIP.Unmap().String()
+}
+
+func parseRemoteIP(remoteAddr string) (netip.Addr, bool) {
+	if addressPort, err := netip.ParseAddrPort(strings.TrimSpace(remoteAddr)); err == nil {
+		return addressPort.Addr().WithZone("").Unmap(), true
+	}
+	address, err := netip.ParseAddr(strings.TrimSpace(remoteAddr))
+	if err != nil || address.Zone() != "" {
+		return netip.Addr{}, false
+	}
+	return address.Unmap(), true
+}
+
+func isTrustedProxy(address netip.Addr, trustedProxyCIDRs []netip.Prefix) bool {
+	for _, prefix := range trustedProxyCIDRs {
+		if prefix.Contains(address) {
+			return true
+		}
+	}
+	return false
 }
 
 func newRequestID() string {

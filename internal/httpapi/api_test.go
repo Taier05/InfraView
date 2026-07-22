@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -128,6 +129,69 @@ func TestLoginRateLimitBlocksSixthFailure(t *testing.T) {
 	}
 	sixth := request(t, handler, http.MethodPost, "/api/v1/session", `{"username":"admin","password":"wrong-password"}`, nil)
 	assertError(t, sixth, http.StatusTooManyRequests, "rate_limited", "登录尝试过于频繁，请稍后重试")
+}
+
+func TestLoginRateLimitIgnoresForgedRealIPFromDirectClients(t *testing.T) {
+	handler := newTestAPIWithConfig(t, mock.New(3, testNow), config.Config{
+		TrustedProxyCIDRs: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")},
+	})
+	for attempt := 1; attempt <= 5; attempt++ {
+		response := loginRequestFrom(t, handler, "192.0.2.10:12345", "198.51.100."+string(rune('0'+attempt)))
+		assertError(t, response, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
+	}
+	sixth := loginRequestFrom(t, handler, "192.0.2.10:54321", "203.0.113.200")
+	assertError(t, sixth, http.StatusTooManyRequests, "rate_limited", "登录尝试过于频繁，请稍后重试")
+}
+
+func TestLoginRateLimitSeparatesRealClientsBehindTrustedProxy(t *testing.T) {
+	handler := newTestAPIWithConfig(t, mock.New(3, testNow), config.Config{
+		TrustedProxyCIDRs: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")},
+	})
+	for range 5 {
+		response := loginRequestFrom(t, handler, "10.0.0.5:12345", "198.51.100.10")
+		assertError(t, response, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
+	}
+	otherClient := loginRequestFrom(t, handler, "10.0.0.5:12345", "198.51.100.11")
+	assertError(t, otherClient, http.StatusUnauthorized, "invalid_credentials", "用户名或密码错误")
+	blockedClient := loginRequestFrom(t, handler, "10.0.0.5:12345", "198.51.100.10")
+	assertError(t, blockedClient, http.StatusTooManyRequests, "rate_limited", "登录尝试过于频繁，请稍后重试")
+}
+
+func TestClientIPAcceptsOnlySingleValidRealIPFromTrustedProxy(t *testing.T) {
+	trusted := []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}
+	tests := []struct {
+		name       string
+		remoteAddr string
+		headers    []string
+		want       string
+	}{
+		{name: "trusted IPv4", remoteAddr: "10.0.0.5:12345", headers: []string{"198.51.100.10"}, want: "198.51.100.10"},
+		{name: "trusted mapped IPv4", remoteAddr: "10.0.0.5:12345", headers: []string{"::ffff:198.51.100.10"}, want: "198.51.100.10"},
+		{name: "direct forged header", remoteAddr: "192.0.2.10:12345", headers: []string{"198.51.100.10"}, want: "192.0.2.10"},
+		{name: "chained value", remoteAddr: "10.0.0.5:12345", headers: []string{"198.51.100.10, 10.0.0.4"}, want: "10.0.0.5"},
+		{name: "multiple header fields", remoteAddr: "10.0.0.5:12345", headers: []string{"198.51.100.10", "198.51.100.11"}, want: "10.0.0.5"},
+		{name: "invalid IP", remoteAddr: "10.0.0.5:12345", headers: []string{"not-an-ip"}, want: "10.0.0.5"},
+		{name: "zoned IP", remoteAddr: "10.0.0.5:12345", headers: []string{"fe80::1%eth0"}, want: "10.0.0.5"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/session", nil)
+			request.RemoteAddr = test.remoteAddr
+			for _, value := range test.headers {
+				request.Header.Add("X-Real-IP", value)
+			}
+			if got := clientIP(request, trusted); got != test.want {
+				t.Fatalf("client IP = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestParseRemoteIPRemovesIPv6ZoneForStableMatching(t *testing.T) {
+	address, ok := parseRemoteIP("[fe80::1%eth0]:12345")
+	if !ok || address.String() != "fe80::1" {
+		t.Fatalf("parsed remote IP = %q, ok = %v; want unzoned fe80::1", address, ok)
+	}
 }
 
 func TestConcurrentInvalidLoginsCannotBypassFailureLimit(t *testing.T) {
@@ -421,6 +485,29 @@ func newTestAPIAt(t *testing.T, provider datasource.Provider, clock func() time.
 		WarningPercent:    80,
 		CriticalPercent:   90,
 	}
+	return newTestAPIWithConfigAt(t, provider, clock, cfg)
+}
+
+func newTestAPIWithConfig(t *testing.T, provider datasource.Provider, overrides config.Config) http.Handler {
+	return newTestAPIWithConfigAt(t, provider, testNow, overrides)
+}
+
+func newTestAPIWithConfigAt(t *testing.T, provider datasource.Provider, clock func() time.Time, overrides config.Config) http.Handler {
+	t.Helper()
+	cfg := config.Config{
+		Username:          "admin",
+		Password:          "correct-password",
+		SessionTTL:        12 * time.Hour,
+		DataSource:        "mock",
+		InventoryTTL:      time.Minute,
+		CurrentMetricsTTL: 20 * time.Second,
+		RangeTTL:          time.Minute,
+		HealthTTL:         15 * time.Second,
+		MaxStale:          5 * time.Minute,
+		WarningPercent:    80,
+		CriticalPercent:   90,
+		TrustedProxyCIDRs: overrides.TrustedProxyCIDRs,
+	}
 	return New(Dependencies{
 		Config:  cfg,
 		Auth:    auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, clock),
@@ -477,6 +564,21 @@ func assertError(t *testing.T, response *httptest.ResponseRecorder, status int, 
 	if body.Code != code || body.Message != message || body.RequestID == "" {
 		t.Fatalf("error body = %#v", body)
 	}
+	var fields map[string]json.RawMessage
+	decodeJSON(t, response, &fields)
+	if stale, ok := fields["stale"]; !ok || string(stale) != "false" {
+		t.Fatalf("error stale field = %s, present = %v; body = %s", stale, ok, response.Body.String())
+	}
+}
+
+func loginRequestFrom(t *testing.T, handler http.Handler, remoteAddr, realIP string) *httptest.ResponseRecorder {
+	t.Helper()
+	request := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/session", strings.NewReader(`{"username":"admin","password":"wrong-password"}`))
+	request.RemoteAddr = remoteAddr
+	request.Header.Set("X-Real-IP", realIP)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	return response
 }
 
 func assertSecurityHeaders(t *testing.T, response *httptest.ResponseRecorder) {

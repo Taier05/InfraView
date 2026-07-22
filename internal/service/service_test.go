@@ -54,6 +54,37 @@ func TestOverviewCountsHostsAndAveragesAvailableMetrics(t *testing.T) {
 	}
 }
 
+func TestServiceDefaultsCurrentMetricsTTLToTwentySeconds(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	svc := service.New(provider, cache.New(clock.Now), service.Options{
+		InventoryTTL: time.Minute,
+		RangeTTL:     time.Minute,
+		HealthTTL:    15 * time.Second,
+		MaxStale:     5 * time.Minute,
+		Clock:        clock.Now,
+	})
+	query := service.HostQuery{Sort: "name", Order: "asc", Page: 1, PageSize: 20}
+
+	if _, _, err := svc.Hosts(context.Background(), query); err != nil {
+		t.Fatalf("first Hosts() error = %v", err)
+	}
+	clock.Advance(19 * time.Second)
+	if _, _, err := svc.Hosts(context.Background(), query); err != nil {
+		t.Fatalf("Hosts() before default TTL error = %v", err)
+	}
+	if provider.currentCalls != 1 {
+		t.Fatalf("current metric calls before 20s = %d, want 1", provider.currentCalls)
+	}
+	clock.Advance(2 * time.Second)
+	if _, _, err := svc.Hosts(context.Background(), query); err != nil {
+		t.Fatalf("Hosts() after default TTL error = %v", err)
+	}
+	if provider.currentCalls != 2 {
+		t.Fatalf("current metric calls after 20s = %d, want 2", provider.currentCalls)
+	}
+}
+
 func TestOverviewTrendsSupportNamedRangesWithOneAggregateQuery(t *testing.T) {
 	clock := newServiceClock()
 	ranges := map[string]time.Duration{

@@ -197,6 +197,16 @@ func TestBuildHandlerWiresAuthenticatedMockAPI(t *testing.T) {
 	}
 }
 
+func TestComposeUsesUnlessStoppedRestartPolicy(t *testing.T) {
+	compose, err := os.ReadFile("../../docker-compose.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(compose), "\n    restart: unless-stopped\n") {
+		t.Fatalf("infraview service must use restart: unless-stopped:\n%s", compose)
+	}
+}
+
 func TestUpstreamTimeoutProviderAddsDeadlineToEveryCall(t *testing.T) {
 	provider := &deadlineCheckingProvider{t: t}
 	timed := withUpstreamTimeout(provider, time.Hour)

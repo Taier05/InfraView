@@ -23,7 +23,7 @@ type sessionView struct {
 }
 
 func (a *api) login(w http.ResponseWriter, r *http.Request) {
-	ip := clientIP(r)
+	ip := clientIP(r, a.config.TrustedProxyCIDRs)
 	var submitted loginRequest
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxLoginBodyBytes))
 	decoder.DisallowUnknownFields()

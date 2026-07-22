@@ -33,6 +33,7 @@ type ErrorBody struct {
 	Message   string `json:"message"`
 	RequestID string `json:"request_id"`
 	Retryable bool   `json:"retryable"`
+	Stale     bool   `json:"stale"`
 }
 
 type successEnvelope struct {
@@ -55,11 +56,13 @@ func writeSuccess(w http.ResponseWriter, r *http.Request, data any, meta service
 }
 
 func writeError(w http.ResponseWriter, r *http.Request, status int, code, message string, retryable bool) {
+	state := requestStateFrom(r.Context())
 	writeJSON(w, status, ErrorBody{
 		Code:      code,
 		Message:   message,
 		RequestID: requestIDFrom(r.Context()),
 		Retryable: retryable,
+		Stale:     state != nil && state.stale,
 	})
 }
 
