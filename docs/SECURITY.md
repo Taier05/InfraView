@@ -1,0 +1,36 @@
+# 安全说明
+
+## 已实现控制
+
+- 固定账号密码，服务端恒定时间比较；密码至少 12 字符且不写日志。
+- 密码学随机内存会话；Cookie 为 HttpOnly、SameSite=Strict、限定路径，HTTPS 可启用 Secure。
+- 登录按来源 IP 限速；默认不信任转发头，仅允许显式可信代理的单值合法 `X-Real-IP` 参与限速；请求 ID、统一错误和敏感字段日志测试。
+- 默认同源，无 CORS 通用开放；设置 CSP、禁止 iframe、MIME 嗅探和不安全 referrer。
+- 业务 API 只读；command/restart/delete/patch/proxy/query 路由测试为 404/405。
+- 运行容器 UID/GID 10001、只读根文件系统、`/tmp` noexec/nosuid/nodev、capabilities 全删、禁止提权。
+- 生产 InfraView 应用容器不挂 Docker Socket，不使用特权模式、宿主 PID/host network 或业务写卷。
+- 静态路径拒绝 dotfile、路径穿越和缺失资源 SPA fallback；只有指纹资源可 immutable。
+
+## 信任边界与限制
+
+- E2E 的短生命周期 Playwright 浏览器容器是生产网络规则的明确例外：它使用 host network 访问专用 `127.0.0.1:18080` 验收端口，但不挂 Docker Socket、不运行 InfraView 服务、不进入生产 Compose 文件，并在测试结束后删除。
+
+- 固定账号意味着所有使用者共享身份，无用户审计、RBAC、MFA 或密码找回。
+- 直接 HTTP 访问会明文传输凭据和会话；不可信网络必须使用 Nginx/Caddy HTTPS，并设置 Secure Cookie。
+- 会话和限速只在单进程内存，不适合多副本共享状态。
+- 可信代理 CIDR 必须只包含直接连接 InfraView 的代理；范围过宽会允许该网段伪造限速来源。
+- `/healthz` 不证明数据源健康；需查看页面或数据源状态 API。
+- Mock 数据不代表真实基础设施；Nightingale 未接入前不得将其用于真实运维判断。
+- InfraView 的只读边界不替代上游最小权限；未来 Nightingale 凭据也必须只具查询权限。
+
+## 凭据处理
+
+`.env` 保持 Git 忽略和最小文件权限。smoke/benchmark 使用按字节 JSON 转义，支持双引号、反斜杠和控制字符，不依赖 `jq`。测试和日志不得输出密码、Cookie、Token、认证头或上游密钥。
+
+## 漏洞与依赖
+
+锁定前端依赖版本，完整验证执行生产依赖和全量 `npm audit`。基础镜像版本固定；升级前应重新跑普通测试、race、镜像、E2E、延迟和资源验收。
+
+## 事件响应
+
+怀疑密码泄露时：更换 `.env` 凭据、重新创建容器使所有内存会话失效、检查反向代理与 InfraView 日志，并确认仓库历史没有 `.env`。InfraView 不存监控历史，因此事件证据主要位于外部日志系统与反向代理。

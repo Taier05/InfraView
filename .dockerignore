@@ -1,0 +1,13 @@
+.git
+.worktrees
+.superpowers
+.env
+.env.*
+web/node_modules
+web/dist
+internal/httpapi/webdist
+bin
+dist
+coverage
+playwright-report
+test-results

@@ -6,7 +6,7 @@
 
 **Architecture:** A Go HTTP service owns immutable configuration, authentication, in-memory sessions, read-only APIs, cache, aggregation, and data-source adapters. A React/TypeScript SPA calls only same-origin InfraView APIs; Vite builds the SPA and the production Go service serves its static assets. Production runs as one non-root InfraView container with no database and no writable business-data volume.
 
-**Tech Stack:** Go 1.24, standard `net/http` and `log/slog`, React 19, TypeScript 5, Vite 7, React Router DOM 7, TanStack Query 5, TanStack Table 8, Apache ECharts 5, Vitest, Testing Library, Playwright, Docker 26+, Docker Compose v5.
+**Tech Stack:** Go 1.24, standard `net/http` and `log/slog`, React 19, TypeScript 5, Vite 7, React Router DOM 7, TanStack Query 5, TanStack Table 8, Apache ECharts 6, Vitest, Testing Library, Playwright, Docker 26+, Docker Compose v5.
 
 ## Global Constraints
 
@@ -187,10 +187,11 @@ type Provider interface {
 	GetHost(context.Context, string) (Host, error)
 	GetCurrentMetrics(context.Context, []string) (map[string]CurrentMetrics, error)
 	QueryRange(context.Context, RangeRequest) ([]Series, error)
+	QueryAggregateRange(context.Context, AggregateRangeRequest) ([]Series, error)
 }
 ```
 
-`RunContract` checks non-empty inventory, unique stable IDs, one-host lookup, batch current metrics, 61 points for a one-hour query at one-minute steps, valid timestamps, and `ErrNotFound` for an unknown host.
+`AggregateRangeRequest` contains `Keys`, `Start`, `End`, and `Step`; it is independent from the single-host `RangeRequest` and does not use an empty-host sentinel. `RunContract` checks non-empty inventory, unique stable IDs, one-host lookup, batch current metrics, 61 points for a one-hour query at one-minute steps, one multi-key aggregate range query, valid timestamps, and `ErrNotFound` for an unknown host.
 
 - [ ] **Step 2: Prove provider tests fail**
 
@@ -202,11 +203,11 @@ Expected: FAIL because provider types do not exist.
 
 - [ ] **Step 3: Define normalized types**
 
-Define statuses `online`, `offline`, `unknown`; metric keys for CPU, memory, load 1, disk usage, disk read/write bytes per second, and network receive/transmit bytes per second. `Host` contains ID, name, IP, OS, status, status time, uptime. `CurrentMetrics` uses `*float64` fields and contains filesystems. `Point` has a nullable value. Define `Health`, `Series`, `RangeRequest`, and errors `ErrNotFound`, `ErrUnavailable`, `ErrNotConfigured`.
+Define statuses `online`, `offline`, `unknown`; metric keys for CPU, memory, load 1, disk usage, disk read/write bytes per second, and network receive/transmit bytes per second. `Host` contains ID, name, IP, OS, status, status time, uptime. `CurrentMetrics` uses `*float64` fields and contains filesystems. `Point` has a nullable value. Define `Health`, `Series`, `RangeRequest`, `AggregateRangeRequest`, and errors `ErrNotFound`, `ErrUnavailable`, `ErrNotConfigured`.
 
 - [ ] **Step 4: Implement deterministic Mock behavior**
 
-Generate hosts `mock-host-001` through the configured count, names `linux-001`, IPs in `192.0.2.0/24`, and stable Linux metadata. Every seventeenth host is offline. Generate values from host index and timestamp with bounded arithmetic and `math.Sin`; never use random numbers. Identical calls with a fixed clock must be deeply equal.
+Generate hosts `mock-host-001` through the configured count, names `linux-001`, IPs in `192.0.2.0/24`, and stable Linux metadata. Every seventeenth host is offline. Generate values from host index and timestamp with bounded arithmetic and `math.Sin`; never use random numbers. Aggregate CPU/memory history deterministically averages at most 100 configured hosts in one request. Identical calls with a fixed clock must be deeply equal.
 
 The Nightingale provider compiles and returns `ErrNotConfigured` for every method; do not add upstream endpoint guesses.
 
@@ -274,6 +275,7 @@ Use a mutex-protected entry map and a separate in-flight map with a `done` chann
 Test:
 
 - overview total/online/offline counts and non-null CPU/memory averages;
+- overview CPU/memory aggregate trends for `1h`, `6h`, `24h`, and `7d`, at most 600 points, one multi-key provider call, range-cache copies, and stale metadata;
 - search by name/IP, status filter, stable sort, page size `1..100`;
 - host detail, filesystems, thresholds, and not-found mapping;
 - ranges `1h`, `6h`, `24h`, `7d` and at most 600 points;
@@ -323,7 +325,7 @@ type HostQuery struct {
 }
 ```
 
-`Overview`, `HostPage`, `HostDetail`, `MetricRange`, and `DataSourceStatus` must use only normalized datasource fields plus server-computed levels and pagination metadata; none may expose provider-specific raw payloads.
+`Overview`, `HostPage`, `HostDetail`, `MetricRange`, and `DataSourceStatus` must use only normalized datasource fields plus server-computed levels and pagination metadata; none may expose provider-specific raw payloads. Overview trends use the range TTL (default 60 seconds), call `QueryAggregateRange` once for CPU and memory, and merge stale/collection metadata with inventory and current metrics.
 
 - [ ] **Step 7: Verify and commit**
 
@@ -469,7 +471,9 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 
 - [ ] **Step 1: Create package scripts and install the lockfile**
 
-Use runtime versions React `19.1.0`, React DOM `19.1.0`, React Router DOM `7.6.2`, TanStack Query `5.80.7`, TanStack Table `8.21.3`, and ECharts `5.6.0`. Use development versions TypeScript `5.8.3`, Vite `7.0.0`, Vitest `3.2.4`, jsdom `26.1.0`, Testing Library React `16.3.0`, user-event `14.6.1`, MSW `2.10.2`, and Playwright `1.53.1`. Set Node engine `>=22` and scripts `dev`, `build`, `test`, `test:run`, `typecheck`, `e2e`.
+Use runtime versions React `19.1.0`, React DOM `19.1.0`, React Router DOM `7.18.1`, TanStack Query `5.80.7`, TanStack Table `8.21.3`, and ECharts `6.1.0`. Use development versions TypeScript `5.8.3`, Vite `7.3.6`, Vitest `3.2.7`, jsdom `26.1.0`, Testing Library React `16.3.0`, user-event `14.6.1`, MSW `2.10.2`, and Playwright `1.61.1`. Set Node engine `>=22` and scripts `dev`, `build`, `test`, `test:run`, `typecheck`, `e2e`.
+
+These versions supersede the original pins after `npm audit --omit=dev` found production vulnerabilities in React Router DOM `7.6.2` and ECharts `5.6.0`. Do not downgrade to the superseded versions.
 
 Run:
 
@@ -546,7 +550,7 @@ Expected: tests, typecheck, and build pass; `web/dist/index.html` exists.
 
 - [ ] **Step 1: Write failing overview tests**
 
-Assert four primary cards, default `24小时`, all four ranges, 30-second refetch without overlap, stale banner with timestamp, `暂无数据` for null values, retryable Chinese error panel, and text labels in addition to colors.
+Assert four primary cards, default `24小时`, all four ranges, 30-second refetch without overlap, stale banner with timestamp, `暂无数据` for null values, retryable Chinese error panel, text labels in addition to colors, and CPU/memory trend summaries that change with the selected server response.
 
 - [ ] **Step 2: Prove overview tests fail**
 
@@ -563,7 +567,7 @@ Expected: FAIL because overview components do not exist.
 
 - [ ] **Step 4: Implement overview query behavior**
 
-Use query key `['overview', range]`, `refetchInterval: 30000`, `refetchIntervalInBackground: false`, and cancellation on range change. Render server-provided levels instead of recalculating authoritative thresholds in the browser.
+Use query key `['overview', range]`, `refetchInterval: 30000`, `refetchIntervalInBackground: false`, and cancellation on range change. Render server-provided levels and aggregate trend points instead of recalculating authoritative thresholds, aggregating hosts, or generating history in the browser.
 
 - [ ] **Step 5: Verify and commit**
 

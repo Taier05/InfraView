@@ -18,3 +18,4 @@ test-results/
 
 # Frontend dependencies.
 web/node_modules/
+internal/httpapi/webdist/
