@@ -348,13 +348,17 @@ h1 {
   min-width: 0;
 }
 
+.workspace[data-density="dense"] {
+  font-size: 0.94rem;
+}
+
 .topbar {
   display: flex;
-  min-height: 3.55rem;
+  min-height: 3.1rem;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.5rem clamp(0.85rem, 2vw, 1.5rem);
+  padding: 0.35rem clamp(0.7rem, 1.5vw, 1rem);
   border-bottom: 1px solid var(--border);
   background: rgb(13 18 23 / 78%);
   backdrop-filter: blur(18px);
@@ -377,8 +381,8 @@ h1 {
 }
 
 .secondary-button {
-  min-height: 2.1rem;
-  padding: 0 0.7rem;
+  min-height: 1.9rem;
+  padding: 0 0.6rem;
   border: 1px solid var(--border-strong);
   color: #d5dde1;
   background: var(--surface-raised);
@@ -390,18 +394,24 @@ h1 {
 }
 
 .content {
-  width: min(100%, 104rem);
+  width: 100%;
   margin: 0 auto;
-  padding: clamp(1rem, 2vw, 1.5rem) clamp(0.85rem, 2vw, 1.5rem);
+  padding: clamp(0.6rem, 1.2vw, 0.9rem) clamp(0.7rem, 1.5vw, 1rem);
 }
 
 .page-description {
-  margin: 0.35rem 0 1rem;
-  line-height: 1.45;
+  margin: 0.2rem 0 0.65rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .content h1 {
-  font-size: clamp(1.45rem, 2.2vw, 1.9rem);
+  font-size: clamp(1.3rem, 1.8vw, 1.65rem);
+}
+
+.content .eyebrow {
+  margin-bottom: 0.2rem;
+  font-size: 0.66rem;
 }
 
 .sr-only {
@@ -420,13 +430,13 @@ h1 {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 0.8rem;
+  gap: 0.5rem;
 }
 
 .overview-controls {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.3rem;
 }
 
 .time-range-selector {
@@ -438,8 +448,8 @@ h1 {
 }
 
 .time-range-selector button {
-  min-height: 2rem;
-  padding: 0 0.65rem;
+  min-height: 1.8rem;
+  padding: 0 0.55rem;
   border: 0;
   border-radius: 0.45rem;
   color: var(--text-muted);
@@ -464,9 +474,9 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.7rem;
-  margin-bottom: 0.75rem;
-  padding: 0.65rem 0.75rem;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0.6rem;
   border-radius: 0.65rem;
 }
 
@@ -490,7 +500,7 @@ h1 {
 }
 
 .error-panel {
-  min-height: 9rem;
+  min-height: 6rem;
   border: 1px solid #684645;
   background: #24191b;
 }
@@ -510,7 +520,7 @@ h1 {
 
 .overview-loading {
   display: grid;
-  min-height: 15rem;
+  min-height: 9rem;
   border: 1px solid var(--border);
   border-radius: 0.8rem;
   color: var(--text-muted);
@@ -521,12 +531,12 @@ h1 {
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.65rem;
+  gap: 0.45rem;
 }
 
 .metric-card {
   min-width: 0;
-  padding: 0.8rem;
+  padding: 0.6rem;
   border: 1px solid var(--border);
   border-radius: 0.8rem;
   background: linear-gradient(150deg, var(--surface-raised), var(--surface));
@@ -543,7 +553,7 @@ h1 {
 
 .metric-card-heading {
   display: flex;
-  min-height: 1.3rem;
+  min-height: 1.1rem;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.7rem;
@@ -553,14 +563,14 @@ h1 {
 .trend-panel h2 {
   margin: 0;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 750;
   letter-spacing: 0.04em;
 }
 
 .metric-card-value {
-  margin: 0.65rem 0 0.55rem;
-  font-size: clamp(1.55rem, 2.8vw, 2.15rem);
+  margin: 0.4rem 0 0.35rem;
+  font-size: clamp(1.35rem, 2.2vw, 1.85rem);
   font-weight: 760;
   letter-spacing: -0.045em;
 }
@@ -582,8 +592,8 @@ h1 {
 .metric-card-details {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
-  min-height: 1.25rem;
+  gap: 0.22rem;
+  min-height: 1.05rem;
 }
 
 .status-badge {
@@ -591,7 +601,7 @@ h1 {
   align-items: center;
   gap: 0.35rem;
   width: fit-content;
-  padding: 0.24rem 0.48rem;
+  padding: 0.18rem 0.38rem;
   border-radius: 999px;
   color: var(--text-muted);
   background: #222c34;
@@ -628,8 +638,8 @@ h1 {
 }
 
 .trend-panel {
-  margin-top: 0.65rem;
-  padding: 0.8rem;
+  margin-top: 0.45rem;
+  padding: 0.6rem;
   border: 1px solid var(--border);
   border-radius: 0.8rem;
   background: var(--surface);
@@ -637,8 +647,8 @@ h1 {
 
 .trend-chart,
 .trend-chart-empty {
-  height: 13.5rem;
-  margin: 0.6rem 0 0;
+  height: 11.25rem;
+  margin: 0.4rem 0 0;
 }
 
 .trend-chart-empty {
@@ -648,8 +658,8 @@ h1 {
 }
 
 .empty-panel {
-  min-height: 15rem;
-  padding: 1.4rem;
+  min-height: 9rem;
+  padding: 0.9rem;
   border: 1px solid var(--border);
   border-radius: 0.8rem;
   color: var(--text-muted);
@@ -659,24 +669,24 @@ h1 {
 .host-list-controls {
   display: grid;
   grid-template-columns: minmax(16rem, 1fr) minmax(9rem, 12rem) auto;
-  gap: 0.65rem;
-  margin-bottom: 0.75rem;
+  gap: 0.45rem;
+  margin-bottom: 0.5rem;
 }
 
 .host-search,
 .host-status-filter {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.2rem;
   color: #c9d2d8;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   font-weight: 700;
 }
 
 .host-search input,
 .host-status-filter select {
   width: 100%;
-  min-height: 2.25rem;
-  padding: 0.45rem 0.6rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.5rem;
   border: 1px solid var(--border-strong);
   border-radius: 0.55rem;
   color: var(--text);
@@ -685,7 +695,7 @@ h1 {
 
 .host-list-loading {
   display: grid;
-  min-height: 15rem;
+  min-height: 9rem;
   border: 1px solid var(--border);
   border-radius: 0.8rem;
   color: var(--text-muted);
@@ -706,8 +716,8 @@ h1 {
 
 .host-empty {
   display: grid;
-  min-height: 12rem;
-  padding: 1.5rem;
+  min-height: 8rem;
+  padding: 0.9rem;
   color: var(--text-muted);
   place-items: center;
 }
@@ -720,7 +730,7 @@ h1 {
 
 .host-table th,
 .host-table td {
-  padding: 0.55rem 0.7rem;
+  padding: 0.42rem 0.55rem;
   border-bottom: 1px solid var(--border);
   text-align: left;
   vertical-align: middle;
@@ -809,8 +819,8 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.7rem;
-  padding: 0.55rem 0.7rem;
+  gap: 0.5rem;
+  padding: 0.42rem 0.55rem;
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 0.82rem;
@@ -830,19 +840,19 @@ h1 {
 }
 
 .host-detail-heading .host-status {
-  margin-bottom: 1rem;
+  margin-bottom: 0.65rem;
 }
 
 .host-metadata {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.65rem;
-  margin: 0 0 1rem;
+  gap: 0.45rem;
+  margin: 0 0 0.65rem;
 }
 
 .host-metadata > div {
   min-width: 0;
-  padding: 0.7rem;
+  padding: 0.55rem;
   border: 1px solid var(--border);
   border-radius: 0.7rem;
   background: var(--surface);
@@ -855,26 +865,26 @@ h1 {
 }
 
 .host-metadata dd {
-  margin: 0.45rem 0 0;
+  margin: 0.25rem 0 0;
   overflow-wrap: anywhere;
   font-weight: 720;
 }
 
 .host-detail-section {
-  margin-top: 1rem;
+  margin-top: 0.65rem;
 }
 
 .host-detail-section > h2 {
-  margin: 0 0 0.55rem;
-  font-size: 0.9rem;
+  margin: 0 0 0.4rem;
+  font-size: 0.84rem;
 }
 
 .host-current-metrics {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
 }
 
 .host-history-heading {
-  margin-top: 1.35rem;
+  margin-top: 0.85rem;
 }
 
 .host-history-heading .page-description {
@@ -883,7 +893,7 @@ h1 {
 
 .host-detail-loading {
   display: grid;
-  min-height: 12rem;
+  min-height: 8rem;
   border: 1px solid var(--border);
   border-radius: 0.8rem;
   color: var(--text-muted);
@@ -906,7 +916,7 @@ h1 {
 
 .host-filesystem-table th,
 .host-filesystem-table td {
-  padding: 0.55rem 0.7rem;
+  padding: 0.42rem 0.55rem;
   border-bottom: 1px solid var(--border);
   text-align: left;
 }
@@ -930,7 +940,7 @@ h1 {
 .host-trend-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
+  gap: 0.45rem;
 }
 
 @media (max-width: 760px) {

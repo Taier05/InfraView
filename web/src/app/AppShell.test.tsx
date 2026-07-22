@@ -77,6 +77,10 @@ it('默认使用紧凑布局密度', () => {
     'data-density',
     'compact',
   )
+  expect(document.querySelector('.workspace')).toHaveAttribute(
+    'data-density',
+    'dense',
+  )
 })
 
 it('展示健康数据源与最近检查时间', async () => {

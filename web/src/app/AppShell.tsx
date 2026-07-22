@@ -115,7 +115,7 @@ export function AppShell() {
         </div>
       </aside>
 
-      <div className="workspace">
+      <div className="workspace" data-density="dense">
         <header className="topbar">
           <div>
             <span className="topbar-label">当前用户</span>
