@@ -120,6 +120,47 @@ export interface HostPageFixture {
   }
 }
 
+export interface HostDetailFixture {
+  data: HostPageFixture['data']['hosts'][number]
+  meta: {
+    request_id: string
+    stale: boolean
+    collected_at: string
+  }
+}
+
+export type HostMetricKeyFixture =
+  | 'cpu_usage'
+  | 'memory_usage'
+  | 'load_1'
+  | 'disk_usage'
+  | 'disk_read_bytes_per_second'
+  | 'disk_write_bytes_per_second'
+  | 'network_receive_bytes_per_second'
+  | 'network_transmit_bytes_per_second'
+
+export interface HostMetricsFixture {
+  data: {
+    host_id: string
+    range: '1h' | '6h' | '24h' | '7d'
+    from: string
+    to: string
+    step_seconds: number
+    series: Array<{
+      metric: HostMetricKeyFixture
+      points: Array<{
+        timestamp: string
+        value: number | null
+      }>
+    }>
+  }
+  meta: {
+    request_id: string
+    stale: boolean
+    collected_at: string
+  }
+}
+
 let authenticatedUsername: string | null = null
 
 export function sessionFixture(username = 'admin'): SessionFixture {
@@ -255,6 +296,94 @@ export function hostPageFixture(
     },
     meta: {
       request_id: 'req-hosts-001',
+      stale: false,
+      collected_at: '2026-07-21T00:30:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
+export function hostDetailFixture(
+  overrides: {
+    data?: Partial<HostDetailFixture['data']>
+    meta?: Partial<HostDetailFixture['meta']>
+  } = {},
+): HostDetailFixture {
+  const base = hostPageFixture().data.hosts[0]
+  return {
+    data: {
+      ...base,
+      metrics: {
+        ...base.metrics,
+        disk_read_bytes_per_second: { value: 1_572_864, level: 'normal' },
+        disk_write_bytes_per_second: { value: 786_432, level: 'normal' },
+        network_receive_bytes_per_second: {
+          value: 2_097_152,
+          level: 'normal',
+        },
+        network_transmit_bytes_per_second: {
+          value: 524_288,
+          level: 'normal',
+        },
+        filesystems: [
+          { mountpoint: '/', usage: { value: 51.2, level: 'normal' } },
+          { mountpoint: '/data', usage: { value: 88.4, level: 'critical' } },
+        ],
+      },
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-host-detail-001',
+      stale: false,
+      collected_at: '2026-07-21T00:30:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
+export function hostMetricsFixture(
+  overrides: {
+    data?: Partial<HostMetricsFixture['data']>
+    meta?: Partial<HostMetricsFixture['meta']>
+  } = {},
+): HostMetricsFixture {
+  const points = (first: number | null, recent: number | null) => [
+    { timestamp: '2026-07-20T00:30:00.000Z', value: first },
+    { timestamp: '2026-07-21T00:30:00.000Z', value: recent },
+  ]
+  return {
+    data: {
+      host_id: 'host-001',
+      range: '24h',
+      from: '2026-07-20T00:30:00.000Z',
+      to: '2026-07-21T00:30:00.000Z',
+      step_seconds: 145,
+      series: [
+        { metric: 'cpu_usage', points: points(21, 43) },
+        { metric: 'memory_usage', points: points(58, 67) },
+        { metric: 'load_1', points: points(0.8, 1.25) },
+        { metric: 'disk_usage', points: points(50.8, 51.2) },
+        {
+          metric: 'disk_read_bytes_per_second',
+          points: points(1_048_576, 2_097_152),
+        },
+        {
+          metric: 'disk_write_bytes_per_second',
+          points: points(524_288, 1_048_576),
+        },
+        {
+          metric: 'network_receive_bytes_per_second',
+          points: points(2_097_152, 4_194_304),
+        },
+        {
+          metric: 'network_transmit_bytes_per_second',
+          points: points(1_048_576, 3_145_728),
+        },
+      ],
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-host-metrics-001',
       stale: false,
       collected_at: '2026-07-21T00:30:00.000Z',
       ...overrides.meta,

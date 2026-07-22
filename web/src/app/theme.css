@@ -773,6 +773,107 @@ h1 {
   gap: 0.55rem;
 }
 
+.host-detail-heading,
+.host-history-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.host-detail-heading .host-status {
+  margin-bottom: 2rem;
+}
+
+.host-metadata {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0 0 2rem;
+}
+
+.host-metadata > div {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--surface);
+}
+
+.host-metadata dt {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.host-metadata dd {
+  margin: 0.45rem 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 720;
+}
+
+.host-detail-section {
+  margin-top: 1rem;
+}
+
+.host-detail-section > h2 {
+  margin: 0 0 0.9rem;
+  font-size: 1rem;
+}
+
+.host-current-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.host-history-heading {
+  margin-top: 2.5rem;
+}
+
+.host-history-heading .page-description {
+  margin-bottom: 0;
+}
+
+.host-detail-loading {
+  display: grid;
+  min-height: 12rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  color: var(--text-muted);
+  background: linear-gradient(150deg, var(--surface-raised), var(--surface));
+  place-items: center;
+}
+
+.host-filesystem-panel {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface);
+}
+
+.host-filesystem-table {
+  width: 100%;
+  min-width: 32rem;
+  border-collapse: collapse;
+}
+
+.host-filesystem-table th,
+.host-filesystem-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.host-filesystem-table thead th {
+  color: var(--text-muted);
+  background: #11181e;
+  font-size: 0.76rem;
+}
+
+.host-filesystem-table tbody tr:last-child th,
+.host-filesystem-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
 @media (max-width: 760px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -793,6 +894,24 @@ h1 {
   .host-pagination {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .host-detail-heading,
+  .host-history-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .host-detail-heading .host-status {
+    margin-bottom: 1.25rem;
+  }
+
+  .host-metadata {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .host-current-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .sidebar nav {
@@ -847,6 +966,10 @@ h1 {
   }
 
   .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .host-metadata {
     grid-template-columns: 1fr;
   }
 

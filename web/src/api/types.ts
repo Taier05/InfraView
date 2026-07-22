@@ -95,3 +95,31 @@ export interface HostPageData {
 }
 
 export type HostPageResponse = ApiResponse<HostPageData>
+
+export type HostDetailResponse = ApiResponse<HostSummary>
+
+export type HostMetricKey =
+  | 'cpu_usage'
+  | 'memory_usage'
+  | 'load_1'
+  | 'disk_usage'
+  | 'disk_read_bytes_per_second'
+  | 'disk_write_bytes_per_second'
+  | 'network_receive_bytes_per_second'
+  | 'network_transmit_bytes_per_second'
+
+export interface HostMetricSeries {
+  metric: HostMetricKey
+  points: TrendPoint[]
+}
+
+export interface HostMetricsData {
+  host_id: string
+  range: '1h' | '6h' | '24h' | '7d'
+  from: string
+  to: string
+  step_seconds: number
+  series: HostMetricSeries[]
+}
+
+export type HostMetricsResponse = ApiResponse<HostMetricsData>
