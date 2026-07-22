@@ -425,6 +425,34 @@ it('主机不存在时显示后端提供的中文消息', async () => {
   ).not.toBeInTheDocument()
 })
 
+it('当前初始 404 但历史查询成功时保留成功的历史趋势', async () => {
+  vi.mocked(globalThis.fetch).mockImplementation((input) =>
+    Promise.resolve(
+      isHistoryRequest(input)
+        ? jsonResponse(hostMetricsFixture())
+        : jsonResponse(
+            {
+              code: 'host_not_found',
+              message: '该主机当前不在数据源中',
+              request_id: 'req-current-missing-history-success-001',
+              retryable: false,
+            },
+            404,
+          ),
+    ),
+  )
+  renderHostDetail('/hosts/missing-current-only')
+
+  expect(
+    await screen.findByText('该主机当前不在数据源中'),
+  ).toBeInTheDocument()
+  expect(screen.getByText('无法加载当前主机指标')).toBeInTheDocument()
+  expectAllHistoryTrends()
+  expect(
+    screen.queryByRole('table', { name: '文件系统容量' }),
+  ).not.toBeInTheDocument()
+})
+
 it('当前与历史初始查询同时失败时提供可区分的标题和重试入口', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) =>
     Promise.resolve(
@@ -519,6 +547,51 @@ it('当前指标后台刷新失败时保留全部缓存内容并只重试当前�
     await vi.advanceTimersByTimeAsync(0)
   })
   expect(currentAttempts).toBe(3)
+  expect(historyAttempts).toBe(1)
+})
+
+it('当前指标后台刷新返回 404 时保留全部 current 和 history 缓存', async () => {
+  vi.useFakeTimers()
+  let currentAttempts = 0
+  let historyAttempts = 0
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    if (isHistoryRequest(input)) {
+      historyAttempts += 1
+      return Promise.resolve(jsonResponse(hostMetricsFixture()))
+    }
+    currentAttempts += 1
+    if (currentAttempts === 2) {
+      return Promise.resolve(
+        jsonResponse(
+          {
+            code: 'host_not_found',
+            message: '该主机当前不在数据源中',
+            request_id: 'req-current-refresh-missing-001',
+            retryable: false,
+          },
+          404,
+        ),
+      )
+    }
+    return Promise.resolve(jsonResponse(hostDetailFixture()))
+  })
+  renderHostDetail()
+
+  await act(async () => vi.advanceTimersByTimeAsync(0))
+  expectCompleteCurrentData()
+  expectAllHistoryTrends()
+  await act(async () => vi.advanceTimersByTimeAsync(30_000))
+  expect(currentAttempts).toBe(2)
+  await act(async () => vi.advanceTimersByTimeAsync(1))
+
+  expectCompleteCurrentData()
+  expectAllHistoryTrends()
+  const refreshError = screen.getByRole('alert')
+  expect(refreshError).toHaveTextContent('当前指标刷新失败')
+  expect(refreshError).toHaveTextContent('该主机当前不在数据源中')
+  expect(
+    within(refreshError).queryByRole('button', { name: '重试当前指标' }),
+  ).not.toBeInTheDocument()
   expect(historyAttempts).toBe(1)
 })
 

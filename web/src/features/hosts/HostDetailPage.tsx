@@ -101,7 +101,9 @@ export function HostDetailPage() {
     refetchInterval: 30_000,
   })
   const currentError = current.error instanceof APIError ? current.error : null
-  const hostNotFound = currentError?.code === 'host_not_found'
+  const currentData = current.data
+  const currentMissing =
+    currentData === undefined && currentError?.code === 'host_not_found'
   const history = useQuery({
     queryKey: ['host-metrics', id, range],
     queryFn: ({ signal }) =>
@@ -110,12 +112,14 @@ export function HostDetailPage() {
         { signal },
       ),
     refetchInterval: 60_000,
-    enabled: !hostNotFound,
   })
 
   const historyError = history.error instanceof APIError ? history.error : null
-  const currentData = current.data
   const historyData = history.data
+  const duplicateHistoryMissing =
+    currentMissing &&
+    historyData === undefined &&
+    historyError?.code === 'host_not_found'
   const historySeries = historyData?.data.series ?? []
   const resourceDefinitions = [
     { metric: 'cpu_usage', label: 'CPU 使用率' },
@@ -263,7 +267,7 @@ export function HostDetailPage() {
         </>
       )}
 
-      {!hostNotFound && (
+      {!duplicateHistoryMissing && (
         <>
           <div className="host-history-heading">
             <div>
