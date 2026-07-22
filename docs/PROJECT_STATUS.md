@@ -6,6 +6,8 @@
 
 Mock MVP 的 Task 1–10 已完成，并通过完整分支最终独立审查。最终结论为 Critical 0、Important 0；功能分支已通过 merge commit 合入并推送到 `main`，当前 Mock 版本已在局域网设备部署运行。
 
+当前正在 `feature/compact-layout` 分支制作 v0.1.1 紧凑布局预览，等待用户在浏览器中确认。该预览仅调整信息密度，不改变 API、数据源、认证或只读安全边界：缩窄侧栏和顶栏、减少页面/卡片留白、降低图表和表格高度、让主机筛选同排、详情当前指标四列并将历史趋势改为桌面双列。
+
 - 当前分支：`main`
 - 主工作树：`/root/github/InfraView`
 - 保留的开发 worktree：`/root/github/InfraView/.worktrees/infraview-mock-mvp`
@@ -63,5 +65,5 @@ Mock MVP 的 Task 1–10 已完成，并通过完整分支最终独立审查。�
 
 ## 下一步
 
-1. 由用户从浏览器完成 Mock 页面人工体验验收。
+1. 由用户从浏览器确认紧凑布局预览；确认后再合并并发布 v0.1.1。
 2. Nightingale 测试环境就绪后，按已记录证据要求进入第二阶段规格和实现。

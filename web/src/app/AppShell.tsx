@@ -55,7 +55,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-density="compact">
       <a className="skip-link" href="#main-content">
         跳到主要内容
       </a>

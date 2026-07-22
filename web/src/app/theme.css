@@ -222,7 +222,7 @@ h1 {
 .app-shell {
   display: grid;
   min-height: 100vh;
-  grid-template-columns: 16rem minmax(0, 1fr);
+  grid-template-columns: 13.5rem minmax(0, 1fr);
 }
 
 .sidebar {
@@ -231,14 +231,14 @@ h1 {
   display: flex;
   height: 100vh;
   flex-direction: column;
-  padding: 1.4rem 1.1rem;
+  padding: 0.9rem 0.75rem;
   border-right: 1px solid var(--border);
   background: rgb(15 22 28 / 94%);
   backdrop-filter: blur(18px);
 }
 
 .brand {
-  padding: 0.2rem 0.35rem 1.7rem;
+  padding: 0.1rem 0.25rem 1rem;
 }
 
 .brand > span:last-child {
@@ -257,11 +257,11 @@ h1 {
 
 .sidebar nav {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.2rem;
 }
 
 .sidebar nav a {
-  padding: 0.75rem 0.9rem;
+  padding: 0.52rem 0.65rem;
   border: 1px solid transparent;
   border-radius: 0.55rem;
   color: var(--text-muted);
@@ -281,9 +281,9 @@ h1 {
 
 .source-status {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.2rem;
   margin-top: auto;
-  padding: 0.9rem;
+  padding: 0.65rem;
   border: 1px solid var(--border);
   border-radius: 0.7rem;
   background: var(--surface);
@@ -350,11 +350,11 @@ h1 {
 
 .topbar {
   display: flex;
-  min-height: 4.8rem;
+  min-height: 3.55rem;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.85rem clamp(1.2rem, 4vw, 3rem);
+  padding: 0.5rem clamp(0.85rem, 2vw, 1.5rem);
   border-bottom: 1px solid var(--border);
   background: rgb(13 18 23 / 78%);
   backdrop-filter: blur(18px);
@@ -377,8 +377,8 @@ h1 {
 }
 
 .secondary-button {
-  min-height: 2.45rem;
-  padding: 0 0.85rem;
+  min-height: 2.1rem;
+  padding: 0 0.7rem;
   border: 1px solid var(--border-strong);
   color: #d5dde1;
   background: var(--surface-raised);
@@ -390,13 +390,18 @@ h1 {
 }
 
 .content {
-  width: min(100%, 92rem);
+  width: min(100%, 104rem);
   margin: 0 auto;
-  padding: clamp(2rem, 5vw, 4rem) clamp(1.2rem, 4vw, 3rem);
+  padding: clamp(1rem, 2vw, 1.5rem) clamp(0.85rem, 2vw, 1.5rem);
 }
 
 .page-description {
-  margin: 0.8rem 0 2rem;
+  margin: 0.35rem 0 1rem;
+  line-height: 1.45;
+}
+
+.content h1 {
+  font-size: clamp(1.45rem, 2.2vw, 1.9rem);
 }
 
 .sr-only {
@@ -415,26 +420,26 @@ h1 {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: 0.8rem;
 }
 
 .overview-controls {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.45rem;
 }
 
 .time-range-selector {
   display: inline-flex;
-  padding: 0.25rem;
+  padding: 0.18rem;
   border: 1px solid var(--border);
   border-radius: 0.65rem;
   background: #0d1419;
 }
 
 .time-range-selector button {
-  min-height: 2.35rem;
-  padding: 0 0.8rem;
+  min-height: 2rem;
+  padding: 0 0.65rem;
   border: 0;
   border-radius: 0.45rem;
   color: var(--text-muted);
@@ -459,9 +464,9 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1.25rem;
-  padding: 0.9rem 1rem;
+  gap: 0.7rem;
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0.75rem;
   border-radius: 0.65rem;
 }
 
@@ -516,12 +521,12 @@ h1 {
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 0.65rem;
 }
 
 .metric-card {
   min-width: 0;
-  padding: 1.15rem;
+  padding: 0.8rem;
   border: 1px solid var(--border);
   border-radius: 0.8rem;
   background: linear-gradient(150deg, var(--surface-raised), var(--surface));
@@ -538,7 +543,7 @@ h1 {
 
 .metric-card-heading {
   display: flex;
-  min-height: 1.7rem;
+  min-height: 1.3rem;
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.7rem;
@@ -554,8 +559,8 @@ h1 {
 }
 
 .metric-card-value {
-  margin: 1.15rem 0 1rem;
-  font-size: clamp(1.9rem, 4vw, 2.75rem);
+  margin: 0.65rem 0 0.55rem;
+  font-size: clamp(1.55rem, 2.8vw, 2.15rem);
   font-weight: 760;
   letter-spacing: -0.045em;
 }
@@ -563,7 +568,7 @@ h1 {
 .metric-card-unit {
   margin-left: 0.18rem;
   color: var(--text-muted);
-  font-size: 1rem;
+  font-size: 0.85rem;
   font-weight: 650;
   letter-spacing: 0;
 }
@@ -577,8 +582,8 @@ h1 {
 .metric-card-details {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
-  min-height: 1.55rem;
+  gap: 0.3rem;
+  min-height: 1.25rem;
 }
 
 .status-badge {
@@ -623,8 +628,8 @@ h1 {
 }
 
 .trend-panel {
-  margin-top: 1rem;
-  padding: 1.15rem;
+  margin-top: 0.65rem;
+  padding: 0.8rem;
   border: 1px solid var(--border);
   border-radius: 0.8rem;
   background: var(--surface);
@@ -632,8 +637,8 @@ h1 {
 
 .trend-chart,
 .trend-chart-empty {
-  height: 18rem;
-  margin: 1rem 0 0;
+  height: 13.5rem;
+  margin: 0.6rem 0 0;
 }
 
 .trend-chart-empty {
@@ -653,15 +658,15 @@ h1 {
 
 .host-list-controls {
   display: grid;
-  grid-template-columns: minmax(16rem, 1fr) minmax(10rem, 14rem);
-  gap: 1rem;
-  margin-bottom: 1.25rem;
+  grid-template-columns: minmax(16rem, 1fr) minmax(9rem, 12rem) auto;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
 }
 
 .host-search,
 .host-status-filter {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.3rem;
   color: #c9d2d8;
   font-size: 0.82rem;
   font-weight: 700;
@@ -670,8 +675,8 @@ h1 {
 .host-search input,
 .host-status-filter select {
   width: 100%;
-  min-height: 2.7rem;
-  padding: 0.65rem 0.75rem;
+  min-height: 2.25rem;
+  padding: 0.45rem 0.6rem;
   border: 1px solid var(--border-strong);
   border-radius: 0.55rem;
   color: var(--text);
@@ -715,7 +720,7 @@ h1 {
 
 .host-table th,
 .host-table td {
-  padding: 0.85rem 1rem;
+  padding: 0.55rem 0.7rem;
   border-bottom: 1px solid var(--border);
   text-align: left;
   vertical-align: middle;
@@ -804,8 +809,8 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.85rem 1rem;
+  gap: 0.7rem;
+  padding: 0.55rem 0.7rem;
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 0.82rem;
@@ -821,23 +826,23 @@ h1 {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: 0.8rem;
 }
 
 .host-detail-heading .host-status {
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
 .host-metadata {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  margin: 0 0 2rem;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
 }
 
 .host-metadata > div {
   min-width: 0;
-  padding: 1rem;
+  padding: 0.7rem;
   border: 1px solid var(--border);
   border-radius: 0.7rem;
   background: var(--surface);
@@ -860,16 +865,16 @@ h1 {
 }
 
 .host-detail-section > h2 {
-  margin: 0 0 0.9rem;
-  font-size: 1rem;
+  margin: 0 0 0.55rem;
+  font-size: 0.9rem;
 }
 
 .host-current-metrics {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .host-history-heading {
-  margin-top: 2.5rem;
+  margin-top: 1.35rem;
 }
 
 .host-history-heading .page-description {
@@ -901,7 +906,7 @@ h1 {
 
 .host-filesystem-table th,
 .host-filesystem-table td {
-  padding: 0.85rem 1rem;
+  padding: 0.55rem 0.7rem;
   border-bottom: 1px solid var(--border);
   text-align: left;
 }
@@ -920,6 +925,12 @@ h1 {
 .host-filesystem-table .host-filesystem-empty {
   color: var(--text-muted);
   text-align: center;
+}
+
+.host-trend-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
 }
 
 @media (max-width: 760px) {
@@ -960,6 +971,10 @@ h1 {
 
   .host-current-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .host-trend-grid {
+    grid-template-columns: 1fr;
   }
 
   .sidebar nav {

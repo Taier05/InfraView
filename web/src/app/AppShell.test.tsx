@@ -70,6 +70,15 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+it('默认使用紧凑布局密度', () => {
+  renderShell()
+
+  expect(document.querySelector('.app-shell')).toHaveAttribute(
+    'data-density',
+    'compact',
+  )
+})
+
 it('展示健康数据源与最近检查时间', async () => {
   renderShell()
 

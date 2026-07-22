@@ -307,16 +307,18 @@ export function HostDetailPage() {
                   />
                 </div>
               )}
-              <TrendChart
-                title="CPU 与内存使用率趋势"
-                series={trendSeries(historySeries, resourceDefinitions)}
-                valueFormat="percent"
-              />
-              <TrendChart
-                title="1 分钟负载趋势"
-                series={trendSeries(historySeries, loadDefinitions)}
-                valueFormat="number"
-              />
+              <div className="host-trend-grid">
+                <TrendChart
+                  title="CPU 与内存使用率趋势"
+                  series={trendSeries(historySeries, resourceDefinitions)}
+                  valueFormat="percent"
+                />
+                <TrendChart
+                  title="1 分钟负载趋势"
+                  series={trendSeries(historySeries, loadDefinitions)}
+                  valueFormat="number"
+                />
+              </div>
             </>
           )}
 
@@ -367,7 +369,7 @@ export function HostDetailPage() {
           )}
 
           {historyData !== undefined && (
-            <>
+            <div className="host-trend-grid">
               <TrendChart
                 title="磁盘 I/O 趋势"
                 series={trendSeries(historySeries, diskDefinitions)}
@@ -378,7 +380,7 @@ export function HostDetailPage() {
                 series={trendSeries(historySeries, networkDefinitions)}
                 valueFormat="bytesPerSecond"
               />
-            </>
+            </div>
           )}
         </>
       )}
