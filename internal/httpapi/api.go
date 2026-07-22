@@ -72,10 +72,19 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/hosts", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/hosts/", server.hostsFallback)
 	mux.HandleFunc("/api/v1/datasource/status", server.methodNotAllowed)
+	mux.HandleFunc("/api", server.notFound)
 	mux.HandleFunc("/api/", server.notFound)
-	mux.HandleFunc("/", server.notFound)
 
-	return server.middleware(mux)
+	web := server.web()
+	routes := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" || r.URL.Path == "/api" || strings.HasPrefix(r.URL.Path, "/api/") {
+			mux.ServeHTTP(w, r)
+			return
+		}
+		web.ServeHTTP(w, r)
+	})
+
+	return server.middleware(routes)
 }
 
 func (a *api) healthz(w http.ResponseWriter, _ *http.Request) {
