@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-Mock MVP 的 Task 1–10 已完成。完整分支首轮审查发现的 6 个 Important 已按 TDD 修复，当前正在执行统一全量验证和最终复审。
+Mock MVP 的 Task 1–10 已完成，并通过完整分支最终独立审查。最终结论为 Critical 0、Important 0；当前分支已具备交付条件，但尚未推送或合并。
 
 - 分支：`feature/infraview-mock-mvp`
 - 隔离 worktree：`/root/github/InfraView/.worktrees/infraview-mock-mvp`
@@ -12,6 +12,7 @@ Mock MVP 的 Task 1–10 已完成。完整分支首轮审查发现的 6 个 Imp
 - Task 10 交付提交：`d401f0b test: verify and document InfraView MVP`。
 - Task 10 隔离修复：`a2736f4 fix: isolate e2e compose projects`。
 - 最终分支修复：`525f343`（部分 E2E 清理）、`17b26fe`（可信代理/重启策略）、`d88138d`（前端状态/刷新/会话失效）。
+- 最终验证修复：`3c5e5c0`（测试夹具）、`9bee36e`（镜像内 Compose 规格测试）、`886a695`（代理信任与 Caddy/Nginx 对齐）。
 - 实施计划：`docs/superpowers/plans/2026-07-20-infraview-mock-mvp.md`
 - 本地 SDD 账本：`.superpowers/sdd/progress.md`，被 Git 忽略，不提交。
 
@@ -29,15 +30,16 @@ Mock MVP 的 Task 1–10 已完成。完整分支首轮审查发现的 6 个 Imp
 - ECharts 动态加载：主 JS 约 330.78 kB，图表块约 495.23 kB，无 500 kB 构建警告。
 - 完整架构、设计、配置、部署、开发、测试、安全和 Nightingale 前置证据文档。
 
-## Task 10 首轮验收证据
+## 最终验收证据
 
-- 前端：Vitest 50/50、typecheck、build 通过。
-- Go：指纹缓存新增测试按 TDD 先 RED 后 GREEN；全仓普通/race 在镜像构建通过。
+- 前端：Vitest 60/60、typecheck、build 通过；生产及全量 npm audit 均为 0。
+- Go：全仓普通测试、race、格式检查和构建通过；镜像构建阶段重复执行普通/race 测试。
 - Smoke：含双引号和反斜杠的账号密码 JSON 转义后 PASS。
 - Playwright：真实 Chromium 3/3，通过总览和详情 4 canvas 验证。
-- 缓存延迟：100 次顺序认证 overview 请求，第 95 样本 `0.003212s`，低于 `0.200s`。
-- 资源：内存 `10.120 MiB`，低于 256 MiB；镜像 `16.63 MB`。
-- 隔离：专用项目/18080 由 trap 清理，未影响现有 Compose 项目。
+- 缓存延迟：100 次顺序认证 overview 请求，第 95 样本 `0.003819s`，低于 `0.200s`。
+- 资源：内存 `10.210 MiB`，低于 256 MiB；镜像 `16.64 MB`。
+- 隔离：专用项目/18080 在成功、碰撞和部分启动失败路径均受精确清理保护；最终只保留原有 `cliproxyapi`。
+- 审查：完整分支最终复审 Approved，未发现破坏性运维能力或代理信任阻断问题。
 
 ## 安全与产品边界
 
@@ -49,5 +51,5 @@ Mock MVP 的 Task 1–10 已完成。完整分支首轮审查发现的 6 个 Imp
 
 ## 下一步
 
-1. 完成统一全量验证和最终独立复审。
-2. 用户明确要求后再决定合并/推送；当前不推送、不合并。
+1. 用户明确要求后再决定合并/推送；当前不推送、不合并。
+2. Nightingale 测试环境就绪后，按已记录证据要求进入第二阶段规格和实现。

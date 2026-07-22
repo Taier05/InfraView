@@ -16,7 +16,7 @@
 - [x] 部署、配置、架构、设计、开发、测试、安全和上下文恢复文档。
 - [x] 完成 Task 10 最终 `make verify` 等价全量验证。
 - [x] 完成 Mock MVP 独立分支首轮代码审查并处理全部 Critical/Important findings。
-- [ ] 完成修复后的统一全量验证与最终复审。
+- [x] 完成修复后的统一全量验证与最终复审（Critical 0、Important 0）。
 
 ## Nightingale 里程碑
 

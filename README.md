@@ -21,7 +21,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-默认可通过 `http://服务器IP:8080` 访问。`.env.example` 只能作为模板，禁止把示例凭据直接用于正式环境。HTTPS 反向代理部署时应设置 `INFRAVIEW_COOKIE_SECURE=true`。
+默认可通过 `http://服务器IP:8080` 访问。`.env.example` 只能作为模板，禁止把示例凭据直接用于正式环境。HTTPS 反向代理部署必须同时启用 Secure Cookie、回环端口绑定和精确可信代理 CIDR，详见[部署说明](docs/DEPLOYMENT.md)。
 
 ## 验证
 
