@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-Mock MVP 的 Task 1–9 已通过任务级规格与质量审查。Task 10 功能实现与最终统一验证完成，正在提交并等待完整分支代码审查。
+Mock MVP 的 Task 1–9 已通过任务级规格与质量审查。Task 10 已完成实现、复审修复和最终统一验证，当前等待完整分支代码审查。
 
 - 分支：`feature/infraview-mock-mvp`
 - 隔离 worktree：`/root/github/InfraView/.worktrees/infraview-mock-mvp`
@@ -45,6 +45,5 @@ Mock MVP 的 Task 1–9 已通过任务级规格与质量审查。Task 10 功能
 
 ## 下一步
 
-1. 提交 Task 10，并在本文记录准确提交。
-2. 对 `ee673f6..HEAD` 进行完整分支代码审查并修复发现项。
-3. 用户明确要求后再决定合并/推送；当前不推送、不合并。
+1. 对 `ee673f6..HEAD` 进行完整分支代码审查并修复发现项。
+2. 用户明确要求后再决定合并/推送；当前不推送、不合并。

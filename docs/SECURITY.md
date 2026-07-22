@@ -8,10 +8,12 @@
 - 默认同源，无 CORS 通用开放；设置 CSP、禁止 iframe、MIME 嗅探和不安全 referrer。
 - 业务 API 只读；command/restart/delete/patch/proxy/query 路由测试为 404/405。
 - 运行容器 UID/GID 10001、只读根文件系统、`/tmp` noexec/nosuid/nodev、capabilities 全删、禁止提权。
-- 不挂 Docker Socket，不使用特权模式、宿主 PID/network 或业务写卷。
+- 生产 InfraView 应用容器不挂 Docker Socket，不使用特权模式、宿主 PID/host network 或业务写卷。
 - 静态路径拒绝 dotfile、路径穿越和缺失资源 SPA fallback；只有指纹资源可 immutable。
 
 ## 信任边界与限制
+
+- E2E 的短生命周期 Playwright 浏览器容器是生产网络规则的明确例外：它使用 host network 访问专用 `127.0.0.1:18080` 验收端口，但不挂 Docker Socket、不运行 InfraView 服务、不进入生产 Compose 文件，并在测试结束后删除。
 
 - 固定账号意味着所有使用者共享身份，无用户审计、RBAC、MFA 或密码找回。
 - 直接 HTTP 访问会明文传输凭据和会话；不可信网络必须使用 Nginx/Caddy HTTPS，并设置 Secure Cookie。

@@ -3,7 +3,9 @@ GO_DOCKER = docker run --rm --user "$$(id -u):$$(id -g)" -e GOCACHE=/tmp/go-cach
 NODE_IMAGE ?= node:22-alpine
 NODE_DOCKER = docker run --rm --user "$$(id -u):$$(id -g)" -e npm_config_cache=/tmp/npm-cache -v "$$(pwd)":/src -w /src/web $(NODE_IMAGE)
 
-.PHONY: gofmt go-test go-test-race go-build web-test web-typecheck web-audit web-build web-copy image-build acceptance verify
+.NOTPARALLEL: verify
+
+.PHONY: gofmt go-test go-test-race go-build web-test web-typecheck web-audit web-build web-copy image-build e2e-safety-test acceptance verify
 
 gofmt:
 	@files="$$(find cmd internal -type f -name '*.go')"; \
@@ -42,7 +44,10 @@ go-build: web-copy
 image-build:
 	docker build --tag infraview:verify .
 
-acceptance:
-	cd web && INFRAVIEW_E2E_PROJECT=infraview-verify INFRAVIEW_E2E_PORT=18080 INFRAVIEW_E2E_RUN_BENCHMARK=true INFRAVIEW_E2E_CHECK_RESOURCES=true npm run e2e
+e2e-safety-test:
+	./scripts/e2e-safety.test.sh
 
-verify: web-test web-typecheck web-audit web-copy gofmt go-test go-test-race go-build image-build acceptance
+acceptance:
+	cd web && INFRAVIEW_E2E_PORT=18080 INFRAVIEW_E2E_RUN_BENCHMARK=true INFRAVIEW_E2E_CHECK_RESOURCES=true npm run e2e
+
+verify: web-test web-typecheck web-audit web-copy gofmt go-test go-test-race go-build image-build e2e-safety-test acceptance

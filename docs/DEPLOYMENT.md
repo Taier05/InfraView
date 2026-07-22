@@ -17,7 +17,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-在同一局域网访问 `http://服务器IP:8080`。如设置 `INFRAVIEW_PORT=18080`，则访问 `http://服务器IP:18080`。需要同时检查主机防火墙与网段访问控制。
+在同一局域网访问 `http://服务器IP:8080`。如设置 `INFRAVIEW_PORT=18080`，则访问 `http://服务器IP:18080`。这种纯端口写法会监听全部宿主接口，必须使用主机防火墙和网段访问控制限制来源。
 
 健康检查：
 
@@ -31,7 +31,7 @@ docker compose logs --tail=100 infraview
 
 ## 可选 Nginx HTTPS
 
-应用仍监听本机 8080，`.env` 设置 `INFRAVIEW_COOKIE_SECURE=true`：
+先在 `.env` 设置 `INFRAVIEW_PORT=127.0.0.1:8080` 和 `INFRAVIEW_COOKIE_SECURE=true`，使 InfraView 只发布到宿主回环地址，不再通过局域网 IP 直接提供明文 HTTP。随后关闭之前为 InfraView 开放的防火墙直连端口，再配置代理：
 
 ```nginx
 server {
@@ -61,7 +61,7 @@ infra.example.com {
 }
 ```
 
-同样设置 `INFRAVIEW_COOKIE_SECURE=true`。证书、DNS 和公网暴露由现有 Caddy/网络策略负责。
+同样设置 `INFRAVIEW_PORT=127.0.0.1:8080` 与 `INFRAVIEW_COOKIE_SECURE=true`，并关闭防火墙中的直接 HTTP 暴露。证书、DNS 和公网访问策略由现有 Caddy/网络策略负责。
 
 ## 升级
 
