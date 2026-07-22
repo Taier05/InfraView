@@ -1,10 +1,10 @@
 # InfraView 项目状态
 
-最后更新：2026-07-21
+最后更新：2026-07-22
 
 ## 当前阶段
 
-Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动和测试驱动方式实施。Task 1–7 已实现并通过任务级规格与质量审查。当前按用户要求暂停在 Task 8 主机详情页的 RED 阶段，等待下次会话继续。
+Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动和测试驱动方式实施。Task 1–8 已实现并通过任务级规格与质量审查。当前正在进行 Task 9：Go 托管 SPA 与安全单容器 Docker Compose 交付。
 
 ## 已确认范围
 
@@ -45,17 +45,18 @@ Mock MVP 正在隔离分支 `feature/infraview-mock-mvp` 中按子代理驱动�
 - Task 5：React/Vite 基础、深色中文主题、API 客户端、登录与会话加固。
 - Task 6：基础设施总览、四档真实聚合趋势、共享展示组件、30 秒刷新与 stale/error 展示。
 - Task 7：主机名/IP 搜索、状态筛选、服务端排序、URL 状态与分页规范化。
+- Task 8：主机详情、当前指标、文件系统容量、四类历史趋势、独立查询错误隔离与缓存保留。
 
 ## 当前任务
 
-Task 8 已完成 RED 准备，尚未写生产页面：
+Task 9 正在启动：
 
-- 已修改但未提交：`web/src/test/fixtures.ts`
-- 已新增但未提交：`web/src/features/hosts/HostDetailPage.test.tsx`
-- 已确认聚焦测试因 `./HostDetailPage` 不存在而失败，属于预期 RED。
-- `HostDetailPage.tsx` 尚未创建，没有需要回滚的部分生产实现。
+- 目标：由 Go 同源托管 SPA 与只读 API。
+- 交付：单一 InfraView 容器和 Docker Compose，可直接通过 `IP:端口` 访问。
+- 安全：非 root、只读根文件系统、删除全部 capabilities、禁止权限提升、不挂载 Docker Socket 或业务写卷。
+- 验证：静态路由与安全边界测试、容器冒烟测试、健康检查、空闲内存低于 256 MiB。
 - 当前分支：`feature/infraview-mock-mvp`
-- 当前 HEAD：`900d62f fix: canonicalize host list pagination`
+- Task 8 完成 HEAD：`ad74f54 fix: preserve cached host history`
 - 隔离 worktree：`/root/github/InfraView/.worktrees/infraview-mock-mvp`
 
 - [Mock MVP 实施计划](superpowers/plans/2026-07-20-infraview-mock-mvp.md)
@@ -63,22 +64,21 @@ Task 8 已完成 RED 准备，尚未写生产页面：
 
 ## 下一步
 
-1. 从现有 Task 8 RED 测试继续，创建 `HostDetailPage.tsx` 并实现独立 current/history 查询。
-2. 完成 Task 8 unit/typecheck/build/audit、任务提交与独立审查。
-3. 完成 Task 9 单容器 Docker Compose 与冒烟验证。
-4. 完成 Task 10 E2E、性能、资源占用和最终文档验收。
-5. 夜莺测试环境就绪后，进入真实适配器集成阶段。
+1. 完成 Task 9 Go 静态资源托管、安全单容器 Docker Compose 与冒烟验证。
+2. 完成 Task 10 E2E、缓存 API 延迟、资源占用和最终文档验收。
+3. 对完整 Mock MVP 分支进行最终代码审查并处理发现项。
+4. 夜莺测试环境就绪后，进入真实适配器集成阶段。
 
 ## 当前阻塞项
 
 - Nightingale 的版本、API 地址与认证方式尚未确定。因此当前阶段不实现或猜测真实 Nightingale API，只保留适配接口与配置边界。
-- 本次暂停是用户主动要求的上下文/token 检查点，不是代码或测试阻塞。
+- 当前无 Task 9 代码阻塞；需要本机 Docker 能正常构建并运行 Compose 以完成交付验收。
 
 ## 验证状态
 
-- 应用代码：Task 1–7 已实现并审查通过；Task 8 只有未提交测试与 fixture，生产页面尚未创建。
-- 自动化测试：截至 Task 7，前端 unit 32/32、typecheck、build 通过；全仓 Go 普通测试、race、vet、build、gofmt 检查通过；生产和全量 npm audit 均为 0 漏洞。Task 8 聚焦测试当前为预期 RED。
+- 应用代码：Task 1–8 已实现并通过独立规格与质量审查。
+- 自动化测试：截至 Task 8，前端 unit 50/50、typecheck、build 通过；全仓 Go 测试通过；生产和全量 npm audit 均为 0 漏洞。
 - Docker 镜像：尚未创建。
 - 设计规格：已确认并提交。
 - 实施计划：已编写并处于执行中。
-- 已知非阻塞项：Task 3 缺少 current TTL 20 秒的直接服务级默认值回归；ECharts 应在最终阶段考虑懒加载并优化重复生命周期；jsdom 不执行 canvas 初始化生命周期，计划在 Task 10 Playwright 覆盖。
+- 已知非阻塞项：Task 3 缺少 current TTL 20 秒的直接服务级默认值回归；ECharts 应在最终阶段考虑懒加载并优化重复生命周期；jsdom 不执行 canvas 初始化生命周期，计划在 Task 10 Playwright 覆盖；当前生产主 JS chunk 约 826 kB，超过 Vite 500 kB 警告阈值。
