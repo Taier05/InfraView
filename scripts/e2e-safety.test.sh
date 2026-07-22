@@ -123,4 +123,13 @@ done
 	exit 1
 }
 
+grep -Fq 'proxy_set_header X-Real-IP $remote_addr;' "$repo_root/docs/DEPLOYMENT.md" || {
+	echo "e2e-safety: FAIL: Nginx 示例未覆盖写入单值 X-Real-IP" >&2
+	exit 1
+}
+grep -Fq 'header_up X-Real-IP {remote_host}' "$repo_root/docs/DEPLOYMENT.md" || {
+	echo "e2e-safety: FAIL: Caddy 示例未覆盖写入单值 X-Real-IP" >&2
+	exit 1
+}
+
 echo "e2e-safety: PASS"

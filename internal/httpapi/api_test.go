@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"io"
@@ -191,6 +192,39 @@ func TestParseRemoteIPRemovesIPv6ZoneForStableMatching(t *testing.T) {
 	address, ok := parseRemoteIP("[fe80::1%eth0]:12345")
 	if !ok || address.String() != "fe80::1" {
 		t.Fatalf("parsed remote IP = %q, ok = %v; want unzoned fe80::1", address, ok)
+	}
+}
+
+func TestSameOriginTrustsForwardedProtoOnlyFromConfiguredProxy(t *testing.T) {
+	trusted := []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}
+	tests := []struct {
+		name       string
+		remoteAddr string
+		tls        bool
+		forwarded  []string
+		want       bool
+	}{
+		{name: "direct client cannot forge https", remoteAddr: "192.0.2.10:12345", forwarded: []string{"https"}, want: false},
+		{name: "trusted proxy supplies https", remoteAddr: "10.0.0.5:12345", forwarded: []string{"https"}, want: true},
+		{name: "trusted proxy chained value rejected", remoteAddr: "10.0.0.5:12345", forwarded: []string{"https, http"}, want: false},
+		{name: "trusted proxy multiple fields rejected", remoteAddr: "10.0.0.5:12345", forwarded: []string{"https", "http"}, want: false},
+		{name: "direct tls remains valid", remoteAddr: "192.0.2.10:12345", tls: true, want: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/session", nil)
+			request.RemoteAddr = test.remoteAddr
+			request.Header.Set("Origin", "https://example.com")
+			if test.tls {
+				request.TLS = &tls.ConnectionState{}
+			}
+			for _, value := range test.forwarded {
+				request.Header.Add("X-Forwarded-Proto", value)
+			}
+			if got := isSameOrigin(request, trusted); got != test.want {
+				t.Fatalf("same origin = %v, want %v", got, test.want)
+			}
+		})
 	}
 }
 

@@ -57,11 +57,13 @@ server {
 
 ```caddyfile
 infra.example.com {
-    reverse_proxy 127.0.0.1:8080
+    reverse_proxy 127.0.0.1:8080 {
+        header_up X-Real-IP {remote_host}
+    }
 }
 ```
 
-同样设置 `INFRAVIEW_PORT=127.0.0.1:8080`、`INFRAVIEW_COOKIE_SECURE=true` 与 `INFRAVIEW_TRUSTED_PROXY_CIDRS=127.0.0.1/32,::1/128`，并关闭防火墙中的直接 HTTP 暴露。若代理通过容器网络连接 InfraView，应改填该代理网络的精确 CIDR。证书、DNS 和公网访问策略由现有 Caddy/网络策略负责。
+同样设置 `INFRAVIEW_PORT=127.0.0.1:8080`、`INFRAVIEW_COOKIE_SECURE=true` 与 `INFRAVIEW_TRUSTED_PROXY_CIDRS=127.0.0.1/32,::1/128`，并关闭防火墙中的直接 HTTP 暴露。`header_up` 必须覆盖写入单值客户端 IP；不能只依赖默认 `X-Forwarded-For`。若代理通过容器网络连接 InfraView，应改填该代理网络的精确 CIDR。证书、DNS 和公网访问策略由现有 Caddy/网络策略负责。
 
 ## 升级
 

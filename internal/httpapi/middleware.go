@@ -90,7 +90,7 @@ func (a *api) requireAuthentication(next http.Handler) http.Handler {
 
 func (a *api) sameOrigin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !isSameOrigin(r) {
+		if !isSameOrigin(r, a.config.TrustedProxyCIDRs) {
 			writeError(w, r, http.StatusForbidden, "cross_origin_forbidden", "不允许跨域请求", false)
 			return
 		}
@@ -98,7 +98,7 @@ func (a *api) sameOrigin(next http.Handler) http.Handler {
 	})
 }
 
-func isSameOrigin(r *http.Request) bool {
+func isSameOrigin(r *http.Request, trustedProxyCIDRs []netip.Prefix) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
 		return true
@@ -110,8 +110,14 @@ func isSameOrigin(r *http.Request) bool {
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
-	} else if forwarded := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-Proto"), ",")[0]); forwarded == "http" || forwarded == "https" {
-		scheme = forwarded
+	} else if remoteIP, ok := parseRemoteIP(r.RemoteAddr); ok && isTrustedProxy(remoteIP, trustedProxyCIDRs) {
+		forwardedProto := r.Header.Values("X-Forwarded-Proto")
+		if len(forwardedProto) == 1 {
+			forwarded := strings.TrimSpace(forwardedProto[0])
+			if forwarded == "http" || forwarded == "https" {
+				scheme = forwarded
+			}
+		}
 	}
 	return strings.EqualFold(parsed.Scheme, scheme) && strings.EqualFold(parsed.Host, r.Host)
 }
