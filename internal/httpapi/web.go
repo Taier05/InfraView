@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -14,6 +15,8 @@ import (
 var embeddedWeb embed.FS
 
 const immutableCacheControl = "public, max-age=31536000, immutable"
+
+var fingerprintedAssetPattern = regexp.MustCompile(`^assets/.+-[A-Za-z0-9_-]{8,}\.[^./]+$`)
 
 func (a *api) web() http.Handler {
 	webRoot, err := fs.Sub(embeddedWeb, "webdist")
@@ -35,11 +38,7 @@ func (a *api) web() http.Handler {
 
 		if requestedPath != "" {
 			if info, statErr := fs.Stat(webRoot, requestedPath); statErr == nil && !info.IsDir() {
-				cacheControl := "no-cache"
-				if strings.HasPrefix(requestedPath, "assets/") {
-					cacheControl = immutableCacheControl
-				}
-				serveWebFile(w, r, webRoot, requestedPath, cacheControl)
+				serveWebFile(w, r, webRoot, requestedPath, webCacheControl(requestedPath))
 				return
 			}
 		}
@@ -50,6 +49,13 @@ func (a *api) web() http.Handler {
 		}
 		serveWebFile(w, r, webRoot, "index.html", "no-cache")
 	})
+}
+
+func webCacheControl(requestedPath string) string {
+	if fingerprintedAssetPattern.MatchString(requestedPath) {
+		return immutableCacheControl
+	}
+	return "no-cache"
 }
 
 func safeWebPath(urlPath string) (string, bool) {

@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     env_file:
-      - .env
+      - ${INFRAVIEW_ENV_FILE:-.env}
     ports:
       - "${INFRAVIEW_PORT:-8080}:8080"
     user: "10001:10001"

@@ -14,6 +14,24 @@ fail() {
 	exit 1
 }
 
+json_escape() {
+	printf '%s' "$1" | LC_ALL=C od -An -v -tu1 | awk '
+		{
+			for (field = 1; field <= NF; field++) {
+				byte = $field + 0
+				if (byte == 8) printf "\\b"
+				else if (byte == 9) printf "\\t"
+				else if (byte == 10) printf "\\n"
+				else if (byte == 12) printf "\\f"
+				else if (byte == 13) printf "\\r"
+				else if (byte == 34) printf "\\\""
+				else if (byte == 92) printf "\\\\"
+				else if (byte < 32) printf "\\u%04x", byte
+				else printf "%c", byte
+			}
+		}'
+}
+
 health_ready=false
 health_deadline=$(($(date +%s) + 60))
 while [ "$(date +%s)" -lt "$health_deadline" ]; do
@@ -26,8 +44,10 @@ done
 [ "$health_ready" = true ] || fail "健康检查在 60 秒内未就绪"
 grep -q '"status":"ok"' "$response_file" || fail "健康检查响应不正确"
 
+escaped_username=$(json_escape "$username")
+escaped_password=$(json_escape "$password")
 login_status=$(
-	printf '{"username":"%s","password":"%s"}' "$username" "$password" |
+	printf '{"username":"%s","password":"%s"}' "$escaped_username" "$escaped_password" |
 		curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
 			--cookie-jar "$cookie_file" \
 			--header 'Content-Type: application/json' \

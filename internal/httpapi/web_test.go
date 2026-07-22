@@ -61,6 +61,26 @@ func TestSPAServesFingerprintedAssetsWithImmutableCache(t *testing.T) {
 	assertSecurityHeaders(t, asset)
 }
 
+func TestWebCacheControlRequiresFingerprint(t *testing.T) {
+	tests := []struct {
+		path string
+		want string
+	}{
+		{path: "assets/index-D6tHgcxT.js", want: immutableCacheControl},
+		{path: "assets/theme-Btbu6QmO.css", want: immutableCacheControl},
+		{path: "assets/app.js", want: "no-cache"},
+		{path: "assets/vendor.min.css", want: "no-cache"},
+		{path: "index.html", want: "no-cache"},
+	}
+	for _, test := range tests {
+		t.Run(test.path, func(t *testing.T) {
+			if got := webCacheControl(test.path); got != test.want {
+				t.Fatalf("webCacheControl(%q) = %q, want %q", test.path, got, test.want)
+			}
+		})
+	}
+}
+
 func TestUnknownAPIRouteNeverFallsBackToSPA(t *testing.T) {
 	handler := newTestAPI(t, mock.New(3, testNow))
 	response := request(t, handler, http.MethodGet, "/api/v1/not-real", "", nil)
