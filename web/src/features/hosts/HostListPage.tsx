@@ -193,7 +193,9 @@ export function HostListPage() {
       header: () => sortButton('name', '主机'),
       cell: ({ row }) => (
         <div className="host-identity">
-          <Link to={`/hosts/${row.original.id}`}>{row.original.name}</Link>
+          <Link to={`/hosts/${encodeURIComponent(row.original.id)}`}>
+            {row.original.name}
+          </Link>
           <span>{row.original.ip}</span>
           <small>{row.original.os}</small>
         </div>
@@ -277,8 +279,10 @@ export function HostListPage() {
         </div>
       ) : hosts.isError ? (
         <ErrorPanel
+          title="无法加载主机列表"
           message={apiError?.message ?? '服务暂时无法处理请求'}
           retryable={apiError?.retryable ?? false}
+          retryLabel="重试主机列表"
           onRetry={() => void hosts.refetch()}
         />
       ) : responseNeedsPageNormalization ? (

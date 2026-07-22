@@ -30,18 +30,57 @@ export interface TrendSeries {
   points: TrendPoint[]
 }
 
+export type TrendValueFormat = 'percent' | 'bytesPerSecond' | 'number'
+
 export interface TrendChartProps {
   title: string
-  summary: string
   series: TrendSeries[]
-  unit?: string
+  valueFormat: TrendValueFormat
+}
+
+function decimal(value: number) {
+  return new Intl.NumberFormat('zh-CN', {
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
+export function formatTrendValue(
+  value: number,
+  valueFormat: TrendValueFormat,
+) {
+  if (valueFormat === 'percent') return `${decimal(value)}%`
+  if (valueFormat === 'number') return decimal(value)
+
+  const units = ['B/s', 'KiB/s', 'MiB/s', 'GiB/s'] as const
+  let scaled = value
+  let unitIndex = 0
+  while (Math.abs(scaled) >= 1024 && unitIndex < units.length - 1) {
+    scaled /= 1024
+    unitIndex += 1
+  }
+  return `${decimal(scaled)} ${units[unitIndex]}`
+}
+
+function seriesSummary(
+  series: TrendSeries[],
+  valueFormat: TrendValueFormat,
+) {
+  return series
+    .map((item) => {
+      const values = item.points.flatMap((point) =>
+        point.value === null ? [] : [point.value],
+      )
+      if (values.length === 0) return `${item.name}趋势：暂无数据。`
+      const recent = values.at(-1) as number
+      return `${item.name}趋势：最低 ${formatTrendValue(Math.min(...values), valueFormat)}，最高 ${formatTrendValue(Math.max(...values), valueFormat)}，最近值 ${formatTrendValue(recent, valueFormat)}。`
+    })
+    .join('')
 }
 
 export function TrendChart({
   title,
-  summary,
   series,
-  unit = '%',
+  valueFormat,
 }: TrendChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const titleID = useId()
@@ -51,6 +90,8 @@ export function TrendChart({
     if (container === null) return
 
     let chart: EChartsType | null = null
+    const valueFormatter = (value: number) =>
+      formatTrendValue(value, valueFormat)
     const option: TrendChartOption = {
       animation: false,
       color: ['#9bc5be', '#d9b77b', '#d39a96'],
@@ -58,7 +99,7 @@ export function TrendChart({
       tooltip: {
         trigger: 'axis',
         valueFormatter: (value) =>
-          value === null || value === undefined ? '暂无数据' : `${value}${unit}`,
+          typeof value === 'number' ? valueFormatter(value) : '暂无数据',
       },
       xAxis: {
         type: 'time',
@@ -67,7 +108,7 @@ export function TrendChart({
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: '#91a0aa', formatter: `{value}${unit}` },
+        axisLabel: { color: '#91a0aa', formatter: valueFormatter },
         splitLine: { lineStyle: { color: '#293640' } },
       },
       series: series.map((item) => ({
@@ -102,7 +143,7 @@ export function TrendChart({
       window.removeEventListener('resize', renderChart)
       chart?.dispose()
     }
-  }, [series, unit])
+  }, [series, valueFormat])
 
   const hasData = series.some((item) =>
     item.points.some((point) => point.value !== null),
@@ -111,7 +152,7 @@ export function TrendChart({
   return (
     <section className="trend-panel" aria-labelledby={titleID}>
       <h2 id={titleID}>{title}</h2>
-      <p className="sr-only">{summary}</p>
+      <p className="sr-only">{seriesSummary(series, valueFormat)}</p>
       {hasData ? (
         <div className="trend-chart" ref={containerRef} aria-hidden="true" />
       ) : (

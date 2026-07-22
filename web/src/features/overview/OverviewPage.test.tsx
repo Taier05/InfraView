@@ -320,6 +320,7 @@ it('可重试错误显示中文信息并可重试成功', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent(
     '数据源暂时不可用，请稍后重试',
   )
+  expect(screen.getByRole('alert')).toHaveTextContent('无法加载总览数据')
   await user.click(screen.getByRole('button', { name: '重试' }))
 
   expect(
@@ -347,16 +348,17 @@ it('不可重试错误不显示重试入口', async () => {
 })
 
 describe('TrendChart', () => {
-  it('为图表提供无需观察画布即可理解的读屏摘要', () => {
+  it('用百分比格式从真实 series 生成读屏摘要', () => {
     render(
       <TrendChart
         title="CPU 使用率趋势"
-        summary="CPU 使用率趋势：最低 32%，最高 61%，最近值 48%。"
+        valueFormat="percent"
         series={[
           {
             name: 'CPU 使用率',
             points: [
               { timestamp: '2026-07-21T00:00:00.000Z', value: 32 },
+              { timestamp: '2026-07-21T00:15:00.000Z', value: 61 },
               { timestamp: '2026-07-21T00:30:00.000Z', value: 48 },
             ],
           },
@@ -370,5 +372,30 @@ describe('TrendChart', () => {
     expect(
       screen.getByText('CPU 使用率趋势：最低 32%，最高 61%，最近值 48%。'),
     ).toHaveClass('sr-only')
+  })
+
+  it('用同一 IEC B/s 格式生成磁盘速率读屏摘要', () => {
+    render(
+      <TrendChart
+        title="磁盘 I/O 趋势"
+        valueFormat="bytesPerSecond"
+        series={[
+          {
+            name: '磁盘读取速率',
+            points: [
+              { timestamp: '2026-07-21T00:00:00.000Z', value: 1_048_576 },
+              { timestamp: '2026-07-21T00:30:00.000Z', value: 2_097_152 },
+            ],
+          },
+        ]}
+      />,
+    )
+
+    expect(
+      screen.getByText(
+        '磁盘读取速率趋势：最低 1 MiB/s，最高 2 MiB/s，最近值 2 MiB/s。',
+      ),
+    ).toHaveClass('sr-only')
+    expect(screen.queryByText(/1048576 B\/s/)).not.toBeInTheDocument()
   })
 })

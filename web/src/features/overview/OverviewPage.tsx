@@ -29,33 +29,6 @@ const trendLabels: Record<OverviewTrend['key'], string> = {
   memory_usage: '内存使用率',
 }
 
-function formatTrendValue(value: number) {
-  return new Intl.NumberFormat('zh-CN', {
-    maximumFractionDigits: 1,
-  }).format(value)
-}
-
-function trendSummary(trends: OverviewTrend[]) {
-  return trends
-    .map((trend) => {
-      const values = trend.points.flatMap((point) =>
-        point.value === null ? [] : [point.value],
-      )
-      if (values.length === 0) {
-        return `${trendLabels[trend.key]}趋势：暂无数据。`
-      }
-      let recent: number | null = null
-      for (let index = trend.points.length - 1; index >= 0; index -= 1) {
-        if (trend.points[index].value !== null) {
-          recent = trend.points[index].value
-          break
-        }
-      }
-      return `${trendLabels[trend.key]}趋势：最低 ${formatTrendValue(Math.min(...values))}${trend.unit}，最高 ${formatTrendValue(Math.max(...values))}${trend.unit}，最近值 ${recent === null || recent === undefined ? '暂无数据' : `${formatTrendValue(recent)}${trend.unit}`}。`
-    })
-    .join('')
-}
-
 export function OverviewPage() {
   const [range, setRange] = useState<TimeRange>('24h')
   const overview = useQuery({
@@ -105,8 +78,10 @@ export function OverviewPage() {
         </div>
       ) : overview.isError ? (
         <ErrorPanel
+          title="无法加载总览数据"
           message={apiError?.message ?? '服务暂时无法处理请求'}
           retryable={apiError?.retryable ?? false}
+          retryLabel="重试"
           onRetry={() => void overview.refetch()}
         />
       ) : (
@@ -147,8 +122,7 @@ export function OverviewPage() {
           </div>
           <TrendChart
             title="资源使用趋势"
-            summary={trendSummary(overview.data.data.trends)}
-            unit="%"
+            valueFormat="percent"
             series={overview.data.data.trends.map((trend) => ({
               name: trendLabels[trend.key],
               points: trend.points,

@@ -155,6 +155,20 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
   })
 })
 
+it('对包含路径和 URL 分隔符的主机 ID 编码详情链接', async () => {
+  const response = hostPageFixture()
+  response.data.hosts[0].id = 'rack/a ?#1'
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    requestedURLs.push(requestURL(input))
+    return Promise.resolve(jsonResponse(response))
+  })
+  renderHostList()
+
+  expect(
+    await screen.findByRole('link', { name: 'linux-app-01' }),
+  ).toHaveAttribute('href', '/hosts/rack%2Fa%20%3F%231')
+})
+
 it('从 URL 恢复列表状态并在详情返回后完整保留', async () => {
   const user = userEvent.setup()
   const initialEntry =

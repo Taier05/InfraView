@@ -1,19 +1,27 @@
 export interface ErrorPanelProps {
+  title: string
   message: string
   retryable: boolean
+  retryLabel: string
   onRetry: () => void
 }
 
-export function ErrorPanel({ message, retryable, onRetry }: ErrorPanelProps) {
+export function ErrorPanel({
+  title,
+  message,
+  retryable,
+  retryLabel,
+  onRetry,
+}: ErrorPanelProps) {
   return (
     <div className="error-panel" role="alert">
       <div>
-        <strong>无法加载总览数据</strong>
+        <strong>{title}</strong>
         <p>{message}</p>
       </div>
       {retryable && (
         <button className="secondary-button" type="button" onClick={onRetry}>
-          重试
+          {retryLabel}
         </button>
       )}
     </div>
