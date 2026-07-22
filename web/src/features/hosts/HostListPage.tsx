@@ -127,6 +127,8 @@ export function HostListPage() {
         `/api/v1/hosts?${requestParameters.toString()}`,
         { signal },
       ),
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   })
   const responsePage = hosts.data?.data.page
   const responseTotalPages = hosts.data?.data.total_pages
@@ -266,6 +268,15 @@ export function HostListPage() {
             <option value="offline">离线</option>
           </select>
         </label>
+        <button
+          className="secondary-button host-list-refresh"
+          type="button"
+          aria-label="刷新主机列表"
+          disabled={hosts.isFetching}
+          onClick={() => void hosts.refetch()}
+        >
+          刷新
+        </button>
       </div>
 
       {hosts.data?.meta.stale === true &&
@@ -273,11 +284,23 @@ export function HostListPage() {
           <StaleBanner collectedAt={hosts.data.meta.collected_at} />
         )}
 
-      {hosts.isPending ? (
+      {hosts.data !== undefined && apiError !== null && (
+        <div className="host-refresh-error">
+          <ErrorPanel
+            title="主机列表刷新失败"
+            message={apiError.message}
+            retryable={apiError.retryable}
+            retryLabel="重试主机列表"
+            onRetry={() => void hosts.refetch()}
+          />
+        </div>
+      )}
+
+      {hosts.data === undefined && hosts.isPending ? (
         <div className="host-list-loading" role="status">
           正在加载主机列表…
         </div>
-      ) : hosts.isError ? (
+      ) : hosts.data === undefined ? (
         <ErrorPanel
           title="无法加载主机列表"
           message={apiError?.message ?? '服务暂时无法处理请求'}

@@ -123,3 +123,10 @@ export interface HostMetricsData {
 }
 
 export type HostMetricsResponse = ApiResponse<HostMetricsData>
+
+export interface DataSourceStatusData {
+  healthy: boolean
+  checked_at: string
+}
+
+export type DataSourceStatusResponse = ApiResponse<DataSourceStatusData>

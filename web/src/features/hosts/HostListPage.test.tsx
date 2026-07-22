@@ -389,3 +389,91 @@ it('连续快速输入只在最后一次变更 300ms 后请求最终搜索词', 
   expect(lastRequest().searchParams.get('q')).toBe('abc')
   expect(window.location.search).toContain('q=abc')
 })
+
+it('支持手动刷新并在请求期间禁用刷新按钮', async () => {
+  let resolveRefresh!: (response: Response) => void
+  vi.mocked(globalThis.fetch)
+    .mockResolvedValueOnce(jsonResponse(hostPageFixture()))
+    .mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveRefresh = resolve
+        }),
+    )
+  const user = userEvent.setup()
+  renderHostList()
+
+  await screen.findByRole('link', { name: 'linux-app-01' })
+  const refresh = screen.getByRole('button', { name: '刷新主机列表' })
+  await user.click(refresh)
+
+  expect(refresh).toBeDisabled()
+  expect(globalThis.fetch).toHaveBeenCalledTimes(2)
+  await act(async () => resolveRefresh(jsonResponse(hostPageFixture())))
+  await waitFor(() => expect(refresh).toBeEnabled())
+})
+
+it('每 30 秒非重叠自动刷新主机列表', async () => {
+  vi.useFakeTimers()
+  let resolveInitial!: (response: Response) => void
+  vi.mocked(globalThis.fetch).mockImplementationOnce(
+    (input) => {
+      requestedURLs.push(requestURL(input))
+      return new Promise<Response>((resolve) => {
+        resolveInitial = resolve
+      })
+    },
+  )
+  renderHostList()
+
+  await act(async () => vi.advanceTimersByTimeAsync(60_000))
+  expect(requestedURLs).toHaveLength(1)
+
+  await act(async () => {
+    resolveInitial(jsonResponse(hostPageFixture()))
+    await vi.advanceTimersByTimeAsync(0)
+  })
+  expect(screen.getByRole('link', { name: 'linux-app-01' })).toBeInTheDocument()
+
+  await act(async () => vi.advanceTimersByTimeAsync(29_999))
+  expect(requestedURLs).toHaveLength(1)
+  await act(async () => vi.advanceTimersByTimeAsync(1))
+  expect(requestedURLs).toHaveLength(2)
+})
+
+it('后台刷新失败时保留已有表格并显示可重试提示', async () => {
+  vi.mocked(globalThis.fetch)
+    .mockResolvedValueOnce(jsonResponse(hostPageFixture()))
+    .mockResolvedValueOnce(
+      jsonResponse(
+        {
+          code: 'datasource_unavailable',
+          message: '数据源暂时不可用，请稍后重试',
+          request_id: 'req-host-list-refresh-failed-001',
+          retryable: true,
+        },
+        503,
+      ),
+    )
+    .mockResolvedValueOnce(jsonResponse(hostPageFixture()))
+  const user = userEvent.setup()
+  renderHostList()
+
+  await screen.findByRole('link', {
+    name: 'linux-app-01',
+  })
+  await user.click(screen.getByRole('button', { name: '刷新主机列表' }))
+
+  const error = await screen.findByRole('alert')
+  expect(error).toHaveTextContent('主机列表刷新失败')
+  expect(error).toHaveTextContent('数据源暂时不可用，请稍后重试')
+  expect(
+    screen.getByRole('link', { name: 'linux-app-01' }),
+  ).toBeInTheDocument()
+  expect(screen.getByText('第 1 / 3 页，共 41 台')).toBeInTheDocument()
+
+  await user.click(
+    within(error).getByRole('button', { name: '重试主机列表' }),
+  )
+  await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+})

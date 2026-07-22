@@ -43,6 +43,21 @@ function mockAuthenticatedRequests(
     if (requestPath(input) === '/api/v1/overview') {
       return Promise.resolve(jsonResponse(overviewFixture()))
     }
+    if (requestPath(input) === '/api/v1/datasource/status') {
+      return Promise.resolve(
+        jsonResponse({
+          data: {
+            healthy: true,
+            checked_at: '2026-07-22T02:03:04.000Z',
+          },
+          meta: {
+            request_id: 'req-datasource-001',
+            stale: false,
+            collected_at: '2026-07-22T02:03:05.000Z',
+          },
+        }),
+      )
+    }
     if (init?.method === 'DELETE') {
       return Promise.resolve(logoutResponse())
     }
@@ -116,6 +131,7 @@ it('登录后进入基础设施总览', async () => {
 })
 
 it('凭据无效时显示后端返回的中文错误', async () => {
+  const clear = vi.spyOn(QueryClient.prototype, 'clear')
   const user = userEvent.setup()
   render(<App />)
 
@@ -124,6 +140,8 @@ it('凭据无效时显示后端返回的中文错误', async () => {
   await user.click(screen.getByRole('button', { name: '登录' }))
 
   expect(await screen.findByRole('alert')).toHaveTextContent('用户名或密码错误')
+  expect(clear).not.toHaveBeenCalled()
+  expect(window.location.pathname).toBe('/login')
 })
 
 it('登录失败后清空密码', async () => {
@@ -210,6 +228,47 @@ it('注销成功后清空查询缓存并回到登录页', async () => {
     await screen.findByRole('heading', { name: '基础设施总览' }),
   ).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: '退出登录' }))
+
+  expect(
+    await screen.findByRole('heading', { name: '登录 InfraView' }),
+  ).toBeInTheDocument()
+  expect(clear).toHaveBeenCalledTimes(1)
+  expect(window.location.pathname).toBe('/login')
+})
+
+it('容器重启导致受保护 API 会话失效时清空缓存并回到登录页', async () => {
+  const clear = vi.spyOn(QueryClient.prototype, 'clear')
+  let overviewRequests = 0
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+    const path = requestPath(input)
+    if (path === '/api/v1/overview') {
+      overviewRequests += 1
+      if (overviewRequests === 1) {
+        return Promise.resolve(jsonResponse(overviewFixture()))
+      }
+      return Promise.resolve(jsonResponse(unauthenticatedFixture, 401))
+    }
+    if (path === '/api/v1/datasource/status') {
+      return Promise.resolve(
+        jsonResponse({
+          data: {
+            healthy: true,
+            checked_at: '2026-07-22T02:03:04.000Z',
+          },
+          meta: { request_id: 'req-datasource-001', stale: false },
+        }),
+      )
+    }
+    return Promise.resolve(jsonResponse(sessionFixture('admin')))
+  })
+  window.history.pushState({}, '', '/')
+  const user = userEvent.setup()
+  render(<App />)
+
+  expect(
+    await screen.findByRole('heading', { name: '基础设施总览' }),
+  ).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: '刷新' }))
 
   expect(
     await screen.findByRole('heading', { name: '登录 InfraView' }),

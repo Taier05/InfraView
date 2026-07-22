@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { APIError, apiRequest } from './client'
+import { APIError, apiRequest, onUnauthorized } from './client'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -28,4 +28,44 @@ describe.each([
       retryable: false,
     })
   })
+})
+
+it('受保护的会话删除请求返回 401 时通知认证失效', async () => {
+  const unauthorized = vi.fn()
+  const unsubscribe = onUnauthorized(unauthorized)
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(
+      new Response('', {
+        status: 401,
+        headers: { 'Content-Type': 'text/plain' },
+      }),
+    ),
+  )
+
+  await expect(
+    apiRequest('/api/v1/session', { method: 'DELETE' }),
+  ).rejects.toBeInstanceOf(APIError)
+  expect(unauthorized).toHaveBeenCalledTimes(1)
+  unsubscribe()
+})
+
+it('登录请求自身返回 401 时不通知认证失效', async () => {
+  const unauthorized = vi.fn()
+  const unsubscribe = onUnauthorized(unauthorized)
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(
+      new Response('', {
+        status: 401,
+        headers: { 'Content-Type': 'text/plain' },
+      }),
+    ),
+  )
+
+  await expect(
+    apiRequest('/api/v1/session', { method: 'POST' }),
+  ).rejects.toBeInstanceOf(APIError)
+  expect(unauthorized).not.toHaveBeenCalled()
+  unsubscribe()
 })

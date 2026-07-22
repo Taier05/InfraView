@@ -4,11 +4,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
 
-import { APIError, apiRequest } from '../api/client'
+import { APIError, apiRequest, onUnauthorized } from '../api/client'
 import type {
   ApiResponse,
   LoginCredentials,
@@ -30,8 +31,26 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const [status, setStatus] = useState<AuthStatus>('loading')
+  const statusRef = useRef<AuthStatus>('loading')
   const [username, setUsername] = useState<string | null>(null)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
+
+  function updateStatus(nextStatus: AuthStatus) {
+    statusRef.current = nextStatus
+    setStatus(nextStatus)
+  }
+
+  useEffect(
+    () =>
+      onUnauthorized(() => {
+        if (statusRef.current !== 'authenticated') return
+        statusRef.current = 'unauthenticated'
+        queryClient.clear()
+        setUsername(null)
+        setStatus('unauthenticated')
+      }),
+    [queryClient],
+  )
 
   useEffect(() => {
     const controller = new AbortController()
@@ -41,12 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
       .then((response) => {
         setUsername(response.data.username)
-        setStatus('authenticated')
+        updateStatus('authenticated')
       })
       .catch(() => {
         if (!controller.signal.aborted) {
           setUsername(null)
-          setStatus('unauthenticated')
+          updateStatus('unauthenticated')
         }
       })
 
@@ -64,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         '/api/v1/session',
       )
       setUsername(response.data.username)
-      setStatus('authenticated')
+      updateStatus('authenticated')
     } finally {
       setIsLoggingIn(false)
     }
@@ -74,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await apiRequest<void>('/api/v1/session', { method: 'DELETE' })
     queryClient.clear()
     setUsername(null)
-    setStatus('unauthenticated')
+    updateStatus('unauthenticated')
   }
 
   const value = useMemo<AuthContextValue>(

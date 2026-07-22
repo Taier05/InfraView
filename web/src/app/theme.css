@@ -309,6 +309,41 @@ h1 {
   background: #8d9ca3;
 }
 
+.source-status[data-state="healthy"] .status-dot {
+  background: var(--success);
+}
+
+.source-status[data-state="unhealthy"] .status-dot,
+.source-status[data-state="error"] .status-dot {
+  background: var(--danger);
+}
+
+.source-status[data-state="stale"] .status-dot {
+  background: var(--warning);
+}
+
+.source-last-result,
+.source-checked-at,
+.source-request-error {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.source-checked-at {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.source-checked-at time {
+  color: #c4ced4;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.source-request-error {
+  color: var(--danger);
+}
+
 .workspace {
   min-width: 0;
 }
@@ -462,6 +497,10 @@ h1 {
 
 .host-refresh-error .error-panel {
   min-height: 0;
+}
+
+.host-list-refresh {
+  align-self: end;
 }
 
 .overview-loading {

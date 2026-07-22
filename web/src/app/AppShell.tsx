@@ -1,12 +1,45 @@
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
-import { APIError } from '../api/client'
+import { APIError, apiRequest } from '../api/client'
+import type { DataSourceStatusResponse } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
 
 export function AppShell() {
   const { logout, username } = useAuth()
   const [logoutError, setLogoutError] = useState<string | null>(null)
+  const datasource = useQuery({
+    queryKey: ['datasource-status'],
+    queryFn: ({ signal }) =>
+      apiRequest<DataSourceStatusResponse>('/api/v1/datasource/status', {
+        signal,
+      }),
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+  })
+
+  const datasourceData = datasource.data
+  const datasourceState =
+    datasourceData === undefined
+      ? datasource.isPending
+        ? 'loading'
+        : 'error'
+      : datasourceData.meta.stale
+        ? 'stale'
+        : datasourceData.data.healthy
+          ? 'healthy'
+          : 'unhealthy'
+  const datasourceLabel =
+    datasourceState === 'loading'
+      ? '正在检查'
+      : datasourceState === 'error'
+        ? '请求失败'
+        : datasourceState === 'stale'
+          ? '状态过期'
+          : datasourceState === 'healthy'
+            ? '健康'
+            : '异常'
 
   async function handleLogout() {
     setLogoutError(null)
@@ -45,13 +78,40 @@ export function AppShell() {
           <NavLink to="/hosts">主机</NavLink>
         </nav>
 
-        <div className="source-status" aria-label="数据源状态">
+        <div
+          className="source-status"
+          aria-label="数据源状态"
+          data-state={datasourceState}
+        >
           <span className="status-label">数据源</span>
           <strong>Mock</strong>
           <span className="status-detail">
             <span className="status-dot" aria-hidden="true" />
-            等待状态数据
+            {datasourceLabel}
           </span>
+          {datasourceData !== undefined && (
+            <>
+              {datasourceData.meta.stale && (
+                <span className="source-last-result">
+                  上次检查{datasourceData.data.healthy ? '健康' : '异常'}
+                </span>
+              )}
+              <span className="source-checked-at">
+                最近检查
+                <time dateTime={datasourceData.data.checked_at}>
+                  {new Intl.DateTimeFormat('zh-CN', {
+                    dateStyle: 'short',
+                    timeStyle: 'medium',
+                  }).format(new Date(datasourceData.data.checked_at))}
+                </time>
+              </span>
+            </>
+          )}
+          {datasourceData !== undefined && datasource.isError && (
+            <span className="source-request-error" role="alert">
+              状态刷新失败
+            </span>
+          )}
         </div>
       </aside>
 

@@ -1,5 +1,9 @@
 import type { ApiErrorBody } from './types'
 
+type UnauthorizedHandler = () => void
+
+const unauthorizedHandlers = new Set<UnauthorizedHandler>()
+
 const fallbackMessages: Record<number, string> = {
   400: '请求内容无效，请检查后重试',
   401: '请先登录',
@@ -39,10 +43,33 @@ function fallbackMessage(status: number) {
   return fallbackMessages[status] ?? '请求失败，请稍后重试'
 }
 
+export function onUnauthorized(handler: UnauthorizedHandler) {
+  unauthorizedHandlers.add(handler)
+  return () => {
+    unauthorizedHandlers.delete(handler)
+  }
+}
+
+function notifyUnauthorized(
+  path: string,
+  method: string,
+  status: number,
+  code: string,
+) {
+  if (
+    (path === '/api/v1/session' && method === 'POST') ||
+    (status !== 401 && code !== 'unauthorized')
+  ) {
+    return
+  }
+  for (const handler of unauthorizedHandlers) handler()
+}
+
 export async function apiRequest<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
+  const method = (init.method ?? 'GET').toUpperCase()
   const headers = new Headers(init.headers)
   if (init.body !== undefined && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
@@ -76,6 +103,7 @@ export async function apiRequest<T>(
     }
 
     if (isApiErrorBody(body)) {
+      notifyUnauthorized(path, method, response.status, body.code)
       throw new APIError(
         response.status,
         body.code,
@@ -85,6 +113,7 @@ export async function apiRequest<T>(
       )
     }
 
+    notifyUnauthorized(path, method, response.status, 'request_failed')
     throw new APIError(
       response.status,
       'request_failed',
