@@ -424,4 +424,17 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 })
   }),
   http.get(OVERVIEW_PATH, () => HttpResponse.json(overviewFixture())),
+  http.get('/api/v1/datasource/status', () =>
+    HttpResponse.json({
+      data: {
+        healthy: true,
+        checked_at: '2026-07-22T02:03:04.000Z',
+      },
+      meta: {
+        request_id: 'req-datasource-default-001',
+        stale: false,
+        collected_at: '2026-07-22T02:03:05.000Z',
+      },
+    }),
+  ),
 ]
