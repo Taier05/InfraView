@@ -94,10 +94,6 @@ while [ "$run" -le 2 ]; do
 		echo "e2e-safety: FAIL: 假 Docker up 失败时 E2E 仍返回成功" >&2
 		exit 1
 	}
-	if grep -Eq '(^| )down( |$)' "$call_log"; then
-		echo "e2e-safety: FAIL: 项目未成功创建时 trap 仍执行了 down" >&2
-		exit 1
-	fi
 	project=$(awk '$1 == "compose" && $2 == "-p" { for (field = 1; field <= NF; field++) if ($field == "up") { print $3; exit } }' "$call_log")
 	[ -n "$project" ] || {
 		echo "e2e-safety: FAIL: 未观察到默认项目名" >&2
@@ -110,6 +106,11 @@ while [ "$run" -le 2 ]; do
 			exit 1
 			;;
 	esac
+	down_project=$(awk '$1 == "compose" && $2 == "-p" { for (field = 1; field <= NF; field++) if ($field == "down") { print $3; exit } }' "$call_log")
+	[ "$down_project" = "$project" ] || {
+		echo "e2e-safety: FAIL: up 部分失败后未精确清理本次项目：up=$project down=${down_project:-none}" >&2
+		exit 1
+	}
 	if [ "$run" -eq 1 ]; then
 		first_project=$project
 	else

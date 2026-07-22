@@ -12,7 +12,7 @@ fi
 base_url="http://127.0.0.1:$host_port"
 playwright_image=${PLAYWRIGHT_IMAGE:-mcr.microsoft.com/playwright:v1.61.1-noble}
 env_file=$(mktemp)
-project_created=false
+project_owned=false
 
 fail() {
 	echo "e2e: FAIL: $*" >&2
@@ -23,7 +23,7 @@ cleanup() {
 	status=$?
 	trap - EXIT HUP INT TERM
 	cd "$repo_root"
-	if [ "$project_created" = true ]; then
+	if [ "$project_owned" = true ]; then
 		INFRAVIEW_ENV_FILE="$env_file" INFRAVIEW_PORT="$host_port" \
 			docker compose -p "$project_name" --env-file "$env_file" down --remove-orphans >/dev/null 2>&1 || true
 	fi
@@ -75,9 +75,9 @@ printf '%s\n' \
 	'TZ=Asia/Hong_Kong' >"$env_file"
 
 cd "$repo_root"
+project_owned=true
 INFRAVIEW_ENV_FILE="$env_file" INFRAVIEW_PORT="$host_port" \
 	docker compose -p "$project_name" --env-file "$env_file" up -d --build
-project_created=true
 
 INFRAVIEW_BASE_URL="$base_url" \
 	INFRAVIEW_USERNAME="$username" \
