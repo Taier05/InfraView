@@ -4,10 +4,13 @@
 
 ## 当前阶段
 
-Mock MVP 的 Task 1–10 已完成，并通过完整分支最终独立审查。最终结论为 Critical 0、Important 0；当前分支已具备交付条件，但尚未推送或合并。
+Mock MVP 的 Task 1–10 已完成，并通过完整分支最终独立审查。最终结论为 Critical 0、Important 0；功能分支已通过 merge commit 合入并推送到 `main`，当前 Mock 版本已在局域网设备部署运行。
 
-- 分支：`feature/infraview-mock-mvp`
-- 隔离 worktree：`/root/github/InfraView/.worktrees/infraview-mock-mvp`
+- 当前分支：`main`
+- 主工作树：`/root/github/InfraView`
+- 保留的开发 worktree：`/root/github/InfraView/.worktrees/infraview-mock-mvp`
+- 合并提交：`f901023 merge: deliver InfraView Mock MVP`
+- 发布标签：`v0.1.0-mock`
 - Task 10 基线：`ee673f6 docs: record task 9 completion`
 - Task 10 交付提交：`d401f0b test: verify and document InfraView MVP`。
 - Task 10 隔离修复：`a2736f4 fix: isolate e2e compose projects`。
@@ -49,7 +52,16 @@ Mock MVP 的 Task 1–10 已完成，并通过完整分支最终独立审查。�
 
 真实 Nightingale 集成缺少精确版本、认证和实际只读 API 证据。该阻塞不影响 Mock MVP；在证据就绪前禁止猜测实现。
 
+## 当前部署
+
+- 访问地址：`http://192.168.8.200:8080`
+- 数据源：确定性 Mock，32 台主机。
+- Compose 服务：`infraview`，健康状态正常。
+- 运行验证：smoke PASS；局域网首页可访问；内存约 `7.4 MiB`。
+- 容器安全：UID/GID 10001、只读根文件系统、capabilities 全删、禁止提权、`restart: unless-stopped`。
+- 登录凭据仅保存在主工作树被 Git 忽略且权限为 600 的 `.env`，文档和仓库不记录密码。
+
 ## 下一步
 
-1. 用户明确要求后再决定合并/推送；当前不推送、不合并。
+1. 由用户从浏览器完成 Mock 页面人工体验验收。
 2. Nightingale 测试环境就绪后，按已记录证据要求进入第二阶段规格和实现。
