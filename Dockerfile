@@ -12,6 +12,7 @@ FROM golang:1.24-bookworm AS go-build
 
 WORKDIR /src
 COPY go.mod ./
+COPY docker-compose.yml ./
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 COPY --from=web-build /src/web/dist/ ./internal/httpapi/webdist/
