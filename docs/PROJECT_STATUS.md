@@ -9,7 +9,7 @@ Mock MVP 的 Task 1–9 已通过任务级规格与质量审查。Task 10 功能
 - 分支：`feature/infraview-mock-mvp`
 - 隔离 worktree：`/root/github/InfraView/.worktrees/infraview-mock-mvp`
 - Task 10 基线：`ee673f6 docs: record task 9 completion`
-- Task 10 交付提交：将在本次交付提交后的状态记录提交中填写。
+- Task 10 交付提交：`d401f0b test: verify and document InfraView MVP`。
 - 实施计划：`docs/superpowers/plans/2026-07-20-infraview-mock-mvp.md`
 - 本地 SDD 账本：`.superpowers/sdd/progress.md`，被 Git 忽略，不提交。
 
