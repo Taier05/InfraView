@@ -4,12 +4,14 @@
 
 ## 当前阶段
 
-Mock MVP 的 Task 1–9 已通过任务级规格与质量审查。Task 10 已完成实现、复审修复和最终统一验证，当前等待完整分支代码审查。
+Mock MVP 的 Task 1–10 已完成。完整分支首轮审查发现的 6 个 Important 已按 TDD 修复，当前正在执行统一全量验证和最终复审。
 
 - 分支：`feature/infraview-mock-mvp`
 - 隔离 worktree：`/root/github/InfraView/.worktrees/infraview-mock-mvp`
 - Task 10 基线：`ee673f6 docs: record task 9 completion`
 - Task 10 交付提交：`d401f0b test: verify and document InfraView MVP`。
+- Task 10 隔离修复：`a2736f4 fix: isolate e2e compose projects`。
+- 最终分支修复：`525f343`（部分 E2E 清理）、`17b26fe`（可信代理/重启策略）、`d88138d`（前端状态/刷新/会话失效）。
 - 实施计划：`docs/superpowers/plans/2026-07-20-infraview-mock-mvp.md`
 - 本地 SDD 账本：`.superpowers/sdd/progress.md`，被 Git 忽略，不提交。
 
@@ -20,6 +22,8 @@ Mock MVP 的 Task 1–9 已通过任务级规格与质量审查。Task 10 已完
 - TTL 缓存、相同请求合并、最多 5 分钟旧值降级。
 - 总览、主机列表、单机详情和数据源状态只读 API。
 - 深色中文 React UI、四档时间范围、刷新、搜索、筛选、排序、URL 状态和分页。
+- 导航展示数据源健康、异常、过期、请求失败和最近检查时间；主机列表支持手动及 30 秒非重叠刷新。
+- 受保护 API 会话失效后集中清缓存并返回登录页。
 - Go 同源托管 SPA；单一安全 Compose 容器直接暴露 IP:端口。
 - Playwright Chromium 覆盖关键路径、真实 canvas、stale/error、退出/重定向和无破坏性控件。
 - ECharts 动态加载：主 JS 约 330.78 kB，图表块约 495.23 kB，无 500 kB 构建警告。
@@ -45,5 +49,5 @@ Mock MVP 的 Task 1–9 已通过任务级规格与质量审查。Task 10 已完
 
 ## 下一步
 
-1. 对 `ee673f6..HEAD` 进行完整分支代码审查并修复发现项。
+1. 完成统一全量验证和最终独立复审。
 2. 用户明确要求后再决定合并/推送；当前不推送、不合并。

@@ -31,7 +31,7 @@ docker compose logs --tail=100 infraview
 
 ## 可选 Nginx HTTPS
 
-先在 `.env` 设置 `INFRAVIEW_PORT=127.0.0.1:8080` 和 `INFRAVIEW_COOKIE_SECURE=true`，使 InfraView 只发布到宿主回环地址，不再通过局域网 IP 直接提供明文 HTTP。随后关闭之前为 InfraView 开放的防火墙直连端口，再配置代理：
+先在 `.env` 设置 `INFRAVIEW_PORT=127.0.0.1:8080`、`INFRAVIEW_COOKIE_SECURE=true` 和 `INFRAVIEW_TRUSTED_PROXY_CIDRS=127.0.0.1/32,::1/128`，使 InfraView 只发布到宿主回环地址、信任本机代理写入的单值 `X-Real-IP`，不再通过局域网 IP 直接提供明文 HTTP。随后关闭之前为 InfraView 开放的防火墙直连端口，再配置代理：
 
 ```nginx
 server {
@@ -61,7 +61,7 @@ infra.example.com {
 }
 ```
 
-同样设置 `INFRAVIEW_PORT=127.0.0.1:8080` 与 `INFRAVIEW_COOKIE_SECURE=true`，并关闭防火墙中的直接 HTTP 暴露。证书、DNS 和公网访问策略由现有 Caddy/网络策略负责。
+同样设置 `INFRAVIEW_PORT=127.0.0.1:8080`、`INFRAVIEW_COOKIE_SECURE=true` 与 `INFRAVIEW_TRUSTED_PROXY_CIDRS=127.0.0.1/32,::1/128`，并关闭防火墙中的直接 HTTP 暴露。若代理通过容器网络连接 InfraView，应改填该代理网络的精确 CIDR。证书、DNS 和公网访问策略由现有 Caddy/网络策略负责。
 
 ## 升级
 

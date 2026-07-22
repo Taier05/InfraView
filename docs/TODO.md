@@ -15,7 +15,8 @@
 - [x] 100 台配置边界与空闲内存低于 256 MiB。
 - [x] 部署、配置、架构、设计、开发、测试、安全和上下文恢复文档。
 - [x] 完成 Task 10 最终 `make verify` 等价全量验证。
-- [ ] 完成 Mock MVP 独立分支代码审查并处理发现项。
+- [x] 完成 Mock MVP 独立分支首轮代码审查并处理全部 Critical/Important findings。
+- [ ] 完成修复后的统一全量验证与最终复审。
 
 ## Nightingale 里程碑
 
@@ -28,9 +29,9 @@
 
 ## 已知后续改进
 
-- [ ] 增加服务级 `INFRAVIEW_CURRENT_METRICS_TTL=20s` 默认值直接回归测试。
 - [ ] 如需要让刷新周期可部署调整，设计只读运行时配置下发；当前 UI 固定 30 秒。
-- [ ] 在获得真实 Nightingale 测试环境后替换导航中的 Mock 状态占位文案。
+- [ ] 扩展缓存结果契约，可靠记录并输出 cache hit/miss 日志字段。
+- [ ] 接入 Nightingale 后让数据源状态 API 返回可展示的数据源类型，替换当前 Mock 名称。
 
 ## 明确不做
 

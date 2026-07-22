@@ -6,9 +6,9 @@
 make verify
 ```
 
-顺序覆盖：E2E 项目碰撞安全测试、前端 Vitest 50 项、TypeScript、Vite build、两类 npm audit、静态资源复制、Go 格式、`go test ./...`、`go test -race ./...`、Go build、生产镜像 build、Compose smoke、100 请求 P95、内存/镜像资源、真实 Chromium E2E，并由 trap 清理本次成功创建的专用 Compose 项目。`Makefile` 使用 `.NOTPARALLEL: verify`，即使调用 `make -j verify` 也会串行执行会修改 `node_modules`、`webdist` 和验收栈的步骤。
+顺序覆盖：前端 Vitest、TypeScript、两类 npm audit、Vite build/静态资源复制、Go 格式、`go test ./...`、`go test -race ./...`、Go build、生产镜像 build、E2E 项目碰撞与部分失败清理安全测试、Compose smoke、100 请求 P95、内存/镜像资源、真实 Chromium E2E。`Makefile` 使用 `.NOTPARALLEL: verify`，即使调用 `make -j verify` 也会串行执行会修改 `node_modules`、`webdist` 和验收栈的步骤。
 
-验收使用带当前进程 PID 的唯一项目名和宿主端口 `18080`。启动前会检查 Compose 项目列表以及容器、网络、卷的 project label；若发现碰撞立即失败。只有本次 `up` 成功后 trap 才拥有清理权，不会执行无项目范围或针对既有项目的 `docker compose down`，不会影响 `cliproxyapi`、`v2raya` 等其他项目。
+验收使用带当前进程 PID 的唯一项目名和宿主端口 `18080`。启动前会检查 Compose 项目列表以及容器、网络、卷的 project label；若发现碰撞立即失败。预检成功后 trap 只取得该唯一项目的清理责任，因此 `up` 部分创建资源后失败也会精确 teardown，同时不会执行无项目范围或针对既有项目的 `docker compose down`，不会影响其他项目。
 
 ## 浏览器覆盖
 

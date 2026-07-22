@@ -12,6 +12,7 @@
 | `INFRAVIEW_LISTEN_ADDR` | `:8080` | 容器内 Go 监听地址；Compose 期望端口为 8080 |
 | `INFRAVIEW_COOKIE_SECURE` | `false` | 布尔值；HTTPS 反代必须设为 `true` |
 | `INFRAVIEW_SESSION_TTL` | `12h` | 正时长；内存会话有效期，重启后仍会失效 |
+| `INFRAVIEW_TRUSTED_PROXY_CIDRS` | 空 | 默认不信任转发头；反代时填写直接连接 InfraView 的代理 CIDR，多个值以英文逗号分隔；只有可信代理提供的单值合法 `X-Real-IP` 用于登录限速 |
 | `INFRAVIEW_DATA_SOURCE` | `mock` | 当前版本只接受 `mock`；不得填写未实现的 `nightingale` |
 | `INFRAVIEW_MOCK_HOST_COUNT` | `32` | 整数 1–100 |
 | `INFRAVIEW_REFRESH_INTERVAL` | `30s` | 正时长；当前后端会校验并保留该配置，Mock MVP 浏览器刷新周期仍固定为 30 秒 |
@@ -30,7 +31,7 @@ Go 时长使用 `time.ParseDuration` 语法，例如 `20s`、`5m`、`12h`。错�
 
 ## 验收专用变量
 
-`scripts/smoke.sh` 与 `scripts/benchmark.sh` 使用 `INFRAVIEW_BASE_URL` 指定待测服务，并复用 `INFRAVIEW_USERNAME`、`INFRAVIEW_PASSWORD` 登录。`scripts/e2e.sh` 支持 `INFRAVIEW_E2E_PROJECT`、`INFRAVIEW_E2E_PORT`、`INFRAVIEW_E2E_USERNAME`、`INFRAVIEW_E2E_PASSWORD`、`INFRAVIEW_E2E_BASE_URL`、`INFRAVIEW_E2E_RUN_BENCHMARK`、`INFRAVIEW_E2E_CHECK_RESOURCES` 和 `PLAYWRIGHT_IMAGE`。默认项目名为带进程唯一后缀的 `infraview-e2e-<PID>`、端口为 `18080`、浏览器镜像为 `mcr.microsoft.com/playwright:v1.61.1-noble`。显式项目名若已存在对应 Compose 项目或标签资源，脚本会在启动前失败，绝不复用或清理它。这些不是生产应用配置。
+`scripts/smoke.sh` 与 `scripts/benchmark.sh` 使用 `INFRAVIEW_BASE_URL` 指定待测服务，并复用 `INFRAVIEW_USERNAME`、`INFRAVIEW_PASSWORD` 登录。`scripts/e2e.sh` 支持 `INFRAVIEW_E2E_PROJECT`、`INFRAVIEW_E2E_PORT`、`INFRAVIEW_E2E_USERNAME`、`INFRAVIEW_E2E_PASSWORD`、`INFRAVIEW_E2E_RUN_BENCHMARK`、`INFRAVIEW_E2E_CHECK_RESOURCES` 和 `PLAYWRIGHT_IMAGE`。默认项目名为带进程唯一后缀的 `infraview-e2e-<PID>`、端口为 `18080`、浏览器镜像为 `mcr.microsoft.com/playwright:v1.61.1-noble`。显式项目名若已存在对应 Compose 项目或标签资源，脚本会在启动前失败，绝不复用或清理它。直接执行 `npm run e2e:run` 时可用 `INFRAVIEW_E2E_BASE_URL` 指向已运行服务。这些不是生产应用配置。
 
 ## 凭据与 `.env`
 

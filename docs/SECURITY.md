@@ -4,7 +4,7 @@
 
 - 固定账号密码，服务端恒定时间比较；密码至少 12 字符且不写日志。
 - 密码学随机内存会话；Cookie 为 HttpOnly、SameSite=Strict、限定路径，HTTPS 可启用 Secure。
-- 登录按来源 IP 限速；请求 ID、统一错误和敏感字段日志测试。
+- 登录按来源 IP 限速；默认不信任转发头，仅允许显式可信代理的单值合法 `X-Real-IP` 参与限速；请求 ID、统一错误和敏感字段日志测试。
 - 默认同源，无 CORS 通用开放；设置 CSP、禁止 iframe、MIME 嗅探和不安全 referrer。
 - 业务 API 只读；command/restart/delete/patch/proxy/query 路由测试为 404/405。
 - 运行容器 UID/GID 10001、只读根文件系统、`/tmp` noexec/nosuid/nodev、capabilities 全删、禁止提权。
@@ -18,6 +18,7 @@
 - 固定账号意味着所有使用者共享身份，无用户审计、RBAC、MFA 或密码找回。
 - 直接 HTTP 访问会明文传输凭据和会话；不可信网络必须使用 Nginx/Caddy HTTPS，并设置 Secure Cookie。
 - 会话和限速只在单进程内存，不适合多副本共享状态。
+- 可信代理 CIDR 必须只包含直接连接 InfraView 的代理；范围过宽会允许该网段伪造限速来源。
 - `/healthz` 不证明数据源健康；需查看页面或数据源状态 API。
 - Mock 数据不代表真实基础设施；Nightingale 未接入前不得将其用于真实运维判断。
 - InfraView 的只读边界不替代上游最小权限；未来 Nightingale 凭据也必须只具查询权限。
