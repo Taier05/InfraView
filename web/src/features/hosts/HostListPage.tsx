@@ -192,15 +192,33 @@ export function HostListPage() {
   const columns: ColumnDef<HostSummary>[] = [
     {
       id: 'name',
-      header: () => sortButton('name', '主机'),
+      header: () => sortButton('name', '主机名'),
       cell: ({ row }) => (
-        <div className="host-identity">
-          <Link to={`/hosts/${encodeURIComponent(row.original.id)}`}>
-            {row.original.name}
-          </Link>
-          <span>{row.original.ip}</span>
-          <small>{row.original.os}</small>
-        </div>
+        <Link
+          className="host-name-link"
+          to={`/hosts/${encodeURIComponent(row.original.id)}`}
+          title={row.original.name}
+        >
+          {row.original.name}
+        </Link>
+      ),
+    },
+    {
+      id: 'ip',
+      header: 'IP 地址',
+      cell: ({ row }) => (
+        <span className="host-cell-text host-ip" title={row.original.ip}>
+          {row.original.ip}
+        </span>
+      ),
+    },
+    {
+      id: 'os',
+      header: '操作系统',
+      cell: ({ row }) => (
+        <span className="host-cell-text" title={row.original.os}>
+          {row.original.os}
+        </span>
       ),
     },
     {

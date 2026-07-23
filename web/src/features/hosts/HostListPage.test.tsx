@@ -116,15 +116,25 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
 
   const appLink = await screen.findByRole('link', { name: 'linux-app-01' })
 
-  for (const label of ['主机', 'CPU', '内存', '负载', '运行时间']) {
+  for (const label of ['主机名', 'CPU', '内存', '负载', '运行时间']) {
     expect(
       screen.getByRole('button', { name: new RegExp(`^${label}`) }),
+    ).toBeInTheDocument()
+  }
+  for (const label of ['IP 地址', '操作系统', '状态']) {
+    expect(
+      screen.getByRole('columnheader', { name: label }),
     ).toBeInTheDocument()
   }
 
   expect(appLink).toHaveAttribute('href', '/hosts/host-001')
   const appRow = appLink.closest('tr')
   expect(appRow).not.toBeNull()
+  const appCells = within(appRow!).getAllByRole('cell')
+  expect(appCells).toHaveLength(8)
+  expect(appCells[0]).toHaveTextContent('linux-app-01')
+  expect(appCells[1]).toHaveTextContent('192.0.2.11')
+  expect(appCells[2]).toHaveTextContent('Ubuntu 24.04')
   expect(within(appRow!).getByText('在线')).toHaveAttribute(
     'data-status',
     'online',

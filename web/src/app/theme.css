@@ -812,17 +812,30 @@ h1 {
 
 .host-table {
   width: 100%;
-  min-width: 54rem;
+  min-width: 66rem;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .host-table th,
 .host-table td {
   padding: 0.42rem 0.55rem;
   border-bottom: 1px solid var(--border);
+  overflow: hidden;
   text-align: left;
+  text-overflow: ellipsis;
   vertical-align: middle;
+  white-space: nowrap;
 }
+
+.host-table th:nth-child(1) { width: 15%; }
+.host-table th:nth-child(2) { width: 13%; }
+.host-table th:nth-child(3) { width: 16%; }
+.host-table th:nth-child(4) { width: 9%; }
+.host-table th:nth-child(5),
+.host-table th:nth-child(6),
+.host-table th:nth-child(7) { width: 9%; }
+.host-table th:nth-child(8) { width: 12%; }
 
 .host-table th {
   color: var(--text-muted);
@@ -855,26 +868,32 @@ h1 {
   color: var(--accent-strong);
 }
 
-.host-identity {
-  display: grid;
-  gap: 0.16rem;
-}
-
-.host-identity a {
-  width: fit-content;
+.host-name-link {
+  display: block;
+  overflow: hidden;
   color: var(--accent-strong);
   font-weight: 750;
   text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.host-identity a:hover {
+.host-name-link:hover {
   text-decoration: underline;
 }
 
-.host-identity span,
-.host-identity small {
+.host-cell-text {
+  display: block;
+  overflow: hidden;
   color: var(--text-muted);
-  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.host-ip {
+  color: #c4ced4;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.78rem;
 }
 
 .host-status {
