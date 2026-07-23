@@ -130,7 +130,9 @@ test('可控旧数据响应会显示过期提示', async ({ page }) => {
   await page.reload()
   await expect(page.getByRole('alert')).toContainText('数据已过期')
   await expect(page.getByText('2026-07-22T00:00:00Z')).toBeVisible()
-  await expectRenderedCanvas(page)
+  await expect(
+    page.getByRole('link', { name: '查看 Linux 主机板块' }),
+  ).toBeVisible()
 })
 
 test('可控错误响应会显示只读重试入口', async ({ page }) => {
