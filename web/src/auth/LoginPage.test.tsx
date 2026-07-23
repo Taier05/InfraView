@@ -97,21 +97,20 @@ it('已认证会话 bootstrap 后直接进入基础设施总览', async () => {
   expect(screen.queryByLabelText('用户名')).not.toBeInTheDocument()
 })
 
-it('已认证总览只显示页面提供的四档时间范围控制', async () => {
+it('已认证总览只保留刷新控制而不显示时间范围', async () => {
   mockAuthenticatedRequests()
   render(<App />)
 
   const overviewControls = await screen.findByRole('group', {
     name: '总览控制',
   })
-  const rangeGroup = within(overviewControls).getByRole('group', {
-    name: '时间范围',
-  })
-  expect(within(rangeGroup).getAllByRole('button')).toHaveLength(4)
   expect(
     within(overviewControls).getByRole('button', { name: '刷新' }),
   ).toBeInTheDocument()
   expect(screen.getAllByRole('button', { name: '刷新' })).toHaveLength(1)
+  expect(
+    within(overviewControls).queryByRole('group', { name: '时间范围' }),
+  ).not.toBeInTheDocument()
   expect(
     screen.queryByRole('combobox', { name: '时间范围' }),
   ).not.toBeInTheDocument()

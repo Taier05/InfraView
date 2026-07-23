@@ -59,15 +59,13 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('展示可进入主机板块的状态卡和资源指标', async () => {
+it('总览只展示可进入主机板块的状态卡', async () => {
   renderOverview()
 
-  const cards = await screen.findAllByRole('article')
-  expect(cards).toHaveLength(2)
-
-  const hostCard = screen.getByRole('link', {
+  const hostCard = await screen.findByRole('link', {
     name: '查看 Linux 主机板块',
   })
+  expect(screen.queryAllByRole('article')).toHaveLength(0)
   expect(hostCard).toHaveAttribute('href', '/hosts')
   expect(within(hostCard).getByText('Linux 主机')).toBeInTheDocument()
   expect(within(hostCard).getByText('主机总数')).toBeInTheDocument()
@@ -75,105 +73,27 @@ it('展示可进入主机板块的状态卡和资源指标', async () => {
   expect(within(hostCard).getByText('在线 9')).toBeInTheDocument()
   expect(within(hostCard).getByText('离线 2')).toBeInTheDocument()
   expect(within(hostCard).getByText('未知 1')).toBeInTheDocument()
-
-  const cpuCard = screen.getByRole('article', { name: 'CPU 平均使用率' })
-  expect(cpuCard).toHaveTextContent('73.5%')
-  expect(within(cpuCard).getByText('危险')).toBeInTheDocument()
-  expect(cpuCard).toHaveAttribute('data-level', 'critical')
-
-  const memoryCard = screen.getByRole('article', {
-    name: '内存平均使用率',
-  })
-  expect(memoryCard).toHaveTextContent('42%')
-  expect(within(memoryCard).getByText('警告')).toBeInTheDocument()
-  expect(memoryCard).toHaveAttribute('data-level', 'warning')
+  expect(screen.queryByText('CPU 平均使用率')).not.toBeInTheDocument()
+  expect(screen.queryByText('内存平均使用率')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('heading', { name: '资源使用趋势' }),
+  ).not.toBeInTheDocument()
 })
 
-it('默认请求 24 小时并提供全部四个范围', async () => {
+it('使用固定查询范围且不显示总览时间范围控件', async () => {
   const requestedRanges: string[] = []
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     requestedRanges.push(requestedRange(input))
     return Promise.resolve(jsonResponse(overviewFixture()))
   })
-  const user = userEvent.setup()
   renderOverview()
 
-  const oneHour = screen.getByRole('button', { name: '1小时' })
-  const sixHours = screen.getByRole('button', { name: '6小时' })
-  const day = screen.getByRole('button', { name: '24小时' })
-  const week = screen.getByRole('button', { name: '7天' })
-  expect(day).toHaveAttribute('aria-pressed', 'true')
-  expect(oneHour).toHaveAttribute('aria-pressed', 'false')
+  await screen.findByRole('link', { name: '查看 Linux 主机板块' })
   await waitFor(() => expect(requestedRanges).toEqual(['24h']))
-
-  for (const [button, range] of [
-    [oneHour, '1h'],
-    [sixHours, '6h'],
-    [week, '7d'],
-    [day, '24h'],
-  ] as const) {
-    await user.click(button)
-    await waitFor(() => expect(requestedRanges.at(-1)).toBe(range))
-    expect(button).toHaveAttribute('aria-pressed', 'true')
-  }
-})
-
-it('渲染服务端聚合趋势并在切换范围后展示对应序列摘要', async () => {
-  vi.mocked(globalThis.fetch).mockImplementation((input) => {
-    const range = requestedRange(input)
-    const recentCPU = range === '7d' ? 77 : 52
-    const recentMemory = range === '7d' ? 68 : 61
-    return Promise.resolve(
-      jsonResponse(
-        overviewFixture({
-          data: {
-            trends: [
-              {
-                key: 'cpu_usage',
-                unit: '%',
-                points: [
-                  { timestamp: '2026-07-14T00:30:00.000Z', value: 31 },
-                  {
-                    timestamp: '2026-07-21T00:30:00.000Z',
-                    value: recentCPU,
-                  },
-                ],
-              },
-              {
-                key: 'memory_usage',
-                unit: '%',
-                points: [
-                  { timestamp: '2026-07-14T00:30:00.000Z', value: 45 },
-                  {
-                    timestamp: '2026-07-21T00:30:00.000Z',
-                    value: recentMemory,
-                  },
-                ],
-              },
-            ],
-          },
-        }),
-      ),
-    )
-  })
-  const user = userEvent.setup()
-  renderOverview()
-
-  expect(
-    await screen.findByRole('heading', { name: '资源使用趋势' }),
-  ).toBeInTheDocument()
-  expect(
-    screen.getByText(
-      'CPU 使用率趋势：最低 31%，最高 52%，最近值 52%。内存使用率趋势：最低 45%，最高 61%，最近值 61%。',
-    ),
-  ).toHaveClass('sr-only')
-
-  await user.click(screen.getByRole('button', { name: '7天' }))
-  expect(
-    await screen.findByText(
-      'CPU 使用率趋势：最低 31%，最高 77%，最近值 77%。内存使用率趋势：最低 45%，最高 68%，最近值 68%。',
-    ),
-  ).toHaveClass('sr-only')
+  expect(screen.queryByRole('button', { name: '1小时' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '6小时' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '24小时' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '7天' })).not.toBeInTheDocument()
 })
 
 it('手动刷新会重新请求当前范围', async () => {
@@ -188,39 +108,6 @@ it('手动刷新会重新请求当前范围', async () => {
   expect(requestedRange(vi.mocked(globalThis.fetch).mock.calls[1][0])).toBe(
     '24h',
   )
-})
-
-it('切换范围时取消已经失去观察者的旧请求', async () => {
-  const requestedRanges: string[] = []
-  const abortedRanges: string[] = []
-  vi.mocked(globalThis.fetch).mockImplementation((input, init) => {
-    const range = requestedRange(input)
-    requestedRanges.push(range)
-    if (range === '24h' || range === '6h') {
-      return Promise.resolve(jsonResponse(overviewFixture()))
-    }
-
-    return new Promise<Response>((resolve) => {
-      init?.signal?.addEventListener(
-        'abort',
-        () => {
-          abortedRanges.push(range)
-          resolve(jsonResponse(overviewFixture()))
-        },
-        { once: true },
-      )
-    })
-  })
-  const user = userEvent.setup()
-  renderOverview()
-
-  await screen.findByRole('article', { name: 'CPU 平均使用率' })
-  await user.click(screen.getByRole('button', { name: '1小时' }))
-  await waitFor(() => expect(requestedRanges).toContain('1h'))
-  await user.click(screen.getByRole('button', { name: '6小时' }))
-
-  await waitFor(() => expect(abortedRanges).toContain('1h'))
-  await waitFor(() => expect(requestedRanges).toContain('6h'))
 })
 
 it('每 30 秒刷新且前一请求未完成时不发起重叠请求', async () => {
@@ -277,26 +164,6 @@ it('过期数据提示显示服务端给出的精确采集时间', async () => {
   )
 })
 
-it('指标值为 null 时显示暂无数据而不是零', async () => {
-  vi.mocked(globalThis.fetch).mockResolvedValue(
-    jsonResponse(
-      overviewFixture({
-        data: {
-          cpu_average: { value: null, level: 'unknown' },
-        },
-      }),
-    ),
-  )
-  renderOverview()
-
-  const cpuCard = await screen.findByRole('article', {
-    name: 'CPU 平均使用率',
-  })
-  expect(within(cpuCard).getByText('暂无数据')).toBeInTheDocument()
-  expect(within(cpuCard).getByText('未知')).toBeInTheDocument()
-  expect(within(cpuCard).queryByText('0%')).not.toBeInTheDocument()
-})
-
 it('可重试错误显示中文信息并可重试成功', async () => {
   let attempts = 0
   vi.mocked(globalThis.fetch).mockImplementation(() => {
@@ -326,8 +193,8 @@ it('可重试错误显示中文信息并可重试成功', async () => {
   await user.click(screen.getByRole('button', { name: '重试' }))
 
   expect(
-    await screen.findByRole('article', { name: 'CPU 平均使用率' }),
-  ).toHaveTextContent('73.5%')
+    await screen.findByRole('link', { name: '查看 Linux 主机板块' }),
+  ).toBeInTheDocument()
   expect(attempts).toBe(2)
 })
 

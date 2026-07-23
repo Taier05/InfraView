@@ -64,26 +64,15 @@ test('未登录会重定向，登录后可完成总览、主机列表和详情�
     page.getByRole('heading', { name: '基础设施总览' }),
   ).toBeVisible()
   await expect(page.getByText('主机总数')).toBeVisible()
-  await expect(page.getByText('CPU 平均使用率')).toBeVisible()
-  await expect(page.getByText('内存平均使用率')).toBeVisible()
-  await expectRenderedCanvas(page)
+  await expect(page.getByText('CPU 平均使用率')).toHaveCount(0)
+  await expect(page.getByText('内存平均使用率')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '资源使用趋势' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '7天' })).toHaveCount(0)
   await expectNoDestructiveControls(page)
-
-  const sevenDayResponse = page.waitForResponse(
-    (response) =>
-      response.url().includes('/api/v1/overview?range=7d') &&
-      response.status() === 200,
-  )
-  await page.getByRole('button', { name: '7天' }).click()
-  await sevenDayResponse
-  await expect(page.getByRole('button', { name: '7天' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  )
 
   const refreshResponse = page.waitForResponse(
     (response) =>
-      response.url().includes('/api/v1/overview?range=7d') &&
+      response.url().includes('/api/v1/overview?range=24h') &&
       response.status() === 200,
   )
   await page.getByRole('button', { name: '刷新' }).click()
