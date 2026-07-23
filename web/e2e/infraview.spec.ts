@@ -89,7 +89,7 @@ test('未登录会重定向，登录后可完成总览、主机列表和详情�
   await page.getByRole('button', { name: '刷新' }).click()
   await refreshResponse
 
-  await page.getByRole('link', { name: '主机', exact: true }).click()
+  await page.getByRole('link', { name: '查看 Linux 主机板块' }).click()
   await expect(
     page.getByRole('heading', { name: '主机', exact: true }),
   ).toBeVisible()

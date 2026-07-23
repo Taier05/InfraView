@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import {
   afterEach,
   beforeEach,
@@ -22,9 +23,11 @@ function renderOverview() {
   })
 
   render(
-    <QueryClientProvider client={queryClient}>
-      <OverviewPage />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <OverviewPage />
+      </QueryClientProvider>
+    </MemoryRouter>,
   )
 }
 
@@ -56,23 +59,22 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('展示四张主指标卡以及不依赖颜色的状态文字', async () => {
+it('展示可进入主机板块的状态卡和资源指标', async () => {
   renderOverview()
 
   const cards = await screen.findAllByRole('article')
-  expect(cards).toHaveLength(4)
+  expect(cards).toHaveLength(2)
 
-  expect(
-    within(screen.getByRole('article', { name: '主机总数' })).getByText('12'),
-  ).toBeInTheDocument()
-  expect(
-    within(screen.getByRole('article', { name: '在线主机' })).getByText('9'),
-  ).toBeInTheDocument()
-
-  const totalCard = screen.getByRole('article', { name: '主机总数' })
-  expect(within(totalCard).getByText('在线 9')).toBeInTheDocument()
-  expect(within(totalCard).getByText('离线 2')).toBeInTheDocument()
-  expect(within(totalCard).getByText('未知 1')).toBeInTheDocument()
+  const hostCard = screen.getByRole('link', {
+    name: '查看 Linux 主机板块',
+  })
+  expect(hostCard).toHaveAttribute('href', '/hosts')
+  expect(within(hostCard).getByText('Linux 主机')).toBeInTheDocument()
+  expect(within(hostCard).getByText('主机总数')).toBeInTheDocument()
+  expect(within(hostCard).getByText('12')).toBeInTheDocument()
+  expect(within(hostCard).getByText('在线 9')).toBeInTheDocument()
+  expect(within(hostCard).getByText('离线 2')).toBeInTheDocument()
+  expect(within(hostCard).getByText('未知 1')).toBeInTheDocument()
 
   const cpuCard = screen.getByRole('article', { name: 'CPU 平均使用率' })
   expect(cpuCard).toHaveTextContent('73.5%')
@@ -178,7 +180,7 @@ it('手动刷新会重新请求当前范围', async () => {
   const user = userEvent.setup()
   renderOverview()
 
-  await screen.findByRole('article', { name: '主机总数' })
+  await screen.findByRole('link', { name: '查看 Linux 主机板块' })
   expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   await user.click(screen.getByRole('button', { name: '刷新' }))
 

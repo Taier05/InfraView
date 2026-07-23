@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { APIError, apiRequest } from '../../api/client'
 import type {
@@ -86,27 +87,42 @@ export function OverviewPage() {
         />
       ) : (
         <>
-          <div className="metric-grid">
-            <MetricCard label="主机总数" value={overview.data.data.total}>
-              <StatusBadge
-                level="normal"
-                label={`在线 ${overview.data.data.online}`}
-              />
-              <StatusBadge
-                level="critical"
-                label={`离线 ${overview.data.data.offline}`}
-              />
-              <StatusBadge
-                level="unknown"
-                label={`未知 ${overview.data.data.unknown}`}
-              />
-            </MetricCard>
-            <MetricCard
-              label="在线主机"
-              value={overview.data.data.online}
-              level="normal"
-              statusLabel="在线"
-            />
+          <div className="overview-status-grid">
+            <Link
+              className="module-status-card"
+              to="/hosts"
+              aria-label="查看 Linux 主机板块"
+            >
+              <div className="module-status-heading">
+                <div>
+                  <span>主机板块</span>
+                  <h2>Linux 主机</h2>
+                </div>
+                <span className="module-status-action">
+                  查看主机 <span aria-hidden="true">→</span>
+                </span>
+              </div>
+              <div className="module-status-body">
+                <div className="module-status-total">
+                  <span>主机总数</span>
+                  <strong>{overview.data.data.total}</strong>
+                </div>
+                <div className="module-status-breakdown">
+                  <StatusBadge
+                    level="normal"
+                    label={`在线 ${overview.data.data.online}`}
+                  />
+                  <StatusBadge
+                    level="critical"
+                    label={`离线 ${overview.data.data.offline}`}
+                  />
+                  <StatusBadge
+                    level="unknown"
+                    label={`未知 ${overview.data.data.unknown}`}
+                  />
+                </div>
+              </div>
+            </Link>
             <MetricCard
               label="CPU 平均使用率"
               value={percentage(overview.data.data.cpu_average)}
