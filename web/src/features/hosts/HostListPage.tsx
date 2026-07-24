@@ -19,7 +19,15 @@ import { ErrorPanel } from '../../components/ErrorPanel'
 import { StaleBanner } from '../../components/StaleBanner'
 
 const PAGE_SIZE = 20
-const sortFields = ['name', 'cpu', 'memory', 'load', 'uptime'] as const
+const sortFields = [
+  'name',
+  'cpu',
+  'memory',
+  'load',
+  'io',
+  'network',
+  'uptime',
+] as const
 type HostSort = (typeof sortFields)[number]
 type SortOrder = 'asc' | 'desc'
 
@@ -255,7 +263,7 @@ export function HostListPage() {
     },
     {
       id: 'io',
-      header: 'IO 忙碌度',
+      header: () => sortButton('io', 'IO 忙碌度'),
       cell: ({ row }) => (
         <MetricText
           metric={row.original.metrics.io_busy_percent}
@@ -265,7 +273,7 @@ export function HostListPage() {
     },
     {
       id: 'network',
-      header: '网络 出/入',
+      header: () => sortButton('network', '网络 出/入'),
       cell: ({ row }) => {
         const transmit = row.original.metrics.network_transmit_bytes_per_second
         const receive = row.original.metrics.network_receive_bytes_per_second

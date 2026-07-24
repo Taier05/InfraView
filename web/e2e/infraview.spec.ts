@@ -70,6 +70,11 @@ test('未登录会重定向，登录后可完成总览和主机列表关键路�
   await expect(page.getByRole('link', { name: 'linux-017' })).toHaveCount(0)
   await expectNoDestructiveControls(page)
 
+  await page.getByRole('button', { name: /^IO 忙碌度/ }).click()
+  await expect(page).toHaveURL(/sort=io/)
+  await page.getByRole('button', { name: /^网络 出\/入/ }).click()
+  await expect(page).toHaveURL(/sort=network/)
+
   await page.getByRole('button', { name: '退出登录' }).click()
   await expect(page).toHaveURL(/\/login$/)
   await page.goto('/hosts/mock-host-001')

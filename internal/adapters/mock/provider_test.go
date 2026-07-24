@@ -2,6 +2,7 @@ package mock_test
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -136,6 +137,35 @@ func TestProviderReturnsBoundedCurrentPercentages(t *testing.T) {
 	}
 	if usage := *current.Filesystems[0].Usage; usage < 0 || usage > 100 {
 		t.Fatalf("filesystem usage = %v, want value in [0, 100]", usage)
+	}
+}
+
+func TestProviderIncludesStableWarningAndCriticalExamplesOnFirstPage(t *testing.T) {
+	fixed := time.Date(2026, time.February, 3, 4, 5, 6, 0, time.UTC)
+	provider := mock.New(20, func() time.Time { return fixed })
+	ids := make([]string, 10)
+	for index := range ids {
+		ids[index] = fmt.Sprintf("mock-host-%03d", index+1)
+	}
+
+	metrics, err := provider.GetCurrentMetrics(context.Background(), ids)
+	if err != nil {
+		t.Fatalf("GetCurrentMetrics() error = %v", err)
+	}
+	assertCurrentValue(t, "CPU warning", metrics["mock-host-003"].CPUUsage, 85)
+	assertCurrentValue(t, "CPU critical", metrics["mock-host-004"].CPUUsage, 95)
+	assertCurrentValue(t, "memory warning", metrics["mock-host-005"].MemoryUsage, 85)
+	assertCurrentValue(t, "memory critical", metrics["mock-host-006"].MemoryUsage, 95)
+	assertCurrentValue(t, "IO warning", metrics["mock-host-007"].IOBusyPercent, 85)
+	assertCurrentValue(t, "IO critical", metrics["mock-host-008"].IOBusyPercent, 95)
+	assertCurrentValue(t, "network warning", metrics["mock-host-009"].NetworkTransmitBytesPerSecond, 85*1024*1024)
+	assertCurrentValue(t, "network critical", metrics["mock-host-010"].NetworkReceiveBytesPerSecond, 105*1024*1024)
+}
+
+func assertCurrentValue(t *testing.T, name string, value *float64, want float64) {
+	t.Helper()
+	if value == nil || *value != want {
+		t.Fatalf("%s = %v, want %v", name, value, want)
 	}
 }
 

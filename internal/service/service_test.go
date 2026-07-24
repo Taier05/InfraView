@@ -301,6 +301,63 @@ func TestHostsAssignsPercentageAndNetworkThresholdLevels(t *testing.T) {
 	assertMetric(t, "network receive", host.Metrics.NetworkReceiveBytesPerSecond, 100*1024*1024, service.LevelCritical)
 }
 
+func TestHostsSortsIOAndCombinedNetworkWithMissingValuesLast(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	provider.hosts = []datasource.Host{
+		{ID: "h4", Name: "four", Status: datasource.StatusOnline},
+		{ID: "h2", Name: "two", Status: datasource.StatusOnline},
+		{ID: "h3", Name: "missing", Status: datasource.StatusOnline},
+		{ID: "h1", Name: "one", Status: datasource.StatusOnline},
+	}
+	provider.metrics = map[string]datasource.CurrentMetrics{
+		"h1": {
+			IOBusyPercent:                 float64Pointer(20),
+			NetworkTransmitBytesPerSecond: float64Pointer(10),
+			NetworkReceiveBytesPerSecond:  float64Pointer(20),
+		},
+		"h2": {
+			IOBusyPercent:                 float64Pointer(90),
+			NetworkTransmitBytesPerSecond: float64Pointer(50),
+		},
+		"h3": {},
+		"h4": {
+			IOBusyPercent:                 float64Pointer(50),
+			NetworkTransmitBytesPerSecond: float64Pointer(15),
+			NetworkReceiveBytesPerSecond:  float64Pointer(15),
+		},
+	}
+	svc := newService(provider, clock)
+
+	for _, test := range []struct {
+		name  string
+		sort  string
+		order string
+		want  []string
+	}{
+		{name: "IO ascending", sort: "io", order: "asc", want: []string{"h1", "h4", "h2", "h3"}},
+		{name: "IO descending", sort: "io", order: "desc", want: []string{"h2", "h4", "h1", "h3"}},
+		{name: "network ascending", sort: "network", order: "asc", want: []string{"h1", "h4", "h2", "h3"}},
+		{name: "network descending", sort: "network", order: "desc", want: []string{"h2", "h1", "h4", "h3"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			page, _, err := svc.Hosts(context.Background(), service.HostQuery{
+				Sort: test.sort, Order: test.order, Page: 1, PageSize: 20,
+			})
+			if err != nil {
+				t.Fatalf("Hosts() error = %v", err)
+			}
+			got := make([]string, len(page.Hosts))
+			for i, host := range page.Hosts {
+				got[i] = host.ID
+			}
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("host IDs = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestHostsRejectsPageSizesOutsideOneToOneHundred(t *testing.T) {
 	clock := newServiceClock()
 	for _, pageSize := range []int{0, 101} {

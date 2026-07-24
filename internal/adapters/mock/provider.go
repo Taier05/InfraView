@@ -210,6 +210,26 @@ func percentageValue(metric datasource.MetricKey, index int, timestamp time.Time
 	case datasource.MetricDiskUsage:
 		value = 40 + float64(index%20) + 20*wave
 	}
+	switch metric {
+	case datasource.MetricCPUUsage:
+		if index%10 == 3 {
+			value = 85
+		} else if index%10 == 4 {
+			value = 95
+		}
+	case datasource.MetricMemoryUsage:
+		if index%10 == 5 {
+			value = 85
+		} else if index%10 == 6 {
+			value = 95
+		}
+	case datasource.MetricIOBusyPercent:
+		if index%10 == 7 {
+			value = 85
+		} else if index%10 == 8 {
+			value = 95
+		}
+	}
 	return math.Max(0, math.Min(100, value))
 }
 
@@ -223,8 +243,14 @@ func scalarValue(metric datasource.MetricKey, index int, timestamp time.Time) fl
 	case datasource.MetricDiskWriteBytesPerSecond:
 		return 1024 * (10 + float64(index%30) + 120*wave)
 	case datasource.MetricNetworkReceiveBytesPerSecond:
+		if index%10 == 0 {
+			return 105 * 1024 * 1024
+		}
 		return 1024 * (50 + float64(index%70) + 500*wave)
 	case datasource.MetricNetworkTransmitBytesPerSecond:
+		if index%10 == 9 {
+			return 85 * 1024 * 1024
+		}
 		return 1024 * (30 + float64(index%60) + 350*wave)
 	default:
 		return 0

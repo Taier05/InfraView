@@ -96,12 +96,20 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
 
   const appName = await screen.findByText('linux-app-01')
 
-  for (const label of ['主机名', 'CPU', '内存', '负载', '运行时间']) {
+  for (const label of [
+    '主机名',
+    'CPU',
+    '内存',
+    '负载',
+    'IO 忙碌度',
+    '网络 出/入',
+    '运行时间',
+  ]) {
     expect(
       screen.getByRole('button', { name: new RegExp(`^${label}`) }),
     ).toBeInTheDocument()
   }
-  for (const label of ['IP 地址', 'IO 忙碌度', '网络 出/入', '状态']) {
+  for (const label of ['IP 地址', '状态']) {
     expect(
       screen.getByRole('columnheader', { name: label }),
     ).toBeInTheDocument()
@@ -240,6 +248,18 @@ it('筛选和服务端排序变化都重置页码并使用规范 load 字段', a
   )
   expect(lastRequest().searchParams.get('order')).toBe('asc')
   expect(window.location.search).not.toContain('load_1')
+
+  await user.click(screen.getByRole('button', { name: /^IO 忙碌度/ }))
+  await waitFor(() =>
+    expect(lastRequest().searchParams.get('sort')).toBe('io'),
+  )
+  expect(lastRequest().searchParams.get('order')).toBe('asc')
+
+  await user.click(screen.getByRole('button', { name: /^网络 出\/入/ }))
+  await waitFor(() =>
+    expect(lastRequest().searchParams.get('sort')).toBe('network'),
+  )
+  expect(lastRequest().searchParams.get('order')).toBe('asc')
 })
 
 it('使用服务端分页且每页固定请求 20 条', async () => {
