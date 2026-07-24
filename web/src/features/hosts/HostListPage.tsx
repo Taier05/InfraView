@@ -6,7 +6,7 @@ import {
   type ColumnDef,
 } from '@tanstack/react-table'
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 
 import { APIError, apiRequest } from '../../api/client'
 import type {
@@ -46,6 +46,28 @@ function percentage(metric: MetricValue) {
 function loadValue(metric: MetricValue) {
   if (metric.value === null) return '暂无数据'
   return metric.value.toFixed(1)
+}
+
+function bytesPerSecond(metric: MetricValue) {
+  if (metric.value === null) return '暂无数据'
+  const units = ['B/s', 'KiB/s', 'MiB/s', 'GiB/s']
+  let value = metric.value
+  let unitIndex = 0
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex += 1
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`
+}
+
+function pairedRate(
+  firstLabel: string,
+  first: MetricValue,
+  secondLabel: string,
+  second: MetricValue,
+) {
+  if (first.value === null && second.value === null) return '暂无数据'
+  return `${firstLabel} ${bytesPerSecond(first)} / ${secondLabel} ${bytesPerSecond(second)}`
 }
 
 function uptime(seconds: number) {
@@ -194,13 +216,9 @@ export function HostListPage() {
       id: 'name',
       header: () => sortButton('name', '主机名'),
       cell: ({ row }) => (
-        <Link
-          className="host-name-link"
-          to={`/hosts/${encodeURIComponent(row.original.id)}`}
-          title={row.original.name}
-        >
+        <span className="host-name-text" title={row.original.name}>
           {row.original.name}
-        </Link>
+        </span>
       ),
     },
     {
@@ -211,20 +229,6 @@ export function HostListPage() {
           {row.original.ip}
         </span>
       ),
-    },
-    {
-      id: 'os',
-      header: '操作系统',
-      cell: ({ row }) => (
-        <span className="host-cell-text" title={row.original.os}>
-          {row.original.os}
-        </span>
-      ),
-    },
-    {
-      id: 'status',
-      header: '状态',
-      cell: ({ row }) => <StatusText status={row.original.status} />,
     },
     {
       id: 'cpu',
@@ -242,9 +246,40 @@ export function HostListPage() {
       cell: ({ row }) => loadValue(row.original.metrics.load_1),
     },
     {
+      id: 'io',
+      header: 'IO 读/写',
+      cell: ({ row }) => {
+        const value = pairedRate(
+          '读',
+          row.original.metrics.disk_read_bytes_per_second,
+          '写',
+          row.original.metrics.disk_write_bytes_per_second,
+        )
+        return <span title={value}>{value}</span>
+      },
+    },
+    {
+      id: 'network',
+      header: '网络 出/入',
+      cell: ({ row }) => {
+        const value = pairedRate(
+          '出',
+          row.original.metrics.network_transmit_bytes_per_second,
+          '入',
+          row.original.metrics.network_receive_bytes_per_second,
+        )
+        return <span title={value}>{value}</span>
+      },
+    },
+    {
       id: 'uptime',
       header: () => sortButton('uptime', '运行时间'),
       cell: ({ row }) => uptime(row.original.uptime_seconds),
+    },
+    {
+      id: 'status',
+      header: '状态',
+      cell: ({ row }) => <StatusText status={row.original.status} />,
     },
   ]
 

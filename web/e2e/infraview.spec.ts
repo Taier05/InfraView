@@ -14,29 +14,6 @@ async function login(page: Page) {
   ).toBeVisible()
 }
 
-async function expectRenderedCanvas(page: Page, minimum = 1) {
-  const canvases = page.locator('.trend-chart canvas')
-  await expect.poll(() => canvases.count()).toBeGreaterThanOrEqual(minimum)
-  const dimensions = await canvases.evaluateAll((elements) =>
-    elements.map((element) => {
-      const canvas = element as HTMLCanvasElement
-      const bounds = canvas.getBoundingClientRect()
-      return {
-        bitmapWidth: canvas.width,
-        bitmapHeight: canvas.height,
-        cssWidth: bounds.width,
-        cssHeight: bounds.height,
-      }
-    }),
-  )
-  for (const dimension of dimensions) {
-    expect(dimension.bitmapWidth).toBeGreaterThan(0)
-    expect(dimension.bitmapHeight).toBeGreaterThan(0)
-    expect(dimension.cssWidth).toBeGreaterThan(0)
-    expect(dimension.cssHeight).toBeGreaterThan(0)
-  }
-}
-
 async function expectNoDestructiveControls(page: Page) {
   await expect(
     page.getByRole('button', {
@@ -50,7 +27,7 @@ async function expectNoDestructiveControls(page: Page) {
   ).toHaveCount(0)
 }
 
-test('未登录会重定向，登录后可完成总览、主机列表和详情关键路径', async ({
+test('未登录会重定向，登录后可完成总览和主机列表关键路径', async ({
   page,
 }) => {
   await page.goto('/hosts')
@@ -86,17 +63,11 @@ test('未登录会重定向，登录后可完成总览、主机列表和详情�
   await page.getByLabel('主机状态').selectOption('offline')
   await expect(page).toHaveURL(/q=linux-017/)
   await expect(page).toHaveURL(/status=offline/)
-  await expect(page.getByRole('link', { name: 'linux-017' })).toBeVisible()
+  await expect(page.getByText('linux-017')).toBeVisible()
   await expect(page.getByRole('row')).toHaveCount(2)
-  await expectNoDestructiveControls(page)
-
-  await page.getByRole('link', { name: 'linux-017' }).click()
-  await expect(page.getByRole('heading', { name: 'linux-017' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: '当前指标' })).toBeVisible()
-  await expect(
-    page.getByRole('table', { name: '文件系统容量' }),
-  ).toBeVisible()
-  await expectRenderedCanvas(page, 4)
+  await expect(page.getByRole('columnheader', { name: 'IO 读/写' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: '网络 出/入' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'linux-017' })).toHaveCount(0)
   await expectNoDestructiveControls(page)
 
   await page.getByRole('button', { name: '退出登录' }).click()

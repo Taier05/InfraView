@@ -812,7 +812,7 @@ h1 {
 
 .host-table {
   width: 100%;
-  min-width: 66rem;
+  min-width: 70rem;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -828,14 +828,15 @@ h1 {
   white-space: nowrap;
 }
 
-.host-table th:nth-child(1) { width: 15%; }
-.host-table th:nth-child(2) { width: 13%; }
-.host-table th:nth-child(3) { width: 16%; }
-.host-table th:nth-child(4) { width: 9%; }
-.host-table th:nth-child(5),
+.host-table th:nth-child(1) { width: 13%; }
+.host-table th:nth-child(2) { width: 11%; }
+.host-table th:nth-child(3),
+.host-table th:nth-child(4),
+.host-table th:nth-child(5) { width: 7%; }
 .host-table th:nth-child(6),
-.host-table th:nth-child(7) { width: 9%; }
-.host-table th:nth-child(8) { width: 12%; }
+.host-table th:nth-child(7) { width: 19%; }
+.host-table th:nth-child(8) { width: 10%; }
+.host-table th:nth-child(9) { width: 7%; }
 
 .host-table th {
   color: var(--text-muted);
@@ -868,18 +869,13 @@ h1 {
   color: var(--accent-strong);
 }
 
-.host-name-link {
+.host-name-text {
   display: block;
   overflow: hidden;
   color: var(--accent-strong);
   font-weight: 750;
-  text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.host-name-link:hover {
-  text-decoration: underline;
 }
 
 .host-cell-text {

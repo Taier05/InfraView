@@ -8,13 +8,7 @@ import {
   within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  BrowserRouter,
-  Route,
-  Routes,
-  useNavigate,
-  useParams,
-} from 'react-router-dom'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 import { hostPageFixture } from '../../test/fixtures'
@@ -39,19 +33,6 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
-function DetailStub() {
-  const navigate = useNavigate()
-  const { id } = useParams()
-  return (
-    <section>
-      <h1>主机详情 {id}</h1>
-      <button type="button" onClick={() => navigate(-1)}>
-        返回主机列表
-      </button>
-    </section>
-  )
-}
-
 function renderHostList(initialEntry = '/hosts') {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -65,7 +46,6 @@ function renderHostList(initialEntry = '/hosts') {
       <BrowserRouter>
         <Routes>
           <Route path="/hosts" element={<HostListPage />} />
-          <Route path="/hosts/:id" element={<DetailStub />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>,
@@ -114,27 +94,30 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
     screen.getAllByRole('option').map((option) => option.textContent),
   ).toEqual(['全部状态', '在线', '离线'])
 
-  const appLink = await screen.findByRole('link', { name: 'linux-app-01' })
+  const appName = await screen.findByText('linux-app-01')
 
   for (const label of ['主机名', 'CPU', '内存', '负载', '运行时间']) {
     expect(
       screen.getByRole('button', { name: new RegExp(`^${label}`) }),
     ).toBeInTheDocument()
   }
-  for (const label of ['IP 地址', '操作系统', '状态']) {
+  for (const label of ['IP 地址', 'IO 读/写', '网络 出/入', '状态']) {
     expect(
       screen.getByRole('columnheader', { name: label }),
     ).toBeInTheDocument()
   }
 
-  expect(appLink).toHaveAttribute('href', '/hosts/host-001')
-  const appRow = appLink.closest('tr')
+  expect(
+    screen.queryByRole('link', { name: 'linux-app-01' }),
+  ).not.toBeInTheDocument()
+  const appRow = appName.closest('tr')
   expect(appRow).not.toBeNull()
   const appCells = within(appRow!).getAllByRole('cell')
-  expect(appCells).toHaveLength(8)
+  expect(appCells).toHaveLength(9)
   expect(appCells[0]).toHaveTextContent('linux-app-01')
   expect(appCells[1]).toHaveTextContent('192.0.2.11')
-  expect(appCells[2]).toHaveTextContent('Ubuntu 24.04')
+  expect(appCells[5]).toHaveTextContent('读 1.0 KiB/s / 写 2.0 KiB/s')
+  expect(appCells[6]).toHaveTextContent('出 8.0 KiB/s / 入 4.0 KiB/s')
   expect(within(appRow!).getByText('在线')).toHaveAttribute(
     'data-status',
     'online',
@@ -144,13 +127,13 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
   expect(appRow).toHaveTextContent('1.3')
   expect(appRow).toHaveTextContent('1天 2小时')
 
-  const dbRow = screen.getByRole('link', { name: 'linux-db-02' }).closest('tr')
+  const dbRow = screen.getByText('linux-db-02').closest('tr')
   expect(dbRow).not.toBeNull()
   expect(within(dbRow!).getByText('离线')).toHaveAttribute(
     'data-status',
     'offline',
   )
-  expect(within(dbRow!).getAllByText('暂无数据')).toHaveLength(3)
+  expect(within(dbRow!).getAllByText('暂无数据')).toHaveLength(5)
 
   expect(
     screen.queryByRole('button', { name: /重启|删除|执行|修改/ }),
@@ -165,28 +148,13 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
   })
 })
 
-it('对包含路径和 URL 分隔符的主机 ID 编码详情链接', async () => {
-  const response = hostPageFixture()
-  response.data.hosts[0].id = 'rack/a ?#1'
-  vi.mocked(globalThis.fetch).mockImplementation((input) => {
-    requestedURLs.push(requestURL(input))
-    return Promise.resolve(jsonResponse(response))
-  })
-  renderHostList()
-
-  expect(
-    await screen.findByRole('link', { name: 'linux-app-01' }),
-  ).toHaveAttribute('href', '/hosts/rack%2Fa%20%3F%231')
-})
-
-it('从 URL 恢复列表状态并在详情返回后完整保留', async () => {
-  const user = userEvent.setup()
+it('从 URL 恢复列表筛选和排序状态', async () => {
   const initialEntry =
     '/hosts?q=db&status=offline&sort=memory&order=desc&page=2'
   renderHostList(initialEntry)
 
   expect(
-    await screen.findByRole('link', { name: 'linux-app-01' }),
+    await screen.findByText('linux-app-01'),
   ).toBeInTheDocument()
   expect(screen.getByRole('searchbox', { name: '搜索主机名或 IP' })).toHaveValue(
     'db',
@@ -203,17 +171,7 @@ it('从 URL 恢复列表状态并在详情返回后完整保留', async () => {
     page_size: '20',
   })
 
-  await user.click(screen.getByRole('link', { name: 'linux-app-01' }))
-  expect(window.location.pathname).toBe('/hosts/host-001')
-  await user.click(screen.getByRole('button', { name: '返回主机列表' }))
-
   expect(window.location.pathname + window.location.search).toBe(initialEntry)
-  expect(
-    await screen.findByRole('searchbox', { name: '搜索主机名或 IP' }),
-  ).toHaveValue('db')
-  expect(screen.getByRole('combobox', { name: '主机状态' })).toHaveValue(
-    'offline',
-  )
 })
 
 it('搜索等待 300ms 后请求并把页码重置为 1', async () => {
@@ -246,7 +204,7 @@ it('搜索等待 300ms 后请求并把页码重置为 1', async () => {
 it('筛选和服务端排序变化都重置页码并使用规范 load 字段', async () => {
   const user = userEvent.setup()
   renderHostList('/hosts?page=3')
-  await screen.findByRole('link', { name: 'linux-app-01' })
+  await screen.findByText('linux-app-01')
 
   await user.selectOptions(
     screen.getByRole('combobox', { name: '主机状态' }),
@@ -361,7 +319,7 @@ it('用 replace 规范非法 URL 参数并保留搜索词', async () => {
     '/hosts?q=keep&status=broken&sort=password&order=sideways&page=nope',
   )
 
-  await screen.findByRole('link', { name: 'linux-app-01' })
+  await screen.findByText('linux-app-01')
   await waitFor(() =>
     expect(window.location.search).toBe(
       '?q=keep&status=&sort=name&order=asc&page=1',
@@ -413,7 +371,7 @@ it('支持手动刷新并在请求期间禁用刷新按钮', async () => {
   const user = userEvent.setup()
   renderHostList()
 
-  await screen.findByRole('link', { name: 'linux-app-01' })
+  await screen.findByText('linux-app-01')
   const refresh = screen.getByRole('button', { name: '刷新主机列表' })
   await user.click(refresh)
 
@@ -443,7 +401,7 @@ it('每 30 秒非重叠自动刷新主机列表', async () => {
     resolveInitial(jsonResponse(hostPageFixture()))
     await vi.advanceTimersByTimeAsync(0)
   })
-  expect(screen.getByRole('link', { name: 'linux-app-01' })).toBeInTheDocument()
+  expect(screen.getByText('linux-app-01')).toBeInTheDocument()
 
   await act(async () => vi.advanceTimersByTimeAsync(29_999))
   expect(requestedURLs).toHaveLength(1)
@@ -469,17 +427,13 @@ it('后台刷新失败时保留已有表格并显示可重试提示', async () =
   const user = userEvent.setup()
   renderHostList()
 
-  await screen.findByRole('link', {
-    name: 'linux-app-01',
-  })
+  await screen.findByText('linux-app-01')
   await user.click(screen.getByRole('button', { name: '刷新主机列表' }))
 
   const error = await screen.findByRole('alert')
   expect(error).toHaveTextContent('主机列表刷新失败')
   expect(error).toHaveTextContent('数据源暂时不可用，请稍后重试')
-  expect(
-    screen.getByRole('link', { name: 'linux-app-01' }),
-  ).toBeInTheDocument()
+  expect(screen.getByText('linux-app-01')).toBeInTheDocument()
   expect(screen.getByText('第 1 / 3 页，共 41 台')).toBeInTheDocument()
 
   await user.click(

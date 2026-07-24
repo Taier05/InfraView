@@ -8,7 +8,6 @@ import {
 
 import { AuthProvider, useAuth } from '../auth/AuthProvider'
 import { LoginPage } from '../auth/LoginPage'
-import { HostDetailPage } from '../features/hosts/HostDetailPage'
 import { HostListPage } from '../features/hosts/HostListPage'
 import { OverviewPage } from '../features/overview/OverviewPage'
 import { AppShell } from './AppShell'
@@ -64,7 +63,6 @@ export function App() {
             <Route element={<ProtectedShell />}>
               <Route index element={<OverviewPage />} />
               <Route path="hosts" element={<HostListPage />} />
-              <Route path="hosts/:id" element={<HostDetailPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
