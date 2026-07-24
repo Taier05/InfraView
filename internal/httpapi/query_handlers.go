@@ -42,6 +42,7 @@ type currentMetricsView struct {
 	CPUUsage                      metricValueView  `json:"cpu_usage"`
 	MemoryUsage                   metricValueView  `json:"memory_usage"`
 	Load1                         metricValueView  `json:"load_1"`
+	IOBusyPercent                 metricValueView  `json:"io_busy_percent"`
 	DiskReadBytesPerSecond        metricValueView  `json:"disk_read_bytes_per_second"`
 	DiskWriteBytesPerSecond       metricValueView  `json:"disk_write_bytes_per_second"`
 	NetworkReceiveBytesPerSecond  metricValueView  `json:"network_receive_bytes_per_second"`
@@ -290,6 +291,7 @@ func currentView(value service.CurrentMetrics) currentMetricsView {
 		CPUUsage:                      metricView(value.CPUUsage),
 		MemoryUsage:                   metricView(value.MemoryUsage),
 		Load1:                         metricView(value.Load1),
+		IOBusyPercent:                 metricView(value.IOBusyPercent),
 		DiskReadBytesPerSecond:        metricView(value.DiskReadBytesPerSecond),
 		DiskWriteBytesPerSecond:       metricView(value.DiskWriteBytesPerSecond),
 		NetworkReceiveBytesPerSecond:  metricView(value.NetworkReceiveBytesPerSecond),

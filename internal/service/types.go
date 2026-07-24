@@ -23,14 +23,16 @@ const (
 )
 
 type Options struct {
-	InventoryTTL      time.Duration
-	CurrentMetricsTTL time.Duration
-	RangeTTL          time.Duration
-	HealthTTL         time.Duration
-	MaxStale          time.Duration
-	WarningPercent    float64
-	CriticalPercent   float64
-	Clock             func() time.Time
+	InventoryTTL       time.Duration
+	CurrentMetricsTTL  time.Duration
+	RangeTTL           time.Duration
+	HealthTTL          time.Duration
+	MaxStale           time.Duration
+	WarningPercent     float64
+	CriticalPercent    float64
+	NetworkWarningBPS  float64
+	NetworkCriticalBPS float64
+	Clock              func() time.Time
 }
 
 type Meta struct {
@@ -62,6 +64,7 @@ type CurrentMetrics struct {
 	CPUUsage                      MetricValue
 	MemoryUsage                   MetricValue
 	Load1                         MetricValue
+	IOBusyPercent                 MetricValue
 	DiskReadBytesPerSecond        MetricValue
 	DiskWriteBytesPerSecond       MetricValue
 	NetworkReceiveBytesPerSecond  MetricValue

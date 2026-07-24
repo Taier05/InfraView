@@ -94,14 +94,16 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 	provider = withUpstreamTimeout(provider, cfg.UpstreamTimeout)
 	store := cache.New(clock)
 	queryService := service.New(provider, store, service.Options{
-		InventoryTTL:      cfg.InventoryTTL,
-		CurrentMetricsTTL: cfg.CurrentMetricsTTL,
-		RangeTTL:          cfg.RangeTTL,
-		HealthTTL:         cfg.HealthTTL,
-		MaxStale:          cfg.MaxStale,
-		WarningPercent:    cfg.WarningPercent,
-		CriticalPercent:   cfg.CriticalPercent,
-		Clock:             clock,
+		InventoryTTL:       cfg.InventoryTTL,
+		CurrentMetricsTTL:  cfg.CurrentMetricsTTL,
+		RangeTTL:           cfg.RangeTTL,
+		HealthTTL:          cfg.HealthTTL,
+		MaxStale:           cfg.MaxStale,
+		WarningPercent:     cfg.WarningPercent,
+		CriticalPercent:    cfg.CriticalPercent,
+		NetworkWarningBPS:  cfg.NetworkWarningBPS,
+		NetworkCriticalBPS: cfg.NetworkCriticalBPS,
+		Clock:              clock,
 	})
 	return httpapi.New(httpapi.Dependencies{
 		Config:  cfg,

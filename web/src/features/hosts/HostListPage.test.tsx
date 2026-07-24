@@ -101,7 +101,7 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
       screen.getByRole('button', { name: new RegExp(`^${label}`) }),
     ).toBeInTheDocument()
   }
-  for (const label of ['IP 地址', 'IO 读/写', '网络 出/入', '状态']) {
+  for (const label of ['IP 地址', 'IO 忙碌度', '网络 出/入', '状态']) {
     expect(
       screen.getByRole('columnheader', { name: label }),
     ).toBeInTheDocument()
@@ -116,8 +116,13 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
   expect(appCells).toHaveLength(9)
   expect(appCells[0]).toHaveTextContent('linux-app-01')
   expect(appCells[1]).toHaveTextContent('192.0.2.11')
-  expect(appCells[5]).toHaveTextContent('读 1.0 KiB/s / 写 2.0 KiB/s')
-  expect(appCells[6]).toHaveTextContent('出 8.0 KiB/s / 入 4.0 KiB/s')
+  expect(appCells[5]).toHaveTextContent('91.2%')
+  expect(appCells[6]).toHaveTextContent('8.0KiB/s / 4.0KiB/s')
+  expect(appCells[2].querySelector('[data-level="normal"]')).not.toBeNull()
+  expect(appCells[3].querySelector('[data-level="warning"]')).not.toBeNull()
+  expect(appCells[5].querySelector('[data-level="critical"]')).not.toBeNull()
+  expect(appCells[6].querySelector('[data-level="warning"]')).not.toBeNull()
+  expect(appCells[6].querySelector('[data-level="critical"]')).not.toBeNull()
   expect(within(appRow!).getByText('在线')).toHaveAttribute(
     'data-status',
     'online',
@@ -133,7 +138,7 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
     'data-status',
     'offline',
   )
-  expect(within(dbRow!).getAllByText('暂无数据')).toHaveLength(5)
+  expect(within(dbRow!).getAllByText('暂无数据')).toHaveLength(6)
 
   expect(
     screen.queryByRole('button', { name: /重启|删除|执行|修改/ }),

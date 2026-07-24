@@ -5,13 +5,11 @@ import { MemoryRouter } from 'react-router-dom'
 import {
   afterEach,
   beforeEach,
-  describe,
   expect,
   it,
   vi,
 } from 'vitest'
 
-import { TrendChart } from '../../components/TrendChart'
 import { overviewFixture } from '../../test/fixtures'
 import { OverviewPage } from './OverviewPage'
 
@@ -214,57 +212,4 @@ it('不可重试错误不显示重试入口', async () => {
 
   expect(await screen.findByRole('alert')).toHaveTextContent('时间范围无效')
   expect(screen.queryByRole('button', { name: '重试' })).not.toBeInTheDocument()
-})
-
-describe('TrendChart', () => {
-  it('用百分比格式从真实 series 生成读屏摘要', () => {
-    render(
-      <TrendChart
-        title="CPU 使用率趋势"
-        valueFormat="percent"
-        series={[
-          {
-            name: 'CPU 使用率',
-            points: [
-              { timestamp: '2026-07-21T00:00:00.000Z', value: 32 },
-              { timestamp: '2026-07-21T00:15:00.000Z', value: 61 },
-              { timestamp: '2026-07-21T00:30:00.000Z', value: 48 },
-            ],
-          },
-        ]}
-      />,
-    )
-
-    expect(
-      screen.getByRole('heading', { name: 'CPU 使用率趋势' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText('CPU 使用率趋势：最低 32%，最高 61%，最近值 48%。'),
-    ).toHaveClass('sr-only')
-  })
-
-  it('用同一 IEC B/s 格式生成磁盘速率读屏摘要', () => {
-    render(
-      <TrendChart
-        title="磁盘 I/O 趋势"
-        valueFormat="bytesPerSecond"
-        series={[
-          {
-            name: '磁盘读取速率',
-            points: [
-              { timestamp: '2026-07-21T00:00:00.000Z', value: 1_048_576 },
-              { timestamp: '2026-07-21T00:30:00.000Z', value: 2_097_152 },
-            ],
-          },
-        ]}
-      />,
-    )
-
-    expect(
-      screen.getByText(
-        '磁盘读取速率趋势：最低 1 MiB/s，最高 2 MiB/s，最近值 2 MiB/s。',
-      ),
-    ).toHaveClass('sr-only')
-    expect(screen.queryByText(/1048576 B\/s/)).not.toBeInTheDocument()
-  })
 })

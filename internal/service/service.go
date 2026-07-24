@@ -48,6 +48,12 @@ func New(provider datasource.Provider, store *cache.Store, options Options) *Ser
 	if options.CriticalPercent == 0 {
 		options.CriticalPercent = 90
 	}
+	if options.NetworkWarningBPS == 0 {
+		options.NetworkWarningBPS = 80 * 1024 * 1024
+	}
+	if options.NetworkCriticalBPS == 0 {
+		options.NetworkCriticalBPS = 100 * 1024 * 1024
+	}
 	if store == nil {
 		store = cache.New(options.Clock)
 	}
@@ -116,12 +122,26 @@ func (s *Service) currentView(metrics datasource.CurrentMetrics) CurrentMetrics 
 		CPUUsage:                      s.percentage(metrics.CPUUsage),
 		MemoryUsage:                   s.percentage(metrics.MemoryUsage),
 		Load1:                         scalar(metrics.Load1),
+		IOBusyPercent:                 s.percentage(metrics.IOBusyPercent),
 		DiskReadBytesPerSecond:        scalar(metrics.DiskReadBytesPerSecond),
 		DiskWriteBytesPerSecond:       scalar(metrics.DiskWriteBytesPerSecond),
-		NetworkReceiveBytesPerSecond:  scalar(metrics.NetworkReceiveBytesPerSecond),
-		NetworkTransmitBytesPerSecond: scalar(metrics.NetworkTransmitBytesPerSecond),
+		NetworkReceiveBytesPerSecond:  s.networkThroughput(metrics.NetworkReceiveBytesPerSecond),
+		NetworkTransmitBytesPerSecond: s.networkThroughput(metrics.NetworkTransmitBytesPerSecond),
 		Filesystems:                   filesystems,
 	}
+}
+
+func (s *Service) networkThroughput(value *float64) MetricValue {
+	if value == nil {
+		return MetricValue{Level: LevelUnknown}
+	}
+	level := LevelNormal
+	if *value >= s.options.NetworkCriticalBPS {
+		level = LevelCritical
+	} else if *value >= s.options.NetworkWarningBPS {
+		level = LevelWarning
+	}
+	return MetricValue{Value: cloneFloat(value), Level: level}
 }
 
 func (s *Service) percentage(value *float64) MetricValue {

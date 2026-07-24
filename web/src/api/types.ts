@@ -58,21 +58,14 @@ export type OverviewResponse = ApiResponse<OverviewData>
 
 export type HostStatus = 'online' | 'offline' | 'unknown'
 
-export interface FilesystemMetric {
-  mountpoint: string
-  usage: MetricValue
-}
-
 export interface CurrentMetrics {
   timestamp: string
   cpu_usage: MetricValue
   memory_usage: MetricValue
   load_1: MetricValue
-  disk_read_bytes_per_second: MetricValue
-  disk_write_bytes_per_second: MetricValue
+  io_busy_percent: MetricValue
   network_receive_bytes_per_second: MetricValue
   network_transmit_bytes_per_second: MetricValue
-  filesystems: FilesystemMetric[]
 }
 
 export interface HostSummary {
@@ -95,34 +88,6 @@ export interface HostPageData {
 }
 
 export type HostPageResponse = ApiResponse<HostPageData>
-
-export type HostDetailResponse = ApiResponse<HostSummary>
-
-export type HostMetricKey =
-  | 'cpu_usage'
-  | 'memory_usage'
-  | 'load_1'
-  | 'disk_usage'
-  | 'disk_read_bytes_per_second'
-  | 'disk_write_bytes_per_second'
-  | 'network_receive_bytes_per_second'
-  | 'network_transmit_bytes_per_second'
-
-export interface HostMetricSeries {
-  metric: HostMetricKey
-  points: TrendPoint[]
-}
-
-export interface HostMetricsData {
-  host_id: string
-  range: '1h' | '6h' | '24h' | '7d'
-  from: string
-  to: string
-  step_seconds: number
-  series: HostMetricSeries[]
-}
-
-export type HostMetricsResponse = ApiResponse<HostMetricsData>
 
 export interface DataSourceStatusData {
   healthy: boolean

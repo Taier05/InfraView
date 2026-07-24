@@ -157,6 +157,7 @@ func currentMetrics(index int, timestamp time.Time) datasource.CurrentMetrics {
 	cpu := percentageValue(datasource.MetricCPUUsage, index, timestamp)
 	memory := percentageValue(datasource.MetricMemoryUsage, index, timestamp)
 	load := scalarValue(datasource.MetricLoad1, index, timestamp)
+	ioBusy := percentageValue(datasource.MetricIOBusyPercent, index, timestamp)
 	diskUsage := percentageValue(datasource.MetricDiskUsage, index, timestamp)
 	diskRead := scalarValue(datasource.MetricDiskReadBytesPerSecond, index, timestamp)
 	diskWrite := scalarValue(datasource.MetricDiskWriteBytesPerSecond, index, timestamp)
@@ -168,6 +169,7 @@ func currentMetrics(index int, timestamp time.Time) datasource.CurrentMetrics {
 		CPUUsage:                      &cpu,
 		MemoryUsage:                   &memory,
 		Load1:                         &load,
+		IOBusyPercent:                 &ioBusy,
 		DiskReadBytesPerSecond:        &diskRead,
 		DiskWriteBytesPerSecond:       &diskWrite,
 		NetworkReceiveBytesPerSecond:  &networkReceive,
@@ -181,7 +183,7 @@ func currentMetrics(index int, timestamp time.Time) datasource.CurrentMetrics {
 func metricValue(metric datasource.MetricKey, index int, timestamp time.Time) *float64 {
 	var value float64
 	switch metric {
-	case datasource.MetricCPUUsage, datasource.MetricMemoryUsage, datasource.MetricDiskUsage:
+	case datasource.MetricCPUUsage, datasource.MetricMemoryUsage, datasource.MetricIOBusyPercent, datasource.MetricDiskUsage:
 		value = percentageValue(metric, index, timestamp)
 	case datasource.MetricLoad1,
 		datasource.MetricDiskReadBytesPerSecond,
@@ -203,6 +205,8 @@ func percentageValue(metric datasource.MetricKey, index int, timestamp time.Time
 		value = 15 + float64(index%10) + 55*wave
 	case datasource.MetricMemoryUsage:
 		value = 30 + float64(index%15) + 35*wave
+	case datasource.MetricIOBusyPercent:
+		value = 8 + float64(index%12) + 78*wave
 	case datasource.MetricDiskUsage:
 		value = 40 + float64(index%20) + 20*wave
 	}

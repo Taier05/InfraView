@@ -50,27 +50,32 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.WarningPercent != 80 || cfg.CriticalPercent != 90 {
 		t.Fatalf("thresholds = %v/%v", cfg.WarningPercent, cfg.CriticalPercent)
 	}
+	if cfg.NetworkWarningBPS != 80*1024*1024 || cfg.NetworkCriticalBPS != 100*1024*1024 {
+		t.Fatalf("network thresholds = %v/%v", cfg.NetworkWarningBPS, cfg.NetworkCriticalBPS)
+	}
 }
 
 func TestLoadAllValues(t *testing.T) {
 	cfg, err := Load(mapEnv(map[string]string{
-		"INFRAVIEW_LISTEN_ADDR":         "127.0.0.1:9090",
-		"INFRAVIEW_USERNAME":            "operator",
-		"INFRAVIEW_PASSWORD":            "long-password",
-		"INFRAVIEW_SESSION_TTL":         "24h",
-		"INFRAVIEW_COOKIE_SECURE":       "true",
-		"INFRAVIEW_TRUSTED_PROXY_CIDRS": "127.0.0.1/32, 10.23.4.5/8",
-		"INFRAVIEW_DATA_SOURCE":         "mock",
-		"INFRAVIEW_MOCK_HOST_COUNT":     "100",
-		"INFRAVIEW_REFRESH_INTERVAL":    "45s",
-		"INFRAVIEW_INVENTORY_TTL":       "2m",
-		"INFRAVIEW_CURRENT_METRICS_TTL": "25s",
-		"INFRAVIEW_RANGE_TTL":           "90s",
-		"INFRAVIEW_HEALTH_TTL":          "20s",
-		"INFRAVIEW_MAX_STALE":           "4m",
-		"INFRAVIEW_UPSTREAM_TIMEOUT":    "15s",
-		"INFRAVIEW_WARNING_PERCENT":     "75.5",
-		"INFRAVIEW_CRITICAL_PERCENT":    "95.5",
+		"INFRAVIEW_LISTEN_ADDR":          "127.0.0.1:9090",
+		"INFRAVIEW_USERNAME":             "operator",
+		"INFRAVIEW_PASSWORD":             "long-password",
+		"INFRAVIEW_SESSION_TTL":          "24h",
+		"INFRAVIEW_COOKIE_SECURE":        "true",
+		"INFRAVIEW_TRUSTED_PROXY_CIDRS":  "127.0.0.1/32, 10.23.4.5/8",
+		"INFRAVIEW_DATA_SOURCE":          "mock",
+		"INFRAVIEW_MOCK_HOST_COUNT":      "100",
+		"INFRAVIEW_REFRESH_INTERVAL":     "45s",
+		"INFRAVIEW_INVENTORY_TTL":        "2m",
+		"INFRAVIEW_CURRENT_METRICS_TTL":  "25s",
+		"INFRAVIEW_RANGE_TTL":            "90s",
+		"INFRAVIEW_HEALTH_TTL":           "20s",
+		"INFRAVIEW_MAX_STALE":            "4m",
+		"INFRAVIEW_UPSTREAM_TIMEOUT":     "15s",
+		"INFRAVIEW_WARNING_PERCENT":      "75.5",
+		"INFRAVIEW_CRITICAL_PERCENT":     "95.5",
+		"INFRAVIEW_NETWORK_WARNING_BPS":  "1048576",
+		"INFRAVIEW_NETWORK_CRITICAL_BPS": "2097152",
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -99,6 +104,9 @@ func TestLoadAllValues(t *testing.T) {
 	if cfg.WarningPercent != 75.5 || cfg.CriticalPercent != 95.5 {
 		t.Fatalf("thresholds = %v/%v", cfg.WarningPercent, cfg.CriticalPercent)
 	}
+	if cfg.NetworkWarningBPS != 1048576 || cfg.NetworkCriticalBPS != 2097152 {
+		t.Fatalf("network thresholds = %v/%v", cfg.NetworkWarningBPS, cfg.NetworkCriticalBPS)
+	}
 }
 
 func TestLoadRejectsInvalidValues(t *testing.T) {
@@ -126,6 +134,9 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{name: "warning is positive infinity", overrides: map[string]string{"INFRAVIEW_WARNING_PERCENT": "+Inf"}, wantError: `INFRAVIEW_WARNING_PERCENT 必须是 0 到 100 之间的有限数值，当前值为 "+Inf"`},
 		{name: "critical is negative infinity", overrides: map[string]string{"INFRAVIEW_CRITICAL_PERCENT": "-Inf"}, wantError: `INFRAVIEW_CRITICAL_PERCENT 必须是 0 到 100 之间的有限数值，当前值为 "-Inf"`},
 		{name: "warning equals critical", overrides: map[string]string{"INFRAVIEW_WARNING_PERCENT": "90"}, wantError: "INFRAVIEW_WARNING_PERCENT 必须低于 INFRAVIEW_CRITICAL_PERCENT"},
+		{name: "invalid network warning", overrides: map[string]string{"INFRAVIEW_NETWORK_WARNING_BPS": "0"}, wantError: `INFRAVIEW_NETWORK_WARNING_BPS 必须是大于 0 的有限数值，当前值为 "0"`},
+		{name: "invalid network critical", overrides: map[string]string{"INFRAVIEW_NETWORK_CRITICAL_BPS": "NaN"}, wantError: `INFRAVIEW_NETWORK_CRITICAL_BPS 必须是大于 0 的有限数值，当前值为 "NaN"`},
+		{name: "network warning equals critical", overrides: map[string]string{"INFRAVIEW_NETWORK_WARNING_BPS": "104857600"}, wantError: "INFRAVIEW_NETWORK_WARNING_BPS 必须低于 INFRAVIEW_NETWORK_CRITICAL_BPS"},
 	}
 
 	for _, tt := range tests {

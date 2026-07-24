@@ -57,17 +57,15 @@ function bytesPerSecond(metric: MetricValue) {
     value /= 1024
     unitIndex += 1
   }
-  return `${value.toFixed(1)} ${units[unitIndex]}`
+  return `${value.toFixed(1)}${units[unitIndex]}`
 }
 
-function pairedRate(
-  firstLabel: string,
-  first: MetricValue,
-  secondLabel: string,
-  second: MetricValue,
-) {
-  if (first.value === null && second.value === null) return '暂无数据'
-  return `${firstLabel} ${bytesPerSecond(first)} / ${secondLabel} ${bytesPerSecond(second)}`
+function MetricText({ metric, text }: { metric: MetricValue; text: string }) {
+  return (
+    <span className="host-metric" data-level={metric.level}>
+      {text}
+    </span>
+  )
 }
 
 function uptime(seconds: number) {
@@ -233,12 +231,22 @@ export function HostListPage() {
     {
       id: 'cpu',
       header: () => sortButton('cpu', 'CPU'),
-      cell: ({ row }) => percentage(row.original.metrics.cpu_usage),
+      cell: ({ row }) => (
+        <MetricText
+          metric={row.original.metrics.cpu_usage}
+          text={percentage(row.original.metrics.cpu_usage)}
+        />
+      ),
     },
     {
       id: 'memory',
       header: () => sortButton('memory', '内存'),
-      cell: ({ row }) => percentage(row.original.metrics.memory_usage),
+      cell: ({ row }) => (
+        <MetricText
+          metric={row.original.metrics.memory_usage}
+          text={percentage(row.original.metrics.memory_usage)}
+        />
+      ),
     },
     {
       id: 'load',
@@ -247,28 +255,30 @@ export function HostListPage() {
     },
     {
       id: 'io',
-      header: 'IO 读/写',
-      cell: ({ row }) => {
-        const value = pairedRate(
-          '读',
-          row.original.metrics.disk_read_bytes_per_second,
-          '写',
-          row.original.metrics.disk_write_bytes_per_second,
-        )
-        return <span title={value}>{value}</span>
-      },
+      header: 'IO 忙碌度',
+      cell: ({ row }) => (
+        <MetricText
+          metric={row.original.metrics.io_busy_percent}
+          text={percentage(row.original.metrics.io_busy_percent)}
+        />
+      ),
     },
     {
       id: 'network',
       header: '网络 出/入',
       cell: ({ row }) => {
-        const value = pairedRate(
-          '出',
-          row.original.metrics.network_transmit_bytes_per_second,
-          '入',
-          row.original.metrics.network_receive_bytes_per_second,
+        const transmit = row.original.metrics.network_transmit_bytes_per_second
+        const receive = row.original.metrics.network_receive_bytes_per_second
+        return (
+          <span
+            className="host-network-rate"
+            title={`发送 ${bytesPerSecond(transmit)} / 接收 ${bytesPerSecond(receive)}`}
+          >
+            <MetricText metric={transmit} text={bytesPerSecond(transmit)} />
+            <span className="host-network-separator"> / </span>
+            <MetricText metric={receive} text={bytesPerSecond(receive)} />
+          </span>
         )
-        return <span title={value}>{value}</span>
       },
     },
     {

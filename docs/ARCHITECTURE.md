@@ -51,7 +51,7 @@
 
 ## 前端构建
 
-Vite 产物复制到忽略目录 `internal/httpapi/webdist` 后由 `go:embed` 嵌入。ECharts canvas 按需动态加载：入口 JS 约 331 kB，图表块约 495 kB；标题、读屏摘要和空状态无需等待图表模块。
+Vite 产物复制到忽略目录 `internal/httpapi/webdist` 后由 `go:embed` 嵌入。当前前端不包含主机详情页和图表运行时，主机清单使用服务端规范化的指标值与等级直接渲染。
 
 ## 状态与持久化
 

@@ -19,6 +19,7 @@ const (
 	MetricCPUUsage                      MetricKey = "cpu_usage"
 	MetricMemoryUsage                   MetricKey = "memory_usage"
 	MetricLoad1                         MetricKey = "load_1"
+	MetricIOBusyPercent                 MetricKey = "io_busy_percent"
 	MetricDiskUsage                     MetricKey = "disk_usage"
 	MetricDiskReadBytesPerSecond        MetricKey = "disk_read_bytes_per_second"
 	MetricDiskWriteBytesPerSecond       MetricKey = "disk_write_bytes_per_second"
@@ -51,6 +52,7 @@ type CurrentMetrics struct {
 	CPUUsage                      *float64
 	MemoryUsage                   *float64
 	Load1                         *float64
+	IOBusyPercent                 *float64
 	DiskReadBytesPerSecond        *float64
 	DiskWriteBytesPerSecond       *float64
 	NetworkReceiveBytesPerSecond  *float64

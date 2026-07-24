@@ -24,6 +24,8 @@
 | `INFRAVIEW_UPSTREAM_TIMEOUT` | `10s` | 正时长；为真实数据源调用边界预留，Mock 不发网络请求 |
 | `INFRAVIEW_WARNING_PERCENT` | `80` | 0–100 有限数值，必须低于危险阈值 |
 | `INFRAVIEW_CRITICAL_PERCENT` | `90` | 0–100 有限数值，必须高于警告阈值 |
+| `INFRAVIEW_NETWORK_WARNING_BPS` | `83886080` | 正有限数值，单方向网络速率达到该 B/s 值时标记为警告；默认 80 MiB/s |
+| `INFRAVIEW_NETWORK_CRITICAL_BPS` | `104857600` | 正有限数值且高于警告阈值，单方向网络速率达到该 B/s 值时标记为严重；默认 100 MiB/s |
 | `TZ` | `Asia/Hong_Kong` | 容器系统时区；API 时间戳仍按 RFC 3339 表达 |
 | `INFRAVIEW_ENV_FILE` | `.env` | Compose 工具变量，可指向专用环境文件；应用本身不读取此变量 |
 

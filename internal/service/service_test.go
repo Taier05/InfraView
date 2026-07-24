@@ -268,6 +268,39 @@ func TestHostsSortsLoadWithMissingValuesLastAndStableTies(t *testing.T) {
 	}
 }
 
+func TestHostsAssignsPercentageAndNetworkThresholdLevels(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	provider.metrics["h1"] = datasource.CurrentMetrics{
+		Timestamp:                     clock.Now(),
+		CPUUsage:                      float64Pointer(79),
+		MemoryUsage:                   float64Pointer(80),
+		IOBusyPercent:                 float64Pointer(90),
+		NetworkTransmitBytesPerSecond: float64Pointer(80 * 1024 * 1024),
+		NetworkReceiveBytesPerSecond:  float64Pointer(100 * 1024 * 1024),
+	}
+	svc := newService(provider, clock)
+
+	page, _, err := svc.Hosts(context.Background(), service.HostQuery{
+		Sort: "name", Order: "asc", Page: 1, PageSize: 20,
+	})
+	if err != nil {
+		t.Fatalf("Hosts() error = %v", err)
+	}
+	var host service.HostSummary
+	for _, candidate := range page.Hosts {
+		if candidate.ID == "h1" {
+			host = candidate
+			break
+		}
+	}
+	assertMetric(t, "CPU", host.Metrics.CPUUsage, 79, service.LevelNormal)
+	assertMetric(t, "memory", host.Metrics.MemoryUsage, 80, service.LevelWarning)
+	assertMetric(t, "IO busy", host.Metrics.IOBusyPercent, 90, service.LevelCritical)
+	assertMetric(t, "network transmit", host.Metrics.NetworkTransmitBytesPerSecond, 80*1024*1024, service.LevelWarning)
+	assertMetric(t, "network receive", host.Metrics.NetworkReceiveBytesPerSecond, 100*1024*1024, service.LevelCritical)
+}
+
 func TestHostsRejectsPageSizesOutsideOneToOneHundred(t *testing.T) {
 	clock := newServiceClock()
 	for _, pageSize := range []int{0, 101} {

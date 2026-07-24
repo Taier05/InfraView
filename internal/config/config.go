@@ -10,23 +10,25 @@ import (
 )
 
 type Config struct {
-	ListenAddr        string
-	Username          string
-	Password          string
-	SessionTTL        time.Duration
-	CookieSecure      bool
-	TrustedProxyCIDRs []netip.Prefix
-	DataSource        string
-	MockHostCount     int
-	RefreshInterval   time.Duration
-	InventoryTTL      time.Duration
-	CurrentMetricsTTL time.Duration
-	RangeTTL          time.Duration
-	HealthTTL         time.Duration
-	MaxStale          time.Duration
-	UpstreamTimeout   time.Duration
-	WarningPercent    float64
-	CriticalPercent   float64
+	ListenAddr         string
+	Username           string
+	Password           string
+	SessionTTL         time.Duration
+	CookieSecure       bool
+	TrustedProxyCIDRs  []netip.Prefix
+	DataSource         string
+	MockHostCount      int
+	RefreshInterval    time.Duration
+	InventoryTTL       time.Duration
+	CurrentMetricsTTL  time.Duration
+	RangeTTL           time.Duration
+	HealthTTL          time.Duration
+	MaxStale           time.Duration
+	UpstreamTimeout    time.Duration
+	WarningPercent     float64
+	CriticalPercent    float64
+	NetworkWarningBPS  float64
+	NetworkCriticalBPS float64
 }
 
 func Load(getenv func(string) string) (Config, error) {
@@ -99,6 +101,15 @@ func Load(getenv func(string) string) (Config, error) {
 	if cfg.WarningPercent >= cfg.CriticalPercent {
 		return Config{}, fmt.Errorf("INFRAVIEW_WARNING_PERCENT 必须低于 INFRAVIEW_CRITICAL_PERCENT")
 	}
+	if cfg.NetworkWarningBPS, err = positiveFloatValue(getenv, "INFRAVIEW_NETWORK_WARNING_BPS", "83886080"); err != nil {
+		return Config{}, err
+	}
+	if cfg.NetworkCriticalBPS, err = positiveFloatValue(getenv, "INFRAVIEW_NETWORK_CRITICAL_BPS", "104857600"); err != nil {
+		return Config{}, err
+	}
+	if cfg.NetworkWarningBPS >= cfg.NetworkCriticalBPS {
+		return Config{}, fmt.Errorf("INFRAVIEW_NETWORK_WARNING_BPS 必须低于 INFRAVIEW_NETWORK_CRITICAL_BPS")
+	}
 
 	return cfg, nil
 }
@@ -167,6 +178,15 @@ func percentageValue(getenv func(string) string, key, fallback string) (float64,
 	value, err := strconv.ParseFloat(raw, 64)
 	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 100 {
 		return 0, fmt.Errorf("%s 必须是 0 到 100 之间的有限数值，当前值为 %q", key, raw)
+	}
+	return value, nil
+}
+
+func positiveFloatValue(getenv func(string) string, key, fallback string) (float64, error) {
+	raw := valueOrDefault(getenv, key, fallback)
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || value <= 0 {
+		return 0, fmt.Errorf("%s 必须是大于 0 的有限数值，当前值为 %q", key, raw)
 	}
 	return value, nil
 }
