@@ -730,16 +730,40 @@ h1 {
 .host-sort-button {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0;
+  gap: 0.3rem;
+  padding: 0.12rem 0.18rem;
   border: 0;
+  border-radius: 0.35rem;
   color: inherit;
   background: transparent;
+  cursor: pointer;
   font-weight: inherit;
 }
 
 .host-sort-button:hover {
   color: var(--accent-strong);
+  background: var(--surface-raised);
+}
+
+.host-sort-indicator {
+  display: inline-grid;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 0.28rem;
+  color: #b9c4ca;
+  background: #27323a;
+  font-size: 0.72rem;
+  line-height: 1;
+  place-items: center;
+}
+
+.host-sort-button[data-active="true"] {
+  color: var(--accent-strong);
+}
+
+.host-sort-button[data-active="true"] .host-sort-indicator {
+  color: #d9fffb;
+  background: #31504d;
 }
 
 .host-name-text {

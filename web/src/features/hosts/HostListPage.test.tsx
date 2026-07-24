@@ -254,12 +254,20 @@ it('筛选和服务端排序变化都重置页码并使用规范 load 字段', a
     expect(lastRequest().searchParams.get('sort')).toBe('io'),
   )
   expect(lastRequest().searchParams.get('order')).toBe('asc')
+  expect(screen.getByRole('button', { name: /^IO 忙碌度/ })).toHaveAttribute(
+    'data-active',
+    'true',
+  )
 
   await user.click(screen.getByRole('button', { name: /^网络 出\/入/ }))
   await waitFor(() =>
     expect(lastRequest().searchParams.get('sort')).toBe('network'),
   )
   expect(lastRequest().searchParams.get('order')).toBe('asc')
+  expect(screen.getByRole('button', { name: /^网络 出\/入/ })).toHaveAttribute(
+    'data-active',
+    'true',
+  )
 })
 
 it('使用服务端分页且每页固定请求 20 条', async () => {

@@ -206,12 +206,14 @@ export function HostListPage() {
       <button
         className="host-sort-button"
         type="button"
+        data-active={sort === field}
         aria-label={`${label}排序，当前${state}`}
+        title={`点击按${label}排序`}
         onClick={() => changeSort(field)}
       >
         <span>{label}</span>
-        <span aria-hidden="true">
-          {sort === field ? (order === 'asc' ? '↑' : '↓') : '↕'}
+        <span className="host-sort-indicator" aria-hidden="true">
+          {sort === field ? (order === 'asc' ? '↑' : '↓') : '⇅'}
         </span>
       </button>
     )
