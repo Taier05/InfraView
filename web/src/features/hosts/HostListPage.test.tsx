@@ -182,6 +182,23 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
   })
 })
 
+it('长主机名保留完整提示并使用列内截断容器', async () => {
+  const longName =
+    'production-payment-service-linux-node-with-an-extremely-long-hostname-001'
+  const fixture = hostPageFixture()
+  fixture.data.hosts[0].name = longName
+  vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse(fixture))
+
+  renderHostList()
+
+  const hostName = await screen.findByText(longName)
+  expect(hostName).toHaveClass('host-name-text')
+  expect(hostName).toHaveAttribute('title', longName)
+  const row = hostName.closest('tr')
+  expect(row).not.toBeNull()
+  expect(within(row!).getAllByRole('cell')[1]).toHaveTextContent('192.0.2.11')
+})
+
 it('从 URL 恢复列表筛选和排序状态', async () => {
   const initialEntry =
     '/hosts?q=db&status=offline&sort=memory&order=desc&page=1&page_size=50'

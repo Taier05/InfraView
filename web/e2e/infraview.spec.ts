@@ -104,6 +104,44 @@ test('未登录会重定向，登录后可完成总览和主机列表关键路�
   await expect(page).toHaveURL(/\/login$/)
 })
 
+test('超长主机名限制在自身列内且保留完整提示', async ({ page }) => {
+  await login(page)
+  const fixture = await page.evaluate(async () => {
+    const response = await fetch(
+      '/api/v1/hosts?q=&status=&sort=name&order=asc&page=1&page_size=20',
+    )
+    return response.json()
+  })
+  const longName =
+    'production-payment-service-linux-node-with-an-extremely-long-hostname-001'
+  fixture.data.hosts[0].name = longName
+
+  await page.route('**/api/v1/hosts?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(fixture),
+    })
+  })
+  await page.goto('/hosts')
+
+  const hostName = page.locator('.host-name-text', { hasText: longName })
+  await expect(hostName).toHaveAttribute('title', longName)
+  const clipping = await hostName.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }))
+  expect(clipping.scrollWidth).toBeGreaterThan(clipping.clientWidth)
+
+  const row = hostName.locator('xpath=ancestor::tr')
+  const nameCellBox = await row.getByRole('cell').nth(0).boundingBox()
+  const ipCellBox = await row.getByRole('cell').nth(1).boundingBox()
+  expect(nameCellBox).not.toBeNull()
+  expect(ipCellBox).not.toBeNull()
+  expect(nameCellBox!.x + nameCellBox!.width).toBeLessThanOrEqual(ipCellBox!.x)
+  await expect(row.getByRole('cell').nth(1)).toContainText('192.0.2.1')
+})
+
 test('可控旧数据响应会显示过期提示', async ({ page }) => {
   await login(page)
   const fresh = await page.evaluate(async () => {
