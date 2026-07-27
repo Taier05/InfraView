@@ -53,9 +53,9 @@
 
 Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能只依赖 HTTP 状态，还必须检查 `err`。错误路径会被 SPA 接管并返回 HTML，因此适配器必须同时校验 Content-Type 和 JSON 结构。
 
-## 拟定适配策略（等待 Token 实证）
+## 已确认适配策略
 
-- `ListHosts`：分页调用 `/targets`，以 `ident` 作为稳定 ID 和显示主机名，映射 `host_ip`、`os`、`agent_version`；`target_up=2` 映射 online，`1` 映射 warning/unknown，`0` 映射 offline。最终状态语义需用真实响应确认。
+- `ListHosts`：分页调用 `/targets`，以 `ident` 作为稳定 ID 和显示主机名，映射 `host_ip`、`os`、`agent_version`；`target_up=2` 映射 online，`1` 映射 unknown，`0` 映射 offline。当前 3 台真实 Target 均返回 `target_up=2`。
 - CPU 核数优先使用 Target 的 `cpu_num`，`-1` 映射未知；可使用 `system_n_cpus` 交叉验证。
 - 内存总容量使用 `mem_total` 批量即时查询，因为 Target 只直接提供 `mem_util`，不提供总字节数。
 - `GetCurrentMetrics`：对全部目标使用固定、代码内置的 PromQL 通过一次 `/query-instant-batch` 批量查询，按 `ident` 归并，禁止按主机 N+1。
@@ -65,7 +65,7 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 - 网络使用 `rate(net_bytes_sent[2m])` / `rate(net_bytes_recv[2m])` 并执行配置化接口过滤；当前环境排除虚拟接口后得到合理 B/s。不得硬编码 `ens34`。
 - 不使用 `/api/n9e/proxy/:id/*` 实现任意代理，不向 InfraView API 或页面暴露任意数据源 URL、查询表达式或原始 Nightingale 请求体。
 
-在取得只读 Token 前，以上 API 契约虽有官方源码依据，但仍不能替代当前环境的真实认证响应、分页、权限和错误夹具。下一步必须用 `X-User-Token` 捕获完全脱敏的 GET 和只读查询响应。
+真实 root 用户个人 Token 已写入权限为 600、被 Git 忽略的私密 `.env`，并完成认证实证。即时查询实际返回 `dat[查询索引][序列]`，其中单点值为 `[Unix秒, 字符串值]`；区间查询对应 `values=[[Unix秒, 字符串值], ...]`。无 Token 和错误 Token 均返回 HTTP 401 与 `text/plain`，因此错误解析不能假设 JSON。完全脱敏的仓库测试夹具尚未创建，应作为下一步 TDD 的第一项工作。
 
 ## 禁止猜测
 
@@ -102,13 +102,8 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 
 任何真实凭据都不得进入仓库、测试夹具、错误消息或日志。
 
-## 当前需要用户完成
+## 当前凭据与后续动作
 
-在 Nightingale Web 中为测试创建一个个人 Token。短期联调可以先使用现有 Admin 用户创建的个人 Token 验证接口契约；正式接入前必须换成专用 `infraview` 用户和最小只读角色。Token 不要发送到聊天或提交到 Git，应写入 InfraView 主机上权限为 600、已被 Git 忽略的 `/root/github/InfraView/.env`：
+用户已完成 Token 配置，并确认测试及现阶段正式方案暂时使用 Nightingale root 用户个人 Token。该选择便于当前联调，但权限面较大；InfraView 仍只调用已确认的只读接口。后续若用户决定收敛权限，再迁移到专用最小只读账号，不作为当前接入阻塞项。
 
-```dotenv
-INFRAVIEW_NIGHTINGALE_BASE_URL=http://192.168.8.211:17000
-INFRAVIEW_NIGHTINGALE_TOKEN=<个人 Token>
-```
-
-写入完成后只需告知“Token 已写入”，不要粘贴 Token 内容。
+下一步不再重复远端版本探测，直接创建完全脱敏夹具和失败测试，以 TDD 实现适配器。恢复开发的详细入口见 `docs/HANDOFF.md`。
