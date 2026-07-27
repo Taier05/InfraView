@@ -73,8 +73,17 @@ beforeEach(() => {
     const url = requestURL(input)
     requestedURLs.push(url)
     const page = Number(url.searchParams.get('page') ?? '1')
+    const pageSize = Number(url.searchParams.get('page_size') ?? '20')
     return Promise.resolve(
-      jsonResponse(hostPageFixture({ data: { page } })),
+      jsonResponse(
+        hostPageFixture({
+          data: {
+            page,
+            page_size: pageSize,
+            total_pages: Math.ceil(41 / pageSize),
+          },
+        }),
+      ),
     )
   })
 })
@@ -91,8 +100,15 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
     screen.getByRole('searchbox', { name: '搜索主机名或 IP' }),
   ).toBeInTheDocument()
   expect(
-    screen.getAllByRole('option').map((option) => option.textContent),
+    within(screen.getByRole('combobox', { name: '主机状态' }))
+      .getAllByRole('option')
+      .map((option) => option.textContent),
   ).toEqual(['全部状态', '在线', '离线'])
+  expect(
+    within(screen.getByRole('combobox', { name: '每页数量' }))
+      .getAllByRole('option')
+      .map((option) => option.textContent),
+  ).toEqual(['20 条', '50 条', '100 条'])
 
   const appName = await screen.findByText('linux-app-01')
 
@@ -166,7 +182,7 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
 
 it('从 URL 恢复列表筛选和排序状态', async () => {
   const initialEntry =
-    '/hosts?q=db&status=offline&sort=memory&order=desc&page=2'
+    '/hosts?q=db&status=offline&sort=memory&order=desc&page=1&page_size=50'
   renderHostList(initialEntry)
 
   expect(
@@ -178,13 +194,14 @@ it('从 URL 恢复列表筛选和排序状态', async () => {
   expect(screen.getByRole('combobox', { name: '主机状态' })).toHaveValue(
     'offline',
   )
+  expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('50')
   expectRequestParameters(lastRequest(), {
     q: 'db',
     status: 'offline',
     sort: 'memory',
     order: 'desc',
-    page: '2',
-    page_size: '20',
+    page: '1',
+    page_size: '50',
   })
 
   expect(window.location.pathname + window.location.search).toBe(initialEntry)
@@ -273,7 +290,7 @@ it('筛选和服务端排序变化都重置页码并使用规范 load 字段', a
   )
 })
 
-it('使用服务端分页且每页固定请求 20 条', async () => {
+it('使用服务端分页并保持当前每页数量', async () => {
   const user = userEvent.setup()
   renderHostList('/hosts?page=2')
 
@@ -288,6 +305,26 @@ it('使用服务端分页且每页固定请求 20 条', async () => {
   await user.click(screen.getByRole('button', { name: '上一页' }))
   await waitFor(() => expect(lastRequest().searchParams.get('page')).toBe('2'))
   expect(lastRequest().searchParams.get('page_size')).toBe('20')
+})
+
+it('切换每页数量会回到第一页并写入 URL', async () => {
+  const user = userEvent.setup()
+  renderHostList('/hosts?page=2&page_size=20')
+
+  expect(await screen.findByText('第 2 / 3 页，共 41 台')).toBeInTheDocument()
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: '每页数量' }),
+    '50',
+  )
+
+  await waitFor(() => {
+    expect(lastRequest().searchParams.get('page')).toBe('1')
+    expect(lastRequest().searchParams.get('page_size')).toBe('50')
+  })
+  expect(window.location.search).toContain('page=1')
+  expect(window.location.search).toContain('page_size=50')
+  expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('50')
+  expect(await screen.findByText('第 1 / 1 页，共 41 台')).toBeInTheDocument()
 })
 
 it('把超出服务端总页数的 URL 替换为末页并直接重新请求', async () => {
@@ -352,13 +389,13 @@ it('零结果时规范为第一页并显示空状态而不是 1/0 页', async ()
 it('用 replace 规范非法 URL 参数并保留搜索词', async () => {
   const historyLength = window.history.length
   renderHostList(
-    '/hosts?q=keep&status=broken&sort=password&order=sideways&page=nope',
+    '/hosts?q=keep&status=broken&sort=password&order=sideways&page=nope&page_size=999',
   )
 
   await screen.findByText('linux-app-01')
   await waitFor(() =>
     expect(window.location.search).toBe(
-      '?q=keep&status=&sort=name&order=asc&page=1',
+      '?q=keep&status=&sort=name&order=asc&page=1&page_size=20',
     ),
   )
   expect(window.history.length).toBe(historyLength)

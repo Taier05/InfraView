@@ -768,13 +768,15 @@ h1 {
 
 .host-list-controls {
   display: grid;
-  grid-template-columns: minmax(16rem, 1fr) minmax(9rem, 12rem) auto;
+  grid-template-columns:
+    minmax(16rem, 1fr) minmax(8rem, 10rem) minmax(6rem, 7rem) auto;
   gap: 0.45rem;
   margin-bottom: 0.5rem;
 }
 
 .host-search,
-.host-status-filter {
+.host-status-filter,
+.host-page-size {
   display: grid;
   gap: 0.2rem;
   color: #c9d2d8;
@@ -783,7 +785,8 @@ h1 {
 }
 
 .host-search input,
-.host-status-filter select {
+.host-status-filter select,
+.host-page-size select {
   width: 100%;
   min-height: 2rem;
   padding: 0.35rem 0.5rem;

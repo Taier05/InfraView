@@ -66,10 +66,16 @@ test('未登录会重定向，登录后可完成总览和主机列表关键路�
   await expect(
     page.getByRole('heading', { name: '主机', exact: true }),
   ).toBeVisible()
+  await page.getByRole('combobox', { name: '每页数量' }).selectOption('50')
+  await expect(page).toHaveURL(/page_size=50/)
+  await expect(
+    page.getByRole('combobox', { name: '每页数量' }),
+  ).toHaveValue('50')
   await page.getByLabel('搜索主机名或 IP').fill('linux-017')
   await page.getByLabel('主机状态').selectOption('offline')
   await expect(page).toHaveURL(/q=linux-017/)
   await expect(page).toHaveURL(/status=offline/)
+  await expect(page).toHaveURL(/page_size=50/)
   await expect(page.getByText('linux-017')).toBeVisible()
   await expect(page.getByRole('row')).toHaveCount(2)
   await expect(page.getByText(/上次刷新 \d{2}:\d{2}:\d{2}/)).toBeVisible()

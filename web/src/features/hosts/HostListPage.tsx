@@ -19,7 +19,8 @@ import { ErrorPanel } from '../../components/ErrorPanel'
 import { RefreshControl } from '../../components/RefreshControl'
 import { StaleBanner } from '../../components/StaleBanner'
 
-const PAGE_SIZE = 20
+const pageSizes = [20, 50, 100] as const
+type PageSize = (typeof pageSizes)[number]
 const sortFields = [
   'name',
   'cpu',
@@ -45,6 +46,13 @@ function isHostSort(value: string | null): value is HostSort {
 function positivePage(value: string | null) {
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : 1
+}
+
+function hostPageSize(value: string | null): PageSize {
+  const parsed = Number(value)
+  return pageSizes.some((pageSize) => pageSize === parsed)
+    ? (parsed as PageSize)
+    : 20
 }
 
 function percentage(metric: MetricValue) {
@@ -104,6 +112,7 @@ export function HostListPage() {
   const sort: HostSort = isHostSort(requestedSort) ? requestedSort : 'name'
   const order: SortOrder = searchParams.get('order') === 'desc' ? 'desc' : 'asc'
   const page = positivePage(searchParams.get('page'))
+  const pageSize = hostPageSize(searchParams.get('page_size'))
   const [searchText, setSearchText] = useState(querySearch)
 
   useEffect(() => {
@@ -113,10 +122,20 @@ export function HostListPage() {
     canonical.set('sort', sort)
     canonical.set('order', order)
     canonical.set('page', String(page))
+    canonical.set('page_size', String(pageSize))
     if (canonical.toString() !== searchParams.toString()) {
       setSearchParams(canonical, { replace: true })
     }
-  }, [order, page, querySearch, searchParams, setSearchParams, sort, status])
+  }, [
+    order,
+    page,
+    pageSize,
+    querySearch,
+    searchParams,
+    setSearchParams,
+    sort,
+    status,
+  ])
 
   useEffect(() => {
     setSearchText(querySearch)
@@ -139,7 +158,7 @@ export function HostListPage() {
     sort,
     order,
     page: String(page),
-    page_size: String(PAGE_SIZE),
+    page_size: String(pageSize),
   })
   const hosts = useQuery({
     queryKey: [
@@ -149,7 +168,7 @@ export function HostListPage() {
       sort,
       order,
       page,
-      PAGE_SIZE,
+      pageSize,
     ],
     queryFn: ({ signal }) =>
       apiRequest<HostPageResponse>(
@@ -345,6 +364,21 @@ export function HostListPage() {
             <option value="">全部状态</option>
             <option value="online">在线</option>
             <option value="offline">离线</option>
+          </select>
+        </label>
+        <label className="host-page-size">
+          <span>每页数量</span>
+          <select
+            value={pageSize}
+            onChange={(event) =>
+              updateParameters({ page_size: event.target.value })
+            }
+          >
+            {pageSizes.map((value) => (
+              <option key={value} value={value}>
+                {value} 条
+              </option>
+            ))}
           </select>
         </label>
         <RefreshControl
