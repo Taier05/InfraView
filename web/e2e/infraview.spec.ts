@@ -65,6 +65,8 @@ test('未登录会重定向，登录后可完成总览和主机列表关键路�
   await expect(page).toHaveURL(/status=offline/)
   await expect(page.getByText('linux-017')).toBeVisible()
   await expect(page.getByRole('row')).toHaveCount(2)
+  await expect(page.getByText(/上次刷新 \d{2}:\d{2}:\d{2}/)).toBeVisible()
+  await expect(page.getByText(/每 30 秒自动刷新/)).toBeVisible()
   await expect(page.getByRole('columnheader', { name: 'IO 忙碌度' })).toBeVisible()
   await expect(page.getByRole('columnheader', { name: '网络 出/入' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'linux-017' })).toHaveCount(0)

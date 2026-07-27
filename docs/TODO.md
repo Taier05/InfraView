@@ -1,6 +1,6 @@
 # InfraView TODO
 
-最后更新：2026-07-22
+最后更新：2026-07-27
 
 ## Mock MVP
 
@@ -29,6 +29,7 @@
 
 ## 已知后续改进
 
+- [ ] 跟踪 React Router `GHSA-qwww-vcr4-c8h2` 的兼容修复版本；当前 SPA 不使用受影响的 RSC Action，禁止直接执行 npm 建议的 `audit fix --force` 强制降级。
 - [ ] 如需要让刷新周期可部署调整，设计只读运行时配置下发；当前 UI 固定 30 秒。
 - [ ] 扩展缓存结果契约，可靠记录并输出 cache hit/miss 日志字段。
 - [ ] 接入 Nightingale 后让数据源状态 API 返回可展示的数据源类型，替换当前 Mock 名称。

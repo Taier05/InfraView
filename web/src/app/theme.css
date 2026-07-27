@@ -485,7 +485,22 @@ h1 {
 }
 
 .host-list-refresh {
+  flex: 0 0 auto;
+}
+
+.host-refresh-control {
+  display: flex;
   align-self: end;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+}
+
+.host-refresh-time {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .overview-loading {
@@ -893,6 +908,10 @@ h1 {
 
   .host-list-controls {
     grid-template-columns: 1fr;
+  }
+
+  .host-refresh-control {
+    justify-content: flex-start;
   }
 
   .host-pagination {
