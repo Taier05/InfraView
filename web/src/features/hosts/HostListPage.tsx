@@ -261,7 +261,12 @@ export function HostListPage() {
     {
       id: 'load',
       header: () => sortButton('load', '负载'),
-      cell: ({ row }) => loadValue(row.original.metrics.load_1),
+      cell: ({ row }) => (
+        <MetricText
+          metric={row.original.metrics.load_1}
+          text={loadValue(row.original.metrics.load_1)}
+        />
+      ),
     },
     {
       id: 'io',

@@ -701,6 +701,11 @@ h1 {
   white-space: nowrap;
 }
 
+.host-table td {
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
 .host-table th:nth-child(1) { width: 15%; }
 .host-table th:nth-child(2) { width: 12%; }
 .host-table th:nth-child(3),
@@ -770,7 +775,7 @@ h1 {
   display: block;
   overflow: hidden;
   color: var(--accent-strong);
-  font-weight: 750;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -791,8 +796,10 @@ h1 {
 
 .host-metric {
   color: #d0d8dd;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .host-metric[data-level="warning"] {
@@ -809,6 +816,7 @@ h1 {
 }
 
 .host-network-rate {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   white-space: nowrap;
 }
 
@@ -821,7 +829,7 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .host-status-dot {
