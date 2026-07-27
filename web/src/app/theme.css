@@ -692,7 +692,7 @@ h1 {
 
 .host-table th,
 .host-table td {
-  padding: 0.42rem 0.55rem;
+  padding: 0.42rem 0.48rem;
   border-bottom: 1px solid var(--border);
   overflow: hidden;
   text-align: left;
@@ -706,15 +706,43 @@ h1 {
   font-weight: 500;
 }
 
-.host-table th:nth-child(1) { width: 15%; }
-.host-table th:nth-child(2) { width: 12%; }
+.host-table th:nth-child(1) { width: 11%; }
+.host-table th:nth-child(2) { width: 10.5%; }
 .host-table th:nth-child(3),
 .host-table th:nth-child(4),
-.host-table th:nth-child(5) { width: 7%; }
-.host-table th:nth-child(6) { width: 9%; }
-.host-table th:nth-child(7) { width: 23%; }
+.host-table th:nth-child(5) { width: 8%; }
+.host-table th:nth-child(6) { width: 10%; }
+.host-table th:nth-child(7) { width: 24.5%; }
 .host-table th:nth-child(8) { width: 12%; }
 .host-table th:nth-child(9) { width: 8%; }
+
+.host-table th:nth-child(n + 3):nth-child(-n + 8),
+.host-table td:nth-child(n + 3):nth-child(-n + 8) {
+  text-align: right;
+}
+
+.host-table th:nth-child(9),
+.host-table td:nth-child(9) {
+  text-align: center;
+}
+
+.host-table th:nth-child(1) .host-sort-button,
+.host-table th:nth-child(n + 3):nth-child(-n + 8) .host-sort-button {
+  width: 100%;
+}
+
+.host-table th:nth-child(1) .host-sort-button {
+  justify-content: flex-start;
+}
+
+.host-table th:nth-child(n + 3):nth-child(-n + 8) .host-sort-button {
+  justify-content: flex-end;
+}
+
+.host-table td:nth-child(8) {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
 
 .host-table th {
   color: var(--text-muted);
