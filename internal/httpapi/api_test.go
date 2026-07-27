@@ -321,8 +321,10 @@ func TestAuthenticatedReadOnlyQueriesUseApprovedSnakeCaseViews(t *testing.T) {
 	var hostPage struct {
 		Data struct {
 			Hosts []struct {
-				ID            string `json:"id"`
-				UptimeSeconds int64  `json:"uptime_seconds"`
+				ID               string `json:"id"`
+				CPUCores         *int   `json:"cpu_cores"`
+				MemoryTotalBytes *int64 `json:"memory_total_bytes"`
+				UptimeSeconds    int64  `json:"uptime_seconds"`
 			} `json:"hosts"`
 			Page       int `json:"page"`
 			PageSize   int `json:"page_size"`
@@ -333,6 +335,9 @@ func TestAuthenticatedReadOnlyQueriesUseApprovedSnakeCaseViews(t *testing.T) {
 	decodeJSON(t, hosts, &hostPage)
 	if len(hostPage.Data.Hosts) != 3 || hostPage.Data.Page != 1 || hostPage.Data.PageSize != 20 || hostPage.Data.Total != 3 || hostPage.Data.TotalPages != 1 || hostPage.Data.Hosts[0].UptimeSeconds <= 0 {
 		t.Fatalf("host page = %#v", hostPage.Data)
+	}
+	if hostPage.Data.Hosts[0].CPUCores == nil || *hostPage.Data.Hosts[0].CPUCores != 4 || hostPage.Data.Hosts[0].MemoryTotalBytes == nil || *hostPage.Data.Hosts[0].MemoryTotalBytes != 16*1024*1024*1024 {
+		t.Fatalf("host hardware view = %#v", hostPage.Data.Hosts[0])
 	}
 }
 

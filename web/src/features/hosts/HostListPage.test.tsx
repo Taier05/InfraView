@@ -117,8 +117,8 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
 
   for (const label of [
     '主机名',
-    'CPU',
-    '内存',
+    'CPU 使用率',
+    '内存使用率',
     '负载',
     'IO 忙碌度',
     '网络 出/入',
@@ -128,7 +128,7 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
       screen.getByRole('button', { name: new RegExp(`^${label}`) }),
     ).toBeInTheDocument()
   }
-  for (const label of ['IP 地址', '状态']) {
+  for (const label of ['IP 地址', 'CPU 核数', '内存容量', '状态']) {
     expect(
       screen.getByRole('columnheader', { name: label }),
     ).toBeInTheDocument()
@@ -140,16 +140,18 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
   const appRow = appName.closest('tr')
   expect(appRow).not.toBeNull()
   const appCells = within(appRow!).getAllByRole('cell')
-  expect(appCells).toHaveLength(9)
+  expect(appCells).toHaveLength(11)
   expect(appCells[0]).toHaveTextContent('linux-app-01')
   expect(appCells[1]).toHaveTextContent('192.0.2.11')
-  expect(appCells[5]).toHaveTextContent('91.2%')
-  expect(appCells[6]).toHaveTextContent('8.0KiB/s / 4.0KiB/s')
-  expect(appCells[2].querySelector('[data-level="normal"]')).not.toBeNull()
-  expect(appCells[3].querySelector('[data-level="warning"]')).not.toBeNull()
-  expect(appCells[5].querySelector('[data-level="critical"]')).not.toBeNull()
-  expect(appCells[6].querySelector('[data-level="warning"]')).not.toBeNull()
-  expect(appCells[6].querySelector('[data-level="critical"]')).not.toBeNull()
+  expect(appCells[2]).toHaveTextContent('8 核')
+  expect(appCells[3]).toHaveTextContent('32 GiB')
+  expect(appCells[7]).toHaveTextContent('91.2%')
+  expect(appCells[8]).toHaveTextContent('8.0KiB/s / 4.0KiB/s')
+  expect(appCells[4].querySelector('[data-level="normal"]')).not.toBeNull()
+  expect(appCells[5].querySelector('[data-level="warning"]')).not.toBeNull()
+  expect(appCells[7].querySelector('[data-level="critical"]')).not.toBeNull()
+  expect(appCells[8].querySelector('[data-level="warning"]')).not.toBeNull()
+  expect(appCells[8].querySelector('[data-level="critical"]')).not.toBeNull()
   expect(within(appRow!).getByText('在线')).toHaveAttribute(
     'data-status',
     'online',
@@ -165,7 +167,7 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
     'data-status',
     'offline',
   )
-  expect(within(dbRow!).getAllByText('暂无数据')).toHaveLength(6)
+  expect(within(dbRow!).getAllByText('暂无数据')).toHaveLength(8)
 
   expect(
     screen.queryByRole('button', { name: /重启|删除|执行|修改/ }),

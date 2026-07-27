@@ -33,13 +33,15 @@ type Health struct {
 }
 
 type Host struct {
-	ID         string
-	Name       string
-	IP         string
-	OS         string
-	Status     HostStatus
-	StatusTime time.Time
-	Uptime     time.Duration
+	ID               string
+	Name             string
+	IP               string
+	OS               string
+	CPUCores         *int
+	MemoryTotalBytes *int64
+	Status           HostStatus
+	StatusTime       time.Time
+	Uptime           time.Duration
 }
 
 type FilesystemMetrics struct {

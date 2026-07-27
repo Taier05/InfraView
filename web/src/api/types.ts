@@ -89,6 +89,8 @@ export interface HostSummary {
   name: string
   ip: string
   os: string
+  cpu_cores: number | null
+  memory_total_bytes: number | null
   status: HostStatus
   status_time: string
   uptime_seconds: number

@@ -342,6 +342,9 @@ func TestHostsAssignsPercentageAndNetworkThresholdLevels(t *testing.T) {
 	assertMetric(t, "IO busy", host.Metrics.IOBusyPercent, 90, service.LevelCritical)
 	assertMetric(t, "network transmit", host.Metrics.NetworkTransmitBytesPerSecond, 80*1024*1024, service.LevelWarning)
 	assertMetric(t, "network receive", host.Metrics.NetworkReceiveBytesPerSecond, 100*1024*1024, service.LevelCritical)
+	if host.CPUCores == nil || *host.CPUCores != 4 || host.MemoryTotalBytes == nil || *host.MemoryTotalBytes != 8*1024*1024*1024 {
+		t.Fatalf("host hardware = %#v", host)
+	}
 }
 
 func TestHostsSortsIOAndCombinedNetworkWithMissingValuesLast(t *testing.T) {
@@ -611,9 +614,9 @@ func newService(provider datasource.Provider, clock *serviceClock) *service.Serv
 
 func fixtureProvider(now time.Time) *recordingProvider {
 	hosts := []datasource.Host{
-		{ID: "h1", Name: "web-one", IP: "192.0.2.1", OS: "linux", Status: datasource.StatusOnline, StatusTime: now, Uptime: time.Hour},
+		{ID: "h1", Name: "web-one", IP: "192.0.2.1", OS: "linux", CPUCores: intPointer(4), MemoryTotalBytes: int64Pointer(8 * 1024 * 1024 * 1024), Status: datasource.StatusOnline, StatusTime: now, Uptime: time.Hour},
 		{ID: "h2", Name: "web-two", IP: "192.0.2.2", OS: "linux", Status: datasource.StatusOffline, StatusTime: now, Uptime: 2 * time.Hour},
-		{ID: "h3", Name: "db-one", IP: "192.0.2.3", OS: "linux", Status: datasource.StatusUnknown, StatusTime: now, Uptime: 3 * time.Hour},
+		{ID: "h3", Name: "db-one", IP: "192.0.2.3", OS: "linux", CPUCores: intPointer(16), MemoryTotalBytes: int64Pointer(64 * 1024 * 1024 * 1024), Status: datasource.StatusUnknown, StatusTime: now, Uptime: 3 * time.Hour},
 	}
 	return &recordingProvider{
 		now:   now,
@@ -721,6 +724,14 @@ func assertMetric(t *testing.T, name string, got service.MetricValue, wantValue 
 }
 
 func float64Pointer(value float64) *float64 {
+	return &value
+}
+
+func intPointer(value int) *int {
+	return &value
+}
+
+func int64Pointer(value int64) *int64 {
 	return &value
 }
 

@@ -77,6 +77,16 @@ function bytesPerSecond(metric: MetricValue) {
   return `${value.toFixed(1)}${units[unitIndex]}`
 }
 
+function cpuCoreCount(value: number | null) {
+  return value === null ? '暂无数据' : `${value} 核`
+}
+
+function memoryCapacity(bytes: number | null) {
+  if (bytes === null) return '暂无数据'
+  const gibibytes = bytes / (1024 * 1024 * 1024)
+  return `${Number.isInteger(gibibytes) ? gibibytes.toFixed(0) : gibibytes.toFixed(1)} GiB`
+}
+
 function MetricText({ metric, text }: { metric: MetricValue; text: string }) {
   return (
     <span className="host-metric" data-level={metric.level}>
@@ -259,8 +269,26 @@ export function HostListPage() {
       ),
     },
     {
+      id: 'cpu-cores',
+      header: 'CPU 核数',
+      cell: ({ row }) => (
+        <span className="host-config-value">
+          {cpuCoreCount(row.original.cpu_cores)}
+        </span>
+      ),
+    },
+    {
+      id: 'memory-total',
+      header: '内存容量',
+      cell: ({ row }) => (
+        <span className="host-config-value">
+          {memoryCapacity(row.original.memory_total_bytes)}
+        </span>
+      ),
+    },
+    {
       id: 'cpu',
-      header: () => sortButton('cpu', 'CPU'),
+      header: () => sortButton('cpu', 'CPU 使用率'),
       cell: ({ row }) => (
         <MetricText
           metric={row.original.metrics.cpu_usage}
@@ -270,7 +298,7 @@ export function HostListPage() {
     },
     {
       id: 'memory',
-      header: () => sortButton('memory', '内存'),
+      header: () => sortButton('memory', '内存使用率'),
       cell: ({ row }) => (
         <MetricText
           metric={row.original.metrics.memory_usage}

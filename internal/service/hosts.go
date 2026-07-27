@@ -68,28 +68,32 @@ func (s *Service) Host(ctx context.Context, id string) (HostDetail, Meta, error)
 		return HostDetail{}, Meta{}, err
 	}
 	detail := HostDetail{
-		ID:         host.ID,
-		Name:       host.Name,
-		IP:         host.IP,
-		OS:         host.OS,
-		Status:     host.Status,
-		StatusTime: host.StatusTime,
-		Uptime:     host.Uptime,
-		Metrics:    s.currentView(metrics[id]),
+		ID:               host.ID,
+		Name:             host.Name,
+		IP:               host.IP,
+		OS:               host.OS,
+		CPUCores:         host.CPUCores,
+		MemoryTotalBytes: host.MemoryTotalBytes,
+		Status:           host.Status,
+		StatusTime:       host.StatusTime,
+		Uptime:           host.Uptime,
+		Metrics:          s.currentView(metrics[id]),
 	}
 	return detail, mergeMeta(hostMeta, metricsMeta), nil
 }
 
 func (s *Service) hostSummary(host datasource.Host, metrics datasource.CurrentMetrics) HostSummary {
 	return HostSummary{
-		ID:         host.ID,
-		Name:       host.Name,
-		IP:         host.IP,
-		OS:         host.OS,
-		Status:     host.Status,
-		StatusTime: host.StatusTime,
-		Uptime:     host.Uptime,
-		Metrics:    s.currentView(metrics),
+		ID:               host.ID,
+		Name:             host.Name,
+		IP:               host.IP,
+		OS:               host.OS,
+		CPUCores:         host.CPUCores,
+		MemoryTotalBytes: host.MemoryTotalBytes,
+		Status:           host.Status,
+		StatusTime:       host.StatusTime,
+		Uptime:           host.Uptime,
+		Metrics:          s.currentView(metrics),
 	}
 }
 

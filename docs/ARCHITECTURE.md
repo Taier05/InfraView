@@ -48,6 +48,7 @@
 - 会话：`POST/GET/DELETE /api/v1/session`。
 - 只读查询：`GET /api/v1/overview`、`GET /api/v1/hosts`、`GET /api/v1/hosts/{id}`、`GET /api/v1/hosts/{id}/metrics`、`GET /api/v1/datasource/status`。
 - `GET /api/v1/overview` 的 `alerts` 字段包含受影响主机、严重/警告主机以及 CPU、内存、IO、网络分级数量；主机数按最高等级去重，指标数独立统计。
+- 主机清单与单机只读响应中的 `cpu_cores`、`memory_total_bytes` 为可选资产配置字段；数据源未知时返回 `null`。这两个字段来自主机资产清单，不从使用率指标反推。
 - 进程健康：`GET /healthz`，只反映 InfraView 进程与 HTTP 服务，不以数据源故障触发容器重启。
 - command、restart、delete、patch、proxy、任意 query 等运维路由不存在，并由自动化测试持续验证。
 

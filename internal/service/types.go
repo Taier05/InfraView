@@ -99,14 +99,16 @@ type OverviewAlerts struct {
 }
 
 type HostSummary struct {
-	ID         string
-	Name       string
-	IP         string
-	OS         string
-	Status     datasource.HostStatus
-	StatusTime time.Time
-	Uptime     time.Duration
-	Metrics    CurrentMetrics
+	ID               string
+	Name             string
+	IP               string
+	OS               string
+	CPUCores         *int
+	MemoryTotalBytes *int64
+	Status           datasource.HostStatus
+	StatusTime       time.Time
+	Uptime           time.Duration
+	Metrics          CurrentMetrics
 }
 
 type HostPage struct {
@@ -117,14 +119,16 @@ type HostPage struct {
 }
 
 type HostDetail struct {
-	ID         string
-	Name       string
-	IP         string
-	OS         string
-	Status     datasource.HostStatus
-	StatusTime time.Time
-	Uptime     time.Duration
-	Metrics    CurrentMetrics
+	ID               string
+	Name             string
+	IP               string
+	OS               string
+	CPUCores         *int
+	MemoryTotalBytes *int64
+	Status           datasource.HostStatus
+	StatusTime       time.Time
+	Uptime           time.Duration
+	Metrics          CurrentMetrics
 }
 
 type MetricPoint struct {

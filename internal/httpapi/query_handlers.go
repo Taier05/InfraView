@@ -67,14 +67,16 @@ type currentMetricsView struct {
 }
 
 type hostView struct {
-	ID            string                `json:"id"`
-	Name          string                `json:"name"`
-	IP            string                `json:"ip"`
-	OS            string                `json:"os"`
-	Status        datasource.HostStatus `json:"status"`
-	StatusTime    time.Time             `json:"status_time"`
-	UptimeSeconds int64                 `json:"uptime_seconds"`
-	Metrics       currentMetricsView    `json:"metrics"`
+	ID               string                `json:"id"`
+	Name             string                `json:"name"`
+	IP               string                `json:"ip"`
+	OS               string                `json:"os"`
+	CPUCores         *int                  `json:"cpu_cores"`
+	MemoryTotalBytes *int64                `json:"memory_total_bytes"`
+	Status           datasource.HostStatus `json:"status"`
+	StatusTime       time.Time             `json:"status_time"`
+	UptimeSeconds    int64                 `json:"uptime_seconds"`
+	Metrics          currentMetricsView    `json:"metrics"`
 }
 
 type hostPageView struct {
@@ -331,26 +333,30 @@ func currentView(value service.CurrentMetrics) currentMetricsView {
 
 func summaryView(value service.HostSummary) hostView {
 	return hostView{
-		ID:            value.ID,
-		Name:          value.Name,
-		IP:            value.IP,
-		OS:            value.OS,
-		Status:        value.Status,
-		StatusTime:    value.StatusTime,
-		UptimeSeconds: int64(value.Uptime / time.Second),
-		Metrics:       currentView(value.Metrics),
+		ID:               value.ID,
+		Name:             value.Name,
+		IP:               value.IP,
+		OS:               value.OS,
+		CPUCores:         value.CPUCores,
+		MemoryTotalBytes: value.MemoryTotalBytes,
+		Status:           value.Status,
+		StatusTime:       value.StatusTime,
+		UptimeSeconds:    int64(value.Uptime / time.Second),
+		Metrics:          currentView(value.Metrics),
 	}
 }
 
 func detailView(value service.HostDetail) hostView {
 	return hostView{
-		ID:            value.ID,
-		Name:          value.Name,
-		IP:            value.IP,
-		OS:            value.OS,
-		Status:        value.Status,
-		StatusTime:    value.StatusTime,
-		UptimeSeconds: int64(value.Uptime / time.Second),
-		Metrics:       currentView(value.Metrics),
+		ID:               value.ID,
+		Name:             value.Name,
+		IP:               value.IP,
+		OS:               value.OS,
+		CPUCores:         value.CPUCores,
+		MemoryTotalBytes: value.MemoryTotalBytes,
+		Status:           value.Status,
+		StatusTime:       value.StatusTime,
+		UptimeSeconds:    int64(value.Uptime / time.Second),
+		Metrics:          currentView(value.Metrics),
 	}
 }

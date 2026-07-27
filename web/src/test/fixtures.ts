@@ -75,6 +75,8 @@ export interface HostPageFixture {
       name: string
       ip: string
       os: string
+      cpu_cores: number | null
+      memory_total_bytes: number | null
       status: HostStatusFixture
       status_time: string
       uptime_seconds: number
@@ -220,6 +222,8 @@ export function hostPageFixture(
           name: 'linux-app-01',
           ip: '192.0.2.11',
           os: 'Ubuntu 24.04',
+          cpu_cores: 8,
+          memory_total_bytes: 32 * 1024 * 1024 * 1024,
           status: 'online',
           status_time: '2026-07-21T00:30:00.000Z',
           uptime_seconds: 93_600,
@@ -244,6 +248,8 @@ export function hostPageFixture(
           name: 'linux-db-02',
           ip: '192.0.2.22',
           os: 'Debian 13',
+          cpu_cores: null,
+          memory_total_bytes: null,
           status: 'offline',
           status_time: '2026-07-20T22:30:00.000Z',
           uptime_seconds: 7_200,

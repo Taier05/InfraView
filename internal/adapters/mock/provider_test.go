@@ -30,6 +30,13 @@ func TestProviderBuildsStableInventory(t *testing.T) {
 	if first.OS != "linux" || first.Status != datasource.StatusOnline {
 		t.Fatalf("first host metadata = %#v", first)
 	}
+	if first.CPUCores == nil || *first.CPUCores != 2 || first.MemoryTotalBytes == nil || *first.MemoryTotalBytes != 4*1024*1024*1024 {
+		t.Fatalf("first host hardware = %#v", first)
+	}
+	seventh := hosts[6]
+	if seventh.CPUCores == nil || *seventh.CPUCores != 32 || seventh.MemoryTotalBytes == nil || *seventh.MemoryTotalBytes != 128*1024*1024*1024 {
+		t.Fatalf("seventh host hardware = %#v", seventh)
+	}
 	if !first.StatusTime.Equal(fixed) || first.Uptime <= 0 {
 		t.Fatalf("first host timing = %#v", first)
 	}

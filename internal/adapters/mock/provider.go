@@ -142,15 +142,36 @@ func buildHost(index int, now time.Time) datasource.Host {
 	if index%17 == 0 {
 		status = datasource.StatusOffline
 	}
+	cpuCores, memoryGiB := hardwareProfile(index)
+	memoryTotalBytes := int64(memoryGiB) * 1024 * 1024 * 1024
 	return datasource.Host{
-		ID:         fmt.Sprintf("mock-host-%03d", index),
-		Name:       fmt.Sprintf("linux-%03d", index),
-		IP:         fmt.Sprintf("192.0.2.%d", ((index-1)%254)+1),
-		OS:         "linux",
-		Status:     status,
-		StatusTime: now,
-		Uptime:     time.Duration(24+index) * time.Hour,
+		ID:               fmt.Sprintf("mock-host-%03d", index),
+		Name:             fmt.Sprintf("linux-%03d", index),
+		IP:               fmt.Sprintf("192.0.2.%d", ((index-1)%254)+1),
+		OS:               "linux",
+		CPUCores:         &cpuCores,
+		MemoryTotalBytes: &memoryTotalBytes,
+		Status:           status,
+		StatusTime:       now,
+		Uptime:           time.Duration(24+index) * time.Hour,
 	}
+}
+
+func hardwareProfile(index int) (int, int) {
+	profiles := [...]struct {
+		cpuCores  int
+		memoryGiB int
+	}{
+		{cpuCores: 2, memoryGiB: 4},
+		{cpuCores: 4, memoryGiB: 8},
+		{cpuCores: 4, memoryGiB: 16},
+		{cpuCores: 8, memoryGiB: 16},
+		{cpuCores: 8, memoryGiB: 32},
+		{cpuCores: 16, memoryGiB: 64},
+		{cpuCores: 32, memoryGiB: 128},
+	}
+	profile := profiles[(index-1)%len(profiles)]
+	return profile.cpuCores, profile.memoryGiB
 }
 
 func currentMetrics(index int, timestamp time.Time) datasource.CurrentMetrics {
