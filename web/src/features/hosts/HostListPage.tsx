@@ -16,6 +16,7 @@ import type {
   MetricValue,
 } from '../../api/types'
 import { ErrorPanel } from '../../components/ErrorPanel'
+import { RefreshControl } from '../../components/RefreshControl'
 import { StaleBanner } from '../../components/StaleBanner'
 
 const PAGE_SIZE = 20
@@ -82,15 +83,6 @@ function uptime(seconds: number) {
   if (days > 0 && hours > 0) return `${days}天 ${hours}小时`
   if (days > 0) return `${days}天`
   return `${hours}小时`
-}
-
-function refreshTime(timestamp: number) {
-  return new Intl.DateTimeFormat('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(timestamp)
 }
 
 function StatusText({ status }: { status: HostStatus }) {
@@ -355,25 +347,12 @@ export function HostListPage() {
             <option value="offline">离线</option>
           </select>
         </label>
-        <div className="host-refresh-control">
-          <button
-            className="secondary-button host-list-refresh"
-            type="button"
-            aria-label="刷新主机列表"
-            disabled={hosts.isFetching}
-            onClick={() => void hosts.refetch()}
-          >
-            刷新
-          </button>
-          <span className="host-refresh-time" aria-live="polite">
-            {hosts.isFetching
-              ? '正在刷新…'
-              : hosts.dataUpdatedAt > 0
-                ? `上次刷新 ${refreshTime(hosts.dataUpdatedAt)}`
-                : '等待首次刷新'}
-            {' · 每 30 秒自动刷新'}
-          </span>
-        </div>
+        <RefreshControl
+          isFetching={hosts.isFetching}
+          dataUpdatedAt={hosts.dataUpdatedAt}
+          onRefresh={() => void hosts.refetch()}
+          ariaLabel="刷新主机列表"
+        />
       </div>
 
       {hosts.data?.meta.stale === true &&

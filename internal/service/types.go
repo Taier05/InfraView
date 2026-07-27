@@ -80,6 +80,22 @@ type Overview struct {
 	CPUAverage    MetricValue
 	MemoryAverage MetricValue
 	Trends        []TrendSeries
+	Alerts        OverviewAlerts
+}
+
+type AlertCount struct {
+	Warning  int
+	Critical int
+}
+
+type OverviewAlerts struct {
+	AffectedHosts int
+	WarningHosts  int
+	CriticalHosts int
+	CPU           AlertCount
+	Memory        AlertCount
+	IO            AlertCount
+	Network       AlertCount
 }
 
 type HostSummary struct {

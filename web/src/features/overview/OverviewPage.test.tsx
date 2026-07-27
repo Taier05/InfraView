@@ -57,7 +57,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('总览只展示可进入主机板块的状态卡', async () => {
+it('总览只展示可进入主机板块的告警摘要卡', async () => {
   renderOverview()
 
   const hostCard = await screen.findByRole('link', {
@@ -65,9 +65,25 @@ it('总览只展示可进入主机板块的状态卡', async () => {
   })
   expect(screen.queryAllByRole('article')).toHaveLength(0)
   expect(hostCard).toHaveAttribute('href', '/hosts')
+  expect(hostCard).toHaveAttribute('data-level', 'critical')
   expect(within(hostCard).getByText('Linux 主机')).toBeInTheDocument()
-  expect(within(hostCard).getByText('主机总数')).toBeInTheDocument()
-  expect(within(hostCard).getByText('12')).toBeInTheDocument()
+  expect(within(hostCard).getByText('存在严重异常')).toBeInTheDocument()
+  expect(within(hostCard).getByText('异常主机')).toBeInTheDocument()
+  expect(within(hostCard).getByText('7')).toBeInTheDocument()
+  expect(within(hostCard).getByText('/ 12')).toBeInTheDocument()
+  expect(within(hostCard).getByText('严重 4')).toBeInTheDocument()
+  expect(within(hostCard).getByText('警告 3')).toBeInTheDocument()
+  for (const [label, total, details] of [
+    ['CPU', '2', '严重 1 · 警告 1'],
+    ['内存', '1', '严重 1 · 警告 0'],
+    ['IO', '2', '严重 0 · 警告 2'],
+    ['网络', '3', '严重 2 · 警告 1'],
+  ]) {
+    const metric = within(hostCard).getByText(label).closest('div')?.parentElement
+    expect(metric).not.toBeNull()
+    expect(within(metric as HTMLElement).getByText(total)).toBeInTheDocument()
+    expect(within(metric as HTMLElement).getByText(details)).toBeInTheDocument()
+  }
   expect(within(hostCard).getByText('在线 9')).toBeInTheDocument()
   expect(within(hostCard).getByText('离线 2')).toBeInTheDocument()
   expect(within(hostCard).getByText('未知 1')).toBeInTheDocument()
@@ -76,6 +92,11 @@ it('总览只展示可进入主机板块的状态卡', async () => {
   expect(
     screen.queryByRole('heading', { name: '资源使用趋势' }),
   ).not.toBeInTheDocument()
+  const controls = screen.getByRole('group', { name: '总览控制' })
+  expect(
+    within(controls).getByText(/上次刷新 \d{2}:\d{2}:\d{2}/),
+  ).toBeInTheDocument()
+  expect(within(controls).getByText(/每 30 秒自动刷新/)).toBeInTheDocument()
 })
 
 it('使用固定查询范围且不显示总览时间范围控件', async () => {

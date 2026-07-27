@@ -27,6 +27,9 @@ func TestOverviewCountsHostsAndAveragesAvailableMetrics(t *testing.T) {
 	if overview.Total != 3 || overview.Online != 1 || overview.Offline != 1 || overview.Unknown != 1 {
 		t.Fatalf("host counts = %#v", overview)
 	}
+	if overview.Alerts.AffectedHosts != 2 || overview.Alerts.WarningHosts != 1 || overview.Alerts.CriticalHosts != 1 {
+		t.Fatalf("host alerts = %#v", overview.Alerts)
+	}
 	assertMetric(t, "CPU average", overview.CPUAverage, 20, service.LevelNormal)
 	assertMetric(t, "memory average", overview.MemoryAverage, 50, service.LevelNormal)
 	if meta.Stale || !meta.CollectedAt.Equal(clock.Now()) {
@@ -51,6 +54,46 @@ func TestOverviewCountsHostsAndAveragesAvailableMetrics(t *testing.T) {
 		if overview.Trends[i].Key != key || overview.Trends[i].Unit != "%" || len(overview.Trends[i].Points) == 0 || len(overview.Trends[i].Points) > 600 {
 			t.Fatalf("trend %d = %#v", i, overview.Trends[i])
 		}
+	}
+}
+
+func TestOverviewSummarizesMetricAlertsAndUsesHighestHostLevel(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	provider.metrics = map[string]datasource.CurrentMetrics{
+		"h1": {
+			Timestamp:                     clock.Now(),
+			CPUUsage:                      float64Pointer(85),
+			MemoryUsage:                   float64Pointer(95),
+			NetworkReceiveBytesPerSecond:  float64Pointer(110 * 1024 * 1024),
+			NetworkTransmitBytesPerSecond: float64Pointer(90 * 1024 * 1024),
+		},
+		"h2": {
+			Timestamp:     clock.Now(),
+			IOBusyPercent: float64Pointer(85),
+		},
+		"h3": {Timestamp: clock.Now()},
+	}
+	svc := newService(provider, clock)
+
+	overview, _, err := svc.Overview(context.Background(), "24h")
+	if err != nil {
+		t.Fatalf("Overview() error = %v", err)
+	}
+	if overview.Alerts.AffectedHosts != 3 || overview.Alerts.WarningHosts != 1 || overview.Alerts.CriticalHosts != 2 {
+		t.Fatalf("host alerts = %#v", overview.Alerts)
+	}
+	if overview.Alerts.CPU != (service.AlertCount{Warning: 1}) {
+		t.Fatalf("CPU alerts = %#v", overview.Alerts.CPU)
+	}
+	if overview.Alerts.Memory != (service.AlertCount{Critical: 1}) {
+		t.Fatalf("memory alerts = %#v", overview.Alerts.Memory)
+	}
+	if overview.Alerts.IO != (service.AlertCount{Warning: 1}) {
+		t.Fatalf("IO alerts = %#v", overview.Alerts.IO)
+	}
+	if overview.Alerts.Network != (service.AlertCount{Critical: 1}) {
+		t.Fatalf("network alerts = %#v", overview.Alerts.Network)
 	}
 }
 
@@ -553,14 +596,16 @@ func TestDataSourceStatusIsCachedForFifteenSeconds(t *testing.T) {
 
 func newService(provider datasource.Provider, clock *serviceClock) *service.Service {
 	return service.New(provider, cache.New(clock.Now), service.Options{
-		InventoryTTL:      time.Minute,
-		CurrentMetricsTTL: time.Minute,
-		RangeTTL:          time.Minute,
-		HealthTTL:         15 * time.Second,
-		MaxStale:          5 * time.Minute,
-		WarningPercent:    80,
-		CriticalPercent:   90,
-		Clock:             clock.Now,
+		InventoryTTL:       time.Minute,
+		CurrentMetricsTTL:  time.Minute,
+		RangeTTL:           time.Minute,
+		HealthTTL:          15 * time.Second,
+		MaxStale:           5 * time.Minute,
+		WarningPercent:     80,
+		CriticalPercent:    90,
+		NetworkWarningBPS:  80 * 1024 * 1024,
+		NetworkCriticalBPS: 100 * 1024 * 1024,
+		Clock:              clock.Now,
 	})
 }
 

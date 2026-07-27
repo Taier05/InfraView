@@ -17,6 +17,7 @@
 - [x] 完成 Task 10 最终 `make verify` 等价全量验证。
 - [x] 完成 Mock MVP 独立分支首轮代码审查并处理全部 Critical/Important findings。
 - [x] 完成修复后的统一全量验证与最终复审（Critical 0、Important 0）。
+- [x] 将总览主机卡升级为阈值告警摘要，展示异常主机和 CPU/内存/IO/网络分级数量。
 
 ## Nightingale 里程碑
 

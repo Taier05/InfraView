@@ -40,7 +40,14 @@ test('未登录会重定向，登录后可完成总览和主机列表关键路�
   await expect(
     page.getByRole('heading', { name: '基础设施总览' }),
   ).toBeVisible()
-  await expect(page.getByText('主机总数')).toBeVisible()
+  await expect(page.getByText('异常主机')).toBeVisible()
+  await expect(page.getByText(/存在严重异常|存在警告|全部正常/)).toBeVisible()
+  await expect(page.getByText('CPU', { exact: true })).toBeVisible()
+  await expect(page.getByText('内存', { exact: true })).toBeVisible()
+  await expect(page.getByText('IO', { exact: true })).toBeVisible()
+  await expect(page.getByText('网络', { exact: true })).toBeVisible()
+  await expect(page.getByText(/上次刷新 \d{2}:\d{2}:\d{2}/)).toBeVisible()
+  await expect(page.getByText(/每 30 秒自动刷新/).first()).toBeVisible()
   await expect(page.getByText('CPU 平均使用率')).toHaveCount(0)
   await expect(page.getByText('内存平均使用率')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '资源使用趋势' })).toHaveCount(0)

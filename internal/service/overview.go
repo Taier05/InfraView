@@ -51,10 +51,75 @@ func (s *Service) Overview(ctx context.Context, rangeName string) (Overview, Met
 			memoryTotal += *current.MemoryUsage
 			memoryCount++
 		}
+		view := s.currentView(current)
+		updateAlertCount(&overview.Alerts.CPU, view.CPUUsage.Level)
+		updateAlertCount(&overview.Alerts.Memory, view.MemoryUsage.Level)
+		updateAlertCount(&overview.Alerts.IO, view.IOBusyPercent.Level)
+		updateAlertCount(
+			&overview.Alerts.Network,
+			higherLevel(
+				view.NetworkTransmitBytesPerSecond.Level,
+				view.NetworkReceiveBytesPerSecond.Level,
+			),
+		)
+
+		hostLevel := LevelNormal
+		switch host.Status {
+		case datasource.StatusOffline:
+			hostLevel = LevelCritical
+		case datasource.StatusUnknown:
+			hostLevel = LevelWarning
+		}
+		for _, level := range []Level{
+			view.CPUUsage.Level,
+			view.MemoryUsage.Level,
+			view.IOBusyPercent.Level,
+			view.NetworkTransmitBytesPerSecond.Level,
+			view.NetworkReceiveBytesPerSecond.Level,
+		} {
+			hostLevel = higherLevel(hostLevel, level)
+		}
+		switch hostLevel {
+		case LevelCritical:
+			overview.Alerts.CriticalHosts++
+		case LevelWarning:
+			overview.Alerts.WarningHosts++
+		}
 	}
+	overview.Alerts.AffectedHosts =
+		overview.Alerts.WarningHosts + overview.Alerts.CriticalHosts
 	overview.CPUAverage = s.average(cpuTotal, cpuCount)
 	overview.MemoryAverage = s.average(memoryTotal, memoryCount)
 	return overview, mergeMeta(inventoryMeta, metricsMeta, trendsMeta), nil
+}
+
+func updateAlertCount(count *AlertCount, level Level) {
+	switch level {
+	case LevelWarning:
+		count.Warning++
+	case LevelCritical:
+		count.Critical++
+	}
+}
+
+func higherLevel(left, right Level) Level {
+	if levelRank(right) > levelRank(left) {
+		return right
+	}
+	return left
+}
+
+func levelRank(level Level) int {
+	switch level {
+	case LevelCritical:
+		return 3
+	case LevelWarning:
+		return 2
+	case LevelNormal:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func (s *Service) overviewTrends(ctx context.Context, rangeName string, duration time.Duration) ([]TrendSeries, Meta, error) {

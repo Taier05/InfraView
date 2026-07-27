@@ -17,13 +17,29 @@ type metricValueView struct {
 }
 
 type overviewView struct {
-	Total         int               `json:"total"`
-	Online        int               `json:"online"`
-	Offline       int               `json:"offline"`
-	Unknown       int               `json:"unknown"`
-	CPUAverage    metricValueView   `json:"cpu_average"`
-	MemoryAverage metricValueView   `json:"memory_average"`
-	Trends        []trendSeriesView `json:"trends"`
+	Total         int                `json:"total"`
+	Online        int                `json:"online"`
+	Offline       int                `json:"offline"`
+	Unknown       int                `json:"unknown"`
+	CPUAverage    metricValueView    `json:"cpu_average"`
+	MemoryAverage metricValueView    `json:"memory_average"`
+	Trends        []trendSeriesView  `json:"trends"`
+	Alerts        overviewAlertsView `json:"alerts"`
+}
+
+type alertCountView struct {
+	Warning  int `json:"warning"`
+	Critical int `json:"critical"`
+}
+
+type overviewAlertsView struct {
+	AffectedHosts int            `json:"affected_hosts"`
+	WarningHosts  int            `json:"warning_hosts"`
+	CriticalHosts int            `json:"critical_hosts"`
+	CPU           alertCountView `json:"cpu"`
+	Memory        alertCountView `json:"memory"`
+	IO            alertCountView `json:"io"`
+	Network       alertCountView `json:"network"`
 }
 
 type trendSeriesView struct {
@@ -112,7 +128,20 @@ func (a *api) overview(w http.ResponseWriter, r *http.Request) {
 		CPUAverage:    metricView(value.CPUAverage),
 		MemoryAverage: metricView(value.MemoryAverage),
 		Trends:        trendViews(value.Trends),
+		Alerts:        overviewAlertsViewFrom(value.Alerts),
 	}, meta)
+}
+
+func overviewAlertsViewFrom(value service.OverviewAlerts) overviewAlertsView {
+	return overviewAlertsView{
+		AffectedHosts: value.AffectedHosts,
+		WarningHosts:  value.WarningHosts,
+		CriticalHosts: value.CriticalHosts,
+		CPU:           alertCountView{Warning: value.CPU.Warning, Critical: value.CPU.Critical},
+		Memory:        alertCountView{Warning: value.Memory.Warning, Critical: value.Memory.Critical},
+		IO:            alertCountView{Warning: value.IO.Warning, Critical: value.IO.Critical},
+		Network:       alertCountView{Warning: value.Network.Warning, Critical: value.Network.Critical},
+	}
 }
 
 func trendViews(source []service.TrendSeries) []trendSeriesView {

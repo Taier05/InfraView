@@ -24,6 +24,7 @@
 5. 主机搜索、状态筛选、排序和分页在共享的清单/当前指标缓存读取后于内存中执行，不进入缓存键；命中有效缓存时直接返回，相同缓存未命中请求合并为一次数据源调用。
 6. 上游失败且旧值未超过 `INFRAVIEW_MAX_STALE` 时返回 `stale=true` 和采集时间；否则返回统一错误。
 7. 浏览器明确展示过期或错误状态，不把缺失指标转换为零。
+8. 总览服务复用同一批主机清单和当前指标，在进程内计算主机最高告警等级及 CPU、内存、IO、网络异常数量；该聚合不增加上游查询，也不存储告警事件。
 
 ## 目录职责
 
@@ -46,12 +47,13 @@
 
 - 会话：`POST/GET/DELETE /api/v1/session`。
 - 只读查询：`GET /api/v1/overview`、`GET /api/v1/hosts`、`GET /api/v1/hosts/{id}`、`GET /api/v1/hosts/{id}/metrics`、`GET /api/v1/datasource/status`。
+- `GET /api/v1/overview` 的 `alerts` 字段包含受影响主机、严重/警告主机以及 CPU、内存、IO、网络分级数量；主机数按最高等级去重，指标数独立统计。
 - 进程健康：`GET /healthz`，只反映 InfraView 进程与 HTTP 服务，不以数据源故障触发容器重启。
 - command、restart、delete、patch、proxy、任意 query 等运维路由不存在，并由自动化测试持续验证。
 
 ## 前端构建
 
-Vite 产物复制到忽略目录 `internal/httpapi/webdist` 后由 `go:embed` 嵌入。当前前端不包含主机详情页和图表运行时，主机清单使用服务端规范化的指标值与等级直接渲染。
+Vite 产物复制到忽略目录 `internal/httpapi/webdist` 后由 `go:embed` 嵌入。当前前端不包含主机详情页和图表运行时；总览使用服务端告警汇总渲染可点击板块卡，主机清单使用服务端规范化的指标值与等级直接渲染。总览与列表共用刷新控制组件。
 
 ## 状态与持久化
 

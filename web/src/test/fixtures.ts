@@ -49,6 +49,15 @@ export interface OverviewFixture {
         value: number | null
       }>
     }>
+    alerts: {
+      affected_hosts: number
+      warning_hosts: number
+      critical_hosts: number
+      cpu: { warning: number; critical: number }
+      memory: { warning: number; critical: number }
+      io: { warning: number; critical: number }
+      network: { warning: number; critical: number }
+    }
   }
   meta: {
     request_id: string
@@ -171,6 +180,15 @@ export function overviewFixture(
           ],
         },
       ],
+      alerts: {
+        affected_hosts: 7,
+        warning_hosts: 3,
+        critical_hosts: 4,
+        cpu: { warning: 1, critical: 1 },
+        memory: { warning: 0, critical: 1 },
+        io: { warning: 2, critical: 0 },
+        network: { warning: 1, critical: 2 },
+      },
       ...overrides.data,
     },
     meta: {

@@ -33,6 +33,21 @@ export interface MetricValue {
   level: MetricLevel
 }
 
+export interface AlertCount {
+  warning: number
+  critical: number
+}
+
+export interface OverviewAlerts {
+  affected_hosts: number
+  warning_hosts: number
+  critical_hosts: number
+  cpu: AlertCount
+  memory: AlertCount
+  io: AlertCount
+  network: AlertCount
+}
+
 export interface OverviewData {
   total: number
   online: number
@@ -41,6 +56,7 @@ export interface OverviewData {
   cpu_average: MetricValue
   memory_average: MetricValue
   trends: OverviewTrend[]
+  alerts: OverviewAlerts
 }
 
 export interface TrendPoint {

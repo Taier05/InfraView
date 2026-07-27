@@ -346,6 +346,15 @@ func TestOverviewReturnsNormalizedAggregateTrends(t *testing.T) {
 
 	var body struct {
 		Data struct {
+			Alerts struct {
+				AffectedHosts int `json:"affected_hosts"`
+				WarningHosts  int `json:"warning_hosts"`
+				CriticalHosts int `json:"critical_hosts"`
+				CPU           struct {
+					Warning  int `json:"warning"`
+					Critical int `json:"critical"`
+				} `json:"cpu"`
+			} `json:"alerts"`
 			Trends []struct {
 				Key    datasource.MetricKey `json:"key"`
 				Unit   string               `json:"unit"`
@@ -360,6 +369,9 @@ func TestOverviewReturnsNormalizedAggregateTrends(t *testing.T) {
 	decodeJSON(t, response, &body)
 	if len(body.Data.Trends) != 2 || body.Meta.RequestID == "" || body.Meta.Stale || body.Meta.CollectedAt.IsZero() {
 		t.Fatalf("overview body = %#v", body)
+	}
+	if body.Data.Alerts.AffectedHosts != body.Data.Alerts.WarningHosts+body.Data.Alerts.CriticalHosts {
+		t.Fatalf("overview alerts = %#v", body.Data.Alerts)
 	}
 	for i, key := range []datasource.MetricKey{datasource.MetricCPUUsage, datasource.MetricMemoryUsage} {
 		trend := body.Data.Trends[i]
