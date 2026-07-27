@@ -716,27 +716,10 @@ h1 {
 .host-table th:nth-child(8) { width: 12%; }
 .host-table th:nth-child(9) { width: 8%; }
 
-.host-table th:nth-child(n + 3):nth-child(-n + 8),
-.host-table td:nth-child(n + 3):nth-child(-n + 8) {
-  text-align: right;
-}
-
-.host-table th:nth-child(9),
-.host-table td:nth-child(9) {
-  text-align: center;
-}
-
 .host-table th:nth-child(1) .host-sort-button,
 .host-table th:nth-child(n + 3):nth-child(-n + 8) .host-sort-button {
   width: 100%;
-}
-
-.host-table th:nth-child(1) .host-sort-button {
   justify-content: flex-start;
-}
-
-.host-table th:nth-child(n + 3):nth-child(-n + 8) .host-sort-button {
-  justify-content: flex-end;
 }
 
 .host-table td:nth-child(8) {
