@@ -32,6 +32,7 @@
 **Files:**
 - Create: `internal/mysql/types.go`
 - Create: `internal/mysql/provider.go`
+- Create: `internal/mysql/mysqltest/contract.go`
 - Create: `internal/mysql/contract_test.go`
 - Test: `internal/mysql/contract_test.go`
 
@@ -54,7 +55,16 @@ func TestStableInstanceIDUsesAllIdentityLabels(t *testing.T) {
 	}
 }
 
-func RunContract(t *testing.T, provider mysql.Provider) {
+package mysqltest
+
+import (
+	"context"
+	"testing"
+
+	"github.com/Taier05/InfraView/internal/mysql"
+)
+
+func RunContract(t testing.TB, provider mysql.Provider) {
 	t.Helper()
 	snapshot, err := provider.MySQLSnapshot(context.Background())
 	if err != nil {
@@ -166,7 +176,7 @@ func StableInstanceID(host, name, address string) string {
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
   -v "$PWD:/src" -w /src golang:1.24-bookworm \
-  gofmt -w internal/mysql/types.go internal/mysql/provider.go internal/mysql/contract_test.go
+  gofmt -w internal/mysql/types.go internal/mysql/provider.go internal/mysql/mysqltest/contract.go internal/mysql/contract_test.go
 docker run --rm --user "$(id -u):$(id -g)" \
   -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod \
   -v "$PWD:/src" -w /src golang:1.24-bookworm \
@@ -193,14 +203,14 @@ git commit -m "feat: 定义 MySQL 只读领域契约"
 - Test: `internal/adapters/mock/mysql_provider_test.go`
 
 **Interfaces:**
-- Consumes: `mysql.Provider`、`mysql.Snapshot`、`mysql.Instance`。
+- Consumes: `mysql.Provider`、`mysql.Snapshot`、`mysql.Instance` 和 `mysqltest.RunContract`。
 - Produces: `mock.NewMySQL() mysql.Provider`，供 Service、主程序和 E2E 使用。
 
 - [ ] **Step 1: 写 Mock 契约和场景失败测试**
 
 ```go
 func TestMySQLProviderContract(t *testing.T) {
-	mysql.RunContract(t, mock.NewMySQL())
+	mysqltest.RunContract(t, mock.NewMySQL())
 }
 
 func TestMySQLProviderContainsDeterministicHealthScenarios(t *testing.T) {
@@ -1182,7 +1192,7 @@ git commit -m "test: 加固 MySQL 指标契约边界"
 - Test: `cmd/infraview/main_test.go`
 
 **Interfaces:**
-- Consumes: `mock.NewMySQL()` 和同时实现两个 Provider 接口的 `*nightingale.Provider`。
+- Consumes: `mock.NewMySQL()`、`mysqltest.RunContract` 和同时实现两个 Provider 接口的 `*nightingale.Provider`。
 - Produces: `providerSet{Hosts datasource.Provider, MySQL mysql.Provider}` 和 `withMySQLUpstreamTimeout`，供 Task 8 创建 MySQL Service。
 
 - [ ] **Step 1: 写装配失败测试**
@@ -1195,7 +1205,7 @@ func TestProviderSetUsesMockForHostsAndMySQL(t *testing.T) {
 	if providers.Hosts == nil || providers.MySQL == nil {
 		t.Fatalf("providers = %#v", providers)
 	}
-	mysql.RunContract(t, providers.MySQL)
+	mysqltest.RunContract(t, providers.MySQL)
 }
 
 func TestProviderSetSharesOneNightingaleProvider(t *testing.T) {

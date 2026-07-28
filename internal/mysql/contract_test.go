@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Taier05/InfraView/internal/mysql"
+	"github.com/Taier05/InfraView/internal/mysql/mysqltest"
 )
 
 func TestStableInstanceIDUsesAllIdentityLabels(t *testing.T) {
@@ -20,20 +21,17 @@ func TestStableInstanceIDUsesAllIdentityLabels(t *testing.T) {
 	}
 }
 
-func RunContract(t *testing.T, provider mysql.Provider) {
-	t.Helper()
-	snapshot, err := provider.MySQLSnapshot(context.Background())
-	if err != nil {
-		t.Fatalf("MySQLSnapshot() error = %v", err)
-	}
-	seen := map[string]struct{}{}
-	for _, instance := range snapshot.Instances {
-		if instance.ID == "" || instance.Name == "" || instance.Address == "" || instance.Host == "" {
-			t.Fatalf("incomplete fixture instance")
-		}
-		if _, exists := seen[instance.ID]; exists {
-			t.Fatalf("duplicate stable ID")
-		}
-		seen[instance.ID] = struct{}{}
-	}
+func TestRunContractValidatesSnapshotFixture(t *testing.T) {
+	mysqltest.RunContract(t, contractFixtureProvider{})
+}
+
+type contractFixtureProvider struct{}
+
+func (contractFixtureProvider) MySQLSnapshot(context.Context) (mysql.Snapshot, error) {
+	return mysql.Snapshot{Instances: []mysql.Instance{{
+		ID:      mysql.StableInstanceID("contract-host", "contract-mysql", "203.0.113.10:3306"),
+		Name:    "contract-mysql",
+		Address: "203.0.113.10:3306",
+		Host:    "contract-host",
+	}}}, nil
 }
