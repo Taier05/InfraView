@@ -8,7 +8,7 @@ make verify
 
 顺序覆盖：前端 Vitest、TypeScript、两类 npm audit、Vite build/静态资源复制、Go 格式、`go test ./...`、`go test -race ./...`、Go build、生产镜像 build、E2E 项目碰撞与部分失败清理安全测试、Compose smoke、100 请求 P95、内存/镜像资源、真实 Chromium E2E。`Makefile` 使用 `.NOTPARALLEL: verify`，即使调用 `make -j verify` 也会串行执行会修改 `node_modules`、`webdist` 和验收栈的步骤。
 
-`internal/adapters/nightingale` 另有完全脱敏契约测试，覆盖认证头、Target 分页、默认数据源缓存、嵌套即时/区间批量响应、状态与单位映射、空结果、401、非 JSON、envelope 错误、响应大小限制、PromQL 转义、无 N+1 和 100 台规模。
+`internal/adapters/nightingale` 另有完全脱敏契约测试，覆盖认证头、Target 分页、v9 `beat_time` 优先与 v8.4.1 `update_at` 回退、默认数据源缓存、嵌套即时/区间批量响应、状态与单位映射、空结果、401、非 JSON、envelope 错误、响应大小限制、PromQL 转义、无 N+1 和 100 台规模。
 
 验收使用带当前进程 PID 的唯一项目名和宿主端口 `18080`。启动前会检查 Compose 项目列表以及容器、网络、卷的 project label；若发现碰撞立即失败。预检成功后 trap 只取得该唯一项目的清理责任，因此 `up` 部分创建资源后失败也会精确 teardown，同时不会执行无项目范围或针对既有项目的 `docker compose down`，不会影响其他项目。
 
@@ -70,6 +70,8 @@ docker compose ls
 预期 whitespace 检查无输出，`.superpowers` 未被跟踪，专用验收项目已清理，其他既有 Compose 项目仍运行。
 
 真实 Nightingale 联调必须使用 Git 忽略且权限受限的环境文件，只输出状态、数量和字段可用性，不输出 Token、真实响应正文或认证头。现有 Mock E2E 含固定主机 ID，真实环境应使用独立浏览器检查登录、总览、主机行数、关键列、布局溢出和登录后页面错误。
+
+当前真实联调基线为 Nightingale v8.4.1；v9.x 仅保留脱敏契约回归。真实验证应确认 `/api/n9e/versions` 的版本证据，但 InfraView 运行时不得为了分支逻辑额外调用版本接口。
 
 ## 2026-07-27 Nightingale 审查修复验证
 

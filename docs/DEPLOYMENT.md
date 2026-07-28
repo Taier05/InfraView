@@ -4,7 +4,7 @@
 
 - Linux 主机可运行 Docker Engine 与 Docker Compose v2。
 - 预留一个局域网可访问端口，默认 8080。
-- 使用 Nightingale 时需准备可访问的 v9 API Base URL 和个人/专用 Token；InfraView 只调用已验证的只读接口。
+- 使用 Nightingale 时需准备可访问的 API Base URL 和个人/专用 Token；当前主要开发与真实验证版本为 v8.4.1，v9.x 保留协议兼容，其他版本须先取得契约证据。InfraView 只调用已验证的只读接口。
 
 ## 首次部署与直接访问
 
@@ -29,6 +29,8 @@ INFRAVIEW_NIGHTINGALE_ALLOW_INSECURE_HTTP=false
 不要把包含 Token 的 `.env` 复制进 worktree。若使用工作树 Compose，应显式执行 `INFRAVIEW_ENV_FILE=/受限路径/.env docker compose up -d --build`。
 
 Nightingale Base URL 默认只允许 HTTPS。仅当受控测试环境确实无法提供 TLS 时，才可同时使用 `http://...` 和 `INFRAVIEW_NIGHTINGALE_ALLOW_INSECURE_HTTP=true`；该开关会允许明文发送 Token，禁止用于生产或不可信网络。
+
+Nightingale v8.4.1 可通过 `/api/n9e/versions` 获取版本信息，但 InfraView 运行时不探测版本，也不依赖任何版本接口；适配器按已验证的响应字段能力兼容 v8.4.1 与 v9.x。
 
 在同一局域网访问 `http://服务器IP:8080`。如设置 `INFRAVIEW_PORT=18080`，则访问 `http://服务器IP:18080`。这种纯端口写法会监听全部宿主接口，必须使用主机防火墙和网段访问控制限制来源。
 

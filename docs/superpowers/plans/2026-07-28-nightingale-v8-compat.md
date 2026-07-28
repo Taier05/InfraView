@@ -227,7 +227,7 @@ git commit -m "feat: 兼容 Nightingale v8.4.1 Target 时间"
 - Consumes: Task 1 的双字段能力兼容和真实 v8.4.1 只读预检证据。
 - Produces: 与代码一致的支持矩阵、恢复入口和验收说明。
 
-- [ ] **Step 1: 更新支持矩阵和 Target 契约**
+- [x] **Step 1: 更新支持矩阵和 Target 契约**
 
 统一记录：
 
@@ -239,7 +239,7 @@ git commit -m "feat: 兼容 Nightingale v8.4.1 Target 时间"
 
 保留原 v9 阶段规格和计划作为历史记录，不回写其既有目标。
 
-- [ ] **Step 2: 更新项目状态和交接**
+- [x] **Step 2: 更新项目状态和交接**
 
 在 `PROJECT_STATUS.md`、`TODO.md`、`HANDOFF.md` 记录：
 
@@ -248,7 +248,7 @@ git commit -m "feat: 兼容 Nightingale v8.4.1 Target 时间"
 - 当前 8080 容器在重建前仍使用旧 Token，重建后必须重新验证。
 - 不记录真实地址、Token、主机数量、标识或指标值。
 
-- [ ] **Step 3: 文档自审**
+- [x] **Step 3: 文档自审**
 
 ```bash
 git diff --check
@@ -263,7 +263,7 @@ fi
 
 期望：空白检查和新增行敏感模式检查通过。
 
-- [ ] **Step 4: 提交支持矩阵文档**
+- [x] **Step 4: 提交支持矩阵文档**
 
 ```bash
 git add README.md docs

@@ -1,14 +1,14 @@
 # Nightingale 数据源接入
 
-状态：真实只读适配器已实现并在当前 8080 预览部署验证。`INFRAVIEW_DATA_SOURCE` 接受 `mock` 或 `nightingale`。
+状态：真实只读适配器已实现。当前主要开发与真实验证版本为 Nightingale v8.4.1，v9.x 保留协议兼容；当前 8080 服务尚待使用更新后的私密环境文件重建并完成最终验收。`INFRAVIEW_DATA_SOURCE` 接受 `mock` 或 `nightingale`。
 
-最后采集：2026-07-27
+最后采集：2026-07-28
 
 ## 脱敏验证契约
 
 | 项目 | 已验证结果 |
 | --- | --- |
-| Nightingale | `v9.x` |
+| Nightingale | `v8.4.1` 为当前主要真实验证版本；`v9.x` 保留脱敏契约兼容 |
 | API 基础地址 | `https://n9e.example.com`；真实私有地址不进入公开仓库 |
 | 部署方式 | 私有部署拓扑不进入公开仓库；适配器只依赖已确认的 Nightingale HTTP API 契约 |
 | Categraf | 采集周期和节点规模属于私有部署信息；验证夹具使用虚构 Linux Target |
@@ -17,9 +17,9 @@
 | 当前认证状态 | 真实账号和凭据权限不进入公开仓库；部署时必须使用专用最小只读 Token |
 | 主机清单 | 脱敏夹具使用 `fixture-node-01`、`fixture-node-02`、`fixture-node-03` |
 | 指标现状 | VictoriaMetrics 已有实际时序数据；未认证 Nightingale Target API 返回 HTTP 401 `unauthorized` |
-| 官方源码匹配 | 适配器按 Nightingale v9 系列已验证 API 契约实现，不记录私有部署构建号 |
+| 版本与兼容策略 | v8.4.1 真实只读契约预检通过；v9.x 既有脱敏契约回归保留；其他版本在取得证据前不声明支持 |
 
-本次证据采集使用用户明确授权的开发期只读 SSH，只读取服务状态、版本、脱敏配置结构和只读数据库元数据/非敏感资产字段，没有修改或重启 Nightingale 组件。该行为不改变产品边界：InfraView 运行时不得包含 SSH 客户端、远程命令或自动化变更能力。
+历史 v9 证据采集使用用户明确授权的开发期只读 SSH；2026-07-28 的 v8.4.1 预检仅调用已确认的只读 HTTP API，检查状态码、Content-Type、envelope 和字段形状，不输出上游响应正文或真实资源信息。两次取证都没有修改或重启 Nightingale 组件。该行为不改变产品边界：InfraView 运行时不得包含 SSH 客户端、远程命令或自动化变更能力。
 
 ## 已确认指标映射
 
@@ -41,21 +41,21 @@ CPU 核数、内存总量和网络接口映射已通过脱敏夹具验证。公�
 
 ## 已确认只读 API 契约
 
-以下契约来自 Nightingale v9 系列官方源码、内置 API 文档和脱敏响应证据；未认证访问受保护路由返回 401：
+以下契约来自 Nightingale v8.4.1 当前真实只读预检，以及 v9.x 既有官方源码、内置 API 文档和脱敏响应证据：
 
-- `GET /api/n9e/targets?limit=100&p=1`：分页主机清单，响应 `dat={"list":[...],"total":N}`。Target 包含 `ident`、`host_ip`、`os`、`agent_version`、`beat_time`、`target_up`、`cpu_num`、`cpu_util`、`mem_util`、`arch`、业务组和标签。
+- `GET /api/n9e/targets?limit=100&p=1`：分页主机清单，响应 `dat={"list":[...],"total":N}`。共同字段包含 `ident`、`host_ip`、`os`、`agent_version`、`target_up` 和 `cpu_num`；v9.x 提供 `beat_time`，当前 v8.4.1 提供 `update_at`。InfraView 优先使用有效 `beat_time`，缺失或无效时回退有效 `update_at`，都无效时保留零时间。
 - `GET /api/n9e/targets/stats`：可见主机总数、存活/离线数和 CPU/内存分桶。
 - `GET /api/n9e/busi-groups`：当前用户可见业务组，`dat` 为数组。
 - `GET /api/n9e/datasource/brief`：返回已脱敏的数据源摘要；其 `id` 用作查询的 `datasource_id`，`plugin_type` 用作数据源类型。
 - `POST /api/n9e/query-instant-batch`：Prometheus/VictoriaMetrics 批量即时只读查询。请求体包含 `datasource_id`、固定 PromQL 和 Unix 秒时间，`dat` 按查询顺序返回 vector 数组。
 - `POST /api/n9e/query-range-batch`：Prometheus/VictoriaMetrics 批量历史只读查询。请求体包含 `datasource_id`、固定 PromQL、起止 Unix 秒和步长秒，`dat` 按查询顺序返回 matrix 数组。
-- `GET /api/n9e/version`：公开版本接口，已在当前环境验证。
+- `GET /api/n9e/versions`：当前 v8.4.1 环境的版本接口。`/api/n9e/version` 在该环境不是可依赖的 JSON 版本契约。InfraView 运行时不调用版本接口，也不按版本号分支。
 
 Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能只依赖 HTTP 状态，还必须检查 `err`。错误路径会被 SPA 接管并返回 HTML，因此适配器必须同时校验 Content-Type 和 JSON 结构。
 
 ## 已确认适配策略
 
-- `ListHosts`：分页调用 `/targets`，以 `ident` 作为稳定 ID 和显示主机名，映射 `host_ip`、`os`、`agent_version`；`target_up=2` 映射 online，`1` 映射 unknown，`0` 映射 offline。脱敏 Target 样本已覆盖该映射，真实资源数量和状态不进入公开仓库。
+- `ListHosts`：分页调用 `/targets`，以 `ident` 作为稳定 ID 和显示主机名，映射 `host_ip`、`os`、`agent_version`；`target_up=2` 映射 online，`1` 映射 unknown，`0` 映射 offline。状态时间优先使用有效 `beat_time`，否则回退有效 `update_at`。脱敏 v8.4.1/v9.x Target 样本已覆盖该映射，真实资源数量和状态不进入公开仓库。
 - CPU 核数优先使用 Target 的 `cpu_num`，`-1` 映射未知；可使用 `system_n_cpus` 交叉验证。
 - 内存总容量使用 `mem_total` 批量即时查询，因为 Target 只直接提供 `mem_util`，不提供总字节数。
 - `GetCurrentMetrics`：对全部目标使用固定、代码内置的 PromQL 通过一次 `/query-instant-batch` 批量查询，按 `ident` 归并，禁止按主机 N+1。
@@ -106,4 +106,6 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 
 真实部署必须配置专用最小只读 Token；公开仓库不记录 Token 值、绑定账号或权限。InfraView 仍只调用已确认的只读接口，但应用只读边界不能替代上游最小权限。
 
-当前 8080 服务已切换为 Nightingale：数据源健康，脱敏主机样本的资产字段、六类当前指标、CPU/内存/负载/网络历史和总览聚合均通过真实 API 验证；数据源状态 API 返回真实 `nightingale` 类型和 15 秒界面刷新周期，当前指标缓存为 15 秒，静态资产与历史缓存仍为 60 秒。左下角使用紧凑“数据连接”汇总，健康时显示绿色 `1/1 正常`，展开后显示指标来源、健康结果和最近检查时间。刷新优化重部署后完成 API smoke、隔离 Mock Chromium 4/4，并重新完成真实 Nightingale 1440×900 登录浏览器默认/展开状态视觉验收。磁盘容量、磁盘读写历史没有充分契约证据，适配器明确返回空序列。后续重点是最小权限 Token 和磁盘指标证据，恢复入口见 `docs/HANDOFF.md`。
+2026-07-28 已使用更新后的私密配置完成 v8.4.1 上游只读契约预检：认证 profile、Target 分页、默认 Prometheus 类型数据源以及即时/区间批量查询的状态、Content-Type、envelope 和外层形状均符合适配器预期。当前 8080 容器仍早于私密环境文件更新，重建前数据源状态不可用；不得把预检结果等同于应用端最终验收。下一步是重建后验证数据源健康、15 秒界面周期、主机/总览/历史只读 API 和非 stale 状态。
+
+磁盘容量、磁盘读写历史没有充分契约证据，适配器明确返回空序列。后续仍需落实每个私有环境的专用最小只读 Token，恢复入口见 `docs/HANDOFF.md`。
