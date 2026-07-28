@@ -2,6 +2,7 @@ import { HttpResponse, http } from 'msw'
 
 export const SESSION_PATH = '/api/v1/session'
 export const OVERVIEW_PATH = '*/api/v1/overview'
+export const MYSQL_INSTANCES_PATH = '*/api/v1/mysql/instances'
 
 export interface SessionFixture {
   data: {
@@ -114,6 +115,46 @@ export interface HostPageFixture {
           }
         }>
       }
+    }>
+    total: number
+    page: number
+    page_size: number
+    total_pages: number
+  }
+  meta: {
+    request_id: string
+    stale: boolean
+    collected_at: string
+  }
+}
+
+export interface MySQLInstancePageFixture {
+  data: {
+    instances: Array<{
+      id: string
+      name: string
+      address: string
+      host: string
+      version: string
+      role: 'writable' | 'read_only' | 'unknown'
+      connections: number | null
+      max_connections: number | null
+      connection_usage_percent: number | null
+      threads_running: number | null
+      qps: number | null
+      slow_queries_per_second: number | null
+      buffer_pool_usage_percent: number | null
+      uptime_seconds: number | null
+      replication: {
+        state:
+          | 'normal'
+          | 'threads_stopped'
+          | 'not_configured'
+          | 'unknown'
+        lag_seconds: number | null
+        level: MetricLevelFixture
+      }
+      status: MetricLevelFixture
     }>
     total: number
     page: number
@@ -280,9 +321,128 @@ export function hostPageFixture(
   }
 }
 
+export function mysqlInstancePageFixture(
+  overrides: {
+    data?: Partial<MySQLInstancePageFixture['data']>
+    meta?: Partial<MySQLInstancePageFixture['meta']>
+  } = {},
+): MySQLInstancePageFixture {
+  return {
+    data: {
+      instances: [
+        {
+          id: 'mysql-fixture-001',
+          name: 'fixture-mysql-a',
+          address: '192.0.2.101:3306',
+          host: 'fixture-db-host-a',
+          version: '8.4.1',
+          role: 'writable',
+          connections: 32,
+          max_connections: 200,
+          connection_usage_percent: 16,
+          threads_running: 5,
+          qps: 123.456,
+          slow_queries_per_second: 0.125,
+          buffer_pool_usage_percent: 82.34,
+          uptime_seconds: 183_600,
+          replication: {
+            state: 'normal',
+            lag_seconds: 2,
+            level: 'normal',
+          },
+          status: 'normal',
+        },
+        {
+          id: 'mysql-fixture-002',
+          name: 'fixture-mysql-b',
+          address: '192.0.2.102:3306',
+          host: 'fixture-db-host-b',
+          version: '8.0.39',
+          role: 'read_only',
+          connections: 120,
+          max_connections: 160,
+          connection_usage_percent: 75,
+          threads_running: 18,
+          qps: 87,
+          slow_queries_per_second: 1.2,
+          buffer_pool_usage_percent: 91.25,
+          uptime_seconds: 43_200,
+          replication: {
+            state: 'threads_stopped',
+            lag_seconds: null,
+            level: 'warning',
+          },
+          status: 'warning',
+        },
+        {
+          id: 'mysql-fixture-003',
+          name: 'fixture-mysql-c',
+          address: '192.0.2.103:3306',
+          host: 'fixture-db-host-c',
+          version: '5.7.44',
+          role: 'read_only',
+          connections: 198,
+          max_connections: 200,
+          connection_usage_percent: 99,
+          threads_running: 43,
+          qps: 212.5,
+          slow_queries_per_second: 4.75,
+          buffer_pool_usage_percent: 98.6,
+          uptime_seconds: 900,
+          replication: {
+            state: 'not_configured',
+            lag_seconds: null,
+            level: 'critical',
+          },
+          status: 'critical',
+        },
+        {
+          id: 'mysql-fixture-004',
+          name: 'fixture-mysql-d',
+          address: '192.0.2.104:3306',
+          host: 'fixture-db-host-d',
+          version: 'unknown',
+          role: 'unknown',
+          connections: null,
+          max_connections: null,
+          connection_usage_percent: null,
+          threads_running: null,
+          qps: null,
+          slow_queries_per_second: null,
+          buffer_pool_usage_percent: null,
+          uptime_seconds: null,
+          replication: {
+            state: 'unknown',
+            lag_seconds: null,
+            level: 'unknown',
+          },
+          status: 'unknown',
+        },
+      ],
+      total: 64,
+      page: 1,
+      page_size: 20,
+      total_pages: 4,
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-fixture-mysql-instances-001',
+      stale: false,
+      collected_at: '2026-07-28T08:00:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
 export function resetFixtureState() {
   authenticatedUsername = null
 }
+
+export const mysqlHandlers = [
+  http.get(MYSQL_INSTANCES_PATH, () =>
+    HttpResponse.json(mysqlInstancePageFixture()),
+  ),
+]
 
 export const handlers = [
   http.get(SESSION_PATH, () => {

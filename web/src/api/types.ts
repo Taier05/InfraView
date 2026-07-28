@@ -107,6 +107,47 @@ export interface HostPageData {
 
 export type HostPageResponse = ApiResponse<HostPageData>
 
+export type MySQLRole = 'writable' | 'read_only' | 'unknown'
+
+export type MySQLReplicationState =
+  | 'normal'
+  | 'threads_stopped'
+  | 'not_configured'
+  | 'unknown'
+
+export interface MySQLInstance {
+  id: string
+  name: string
+  address: string
+  host: string
+  version: string
+  role: MySQLRole
+  connections: number | null
+  max_connections: number | null
+  connection_usage_percent: number | null
+  threads_running: number | null
+  qps: number | null
+  slow_queries_per_second: number | null
+  buffer_pool_usage_percent: number | null
+  uptime_seconds: number | null
+  replication: {
+    state: MySQLReplicationState
+    lag_seconds: number | null
+    level: MetricLevel
+  }
+  status: MetricLevel
+}
+
+export interface MySQLInstancePageData {
+  instances: MySQLInstance[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export type MySQLInstancePageResponse = ApiResponse<MySQLInstancePageData>
+
 export interface DataSourceStatusData {
   type: 'mock' | 'nightingale'
   healthy: boolean

@@ -1,5 +1,5 @@
 import { setupServer } from 'msw/node'
 
-import { handlers } from './fixtures'
+import { handlers, mysqlHandlers } from './fixtures'
 
-export const server = setupServer(...handlers)
+export const server = setupServer(...handlers, ...mysqlHandlers)
