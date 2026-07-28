@@ -3,9 +3,13 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"math"
 	"testing"
+	"time"
 
+	"github.com/Taier05/InfraView/internal/cache"
 	"github.com/Taier05/InfraView/internal/mysql"
 )
 
@@ -167,8 +171,499 @@ func TestMySQLSummaryMakesUnavailableInstanceCritical(t *testing.T) {
 	}
 }
 
+func TestMySQLServiceSharesOneSnapshotAcrossOverviewAndList(t *testing.T) {
+	provider := &recordingMySQLProvider{snapshot: fixtureMySQLSnapshot()}
+	clock := &mysqlTestClock{now: time.Date(2026, 7, 28, 0, 0, 0, 0, time.UTC)}
+	store := cache.New(clock.Now)
+	svc := NewMySQL(provider, store, MySQLOptions{
+		CurrentMetricsTTL: 15 * time.Second,
+		MaxStale:          5 * time.Minute,
+		Clock:             clock.Now,
+	})
+	if _, _, err := svc.Overview(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := svc.Instances(context.Background(), MySQLQuery{Page: 1, PageSize: 20}); err != nil {
+		t.Fatal(err)
+	}
+	if provider.calls != 1 {
+		t.Fatalf("MySQLSnapshot calls = %d, want 1", provider.calls)
+	}
+}
+
+func TestMySQLServiceReturnsStaleSnapshotAfterUpstreamFailure(t *testing.T) {
+	provider, clock, svc := newCachingMySQLService(fixtureMySQLSnapshot())
+	if _, _, err := svc.Overview(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	clock.Advance(16 * time.Second)
+	provider.err = mysql.ErrUnavailable
+	_, meta, err := svc.Overview(context.Background())
+	if err != nil || !meta.Stale {
+		t.Fatalf("meta = %#v, err = %v", meta, err)
+	}
+}
+
+func TestMySQLServiceCachesSuccessfulEmptySnapshot(t *testing.T) {
+	provider, _, svc := newCachingMySQLService(mysql.Snapshot{Instances: []mysql.Instance{}})
+	overview, _, err := svc.Overview(context.Background())
+	if err != nil || overview.Total != 0 || provider.calls != 1 {
+		t.Fatalf("overview = %#v, calls = %d, err = %v", overview, provider.calls, err)
+	}
+	if _, _, err := svc.Overview(context.Background()); err != nil || provider.calls != 1 {
+		t.Fatalf("second overview calls = %d, err = %v", provider.calls, err)
+	}
+}
+
+func TestMySQLServiceReturnsIndependentSnapshotCopies(t *testing.T) {
+	_, _, svc := newCachingMySQLService(fixtureMySQLSnapshot())
+	first, _, err := svc.Instances(context.Background(), MySQLQuery{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.Instances[0].Name = "mutated"
+	*first.Instances[0].QPS = 999
+	second, _, err := svc.Instances(context.Background(), MySQLQuery{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Instances[0].Name == "mutated" || *second.Instances[0].QPS == 999 {
+		t.Fatal("cached snapshot was mutated by a caller")
+	}
+}
+
+func TestMySQLServiceSnapshotDeepCopiesMetricsAndReplicationChannels(t *testing.T) {
+	source := fixtureMySQLSnapshot()
+	_, _, svc := newCachingMySQLService(source)
+	first, _, err := svc.snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance := &first.Instances[0]
+	*instance.UptimeSeconds = 999
+	*instance.Connections = 999
+	*instance.MaxConnections = 999
+	*instance.ThreadsRunning = 999
+	*instance.QPS = 999
+	*instance.SlowQueriesPerSecond = 999
+	*instance.BufferPoolUsagePercent = 999
+	*instance.ReplicationChannels[0].IORunning = false
+	*instance.ReplicationChannels[0].SQLRunning = false
+	*instance.ReplicationChannels[0].LagSeconds = 999
+	instance.ReplicationChannels = append(instance.ReplicationChannels, mysql.ReplicationChannel{})
+
+	second, _, err := svc.snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := second.Instances[0]
+	if *got.UptimeSeconds == 999 ||
+		*got.Connections == 999 ||
+		*got.MaxConnections == 999 ||
+		*got.ThreadsRunning == 999 ||
+		*got.QPS == 999 ||
+		*got.SlowQueriesPerSecond == 999 ||
+		*got.BufferPoolUsagePercent == 999 ||
+		!*got.ReplicationChannels[0].IORunning ||
+		!*got.ReplicationChannels[0].SQLRunning ||
+		*got.ReplicationChannels[0].LagSeconds == 999 ||
+		len(got.ReplicationChannels) != 1 {
+		t.Fatalf("second snapshot was mutated: %#v", got)
+	}
+}
+
+func TestMySQLOverviewCountsUnknownAsWarningRisk(t *testing.T) {
+	overview, _, err := newMySQLServiceWithSnapshot(alertCategoryFixtureSnapshot()).Overview(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overview.Total != 9 ||
+		overview.Normal != 1 ||
+		overview.Warning != 1 ||
+		overview.Critical != 3 ||
+		overview.Unknown != 4 ||
+		overview.WarningInstances != 5 ||
+		overview.CriticalInstances != 3 ||
+		overview.AffectedInstances != 8 {
+		t.Fatalf("overview = %#v", overview)
+	}
+}
+
+func TestMySQLOverviewCountsAlertCategoriesIndependently(t *testing.T) {
+	svc := newMySQLServiceWithSnapshot(alertCategoryFixtureSnapshot())
+	overview, _, err := svc.Overview(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := MySQLOverviewAlerts{
+		Availability:       MySQLAlertCount{Warning: 1, Critical: 1},
+		ReplicationThreads: MySQLAlertCount{Warning: 1, Critical: 1},
+		ReplicationLag:     MySQLAlertCount{Warning: 1, Critical: 1},
+		ReplicationData:    MySQLAlertCount{Warning: 3},
+	}
+	if overview.Alerts != want {
+		t.Fatalf("alerts = %#v, want %#v", overview.Alerts, want)
+	}
+}
+
+func TestMySQLInstancesSearchesNameAddressAndHost(t *testing.T) {
+	tests := []struct {
+		search string
+		want   string
+	}{
+		{search: "  FIXTURE-MYSQL-A ", want: "fixture-mysql-a"},
+		{search: "192.0.2.11", want: "fixture-mysql-b"},
+		{search: "fixture-host-c", want: "fixture-mysql-c"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.search, func(t *testing.T) {
+			page, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{
+				Search: tt.search, Page: 1, PageSize: 20,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if page.Total != 1 || len(page.Instances) != 1 || page.Instances[0].Name != tt.want {
+				t.Fatalf("search %q returned %#v", tt.search, page)
+			}
+		})
+	}
+}
+
+func TestMySQLInstancesFiltersStatusAndRole(t *testing.T) {
+	page, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{
+		Status: LevelWarning, Role: mysql.RoleReadOnly, Page: 1, PageSize: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Instances) != 1 {
+		t.Fatalf("page = %#v", page)
+	}
+	for _, instance := range page.Instances {
+		if instance.Status != LevelWarning || instance.Role != mysql.RoleReadOnly {
+			t.Fatalf("unexpected instance %#v", instance)
+		}
+	}
+}
+
+func TestMySQLInstancesDefaultsToInstanceAscendingSort(t *testing.T) {
+	page, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{
+		Page: 1, PageSize: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, want := range []string{"fixture-mysql-a", "fixture-mysql-b", "fixture-mysql-c"} {
+		if page.Instances[i].Name != want {
+			t.Fatalf("instances[%d].Name = %q, want %q", i, page.Instances[i].Name, want)
+		}
+	}
+}
+
+func TestMySQLInstancesSortsMissingMetricsLastAndUsesStableTieBreak(t *testing.T) {
+	for _, order := range []string{"asc", "desc"} {
+		page, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{
+			Sort: "qps", Order: order, Page: 1, PageSize: 100,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertAvailableValuesBeforeMissing(t, page.Instances, func(item MySQLInstanceSummary) *float64 { return item.QPS })
+		assertStableIDTieBreak(t, page.Instances)
+	}
+}
+
+func TestMySQLInstancesSupportsAllMetricSortFields(t *testing.T) {
+	tests := []struct {
+		field string
+		value func(MySQLInstanceSummary) *float64
+	}{
+		{field: "connections", value: func(item MySQLInstanceSummary) *float64 { return item.ConnectionUsagePercent }},
+		{field: "threads_running", value: func(item MySQLInstanceSummary) *float64 { return item.ThreadsRunning }},
+		{field: "qps", value: func(item MySQLInstanceSummary) *float64 { return item.QPS }},
+		{field: "slow_queries", value: func(item MySQLInstanceSummary) *float64 { return item.SlowQueriesPerSecond }},
+		{field: "buffer_pool", value: func(item MySQLInstanceSummary) *float64 { return item.BufferPoolUsagePercent }},
+		{field: "replication_lag", value: func(item MySQLInstanceSummary) *float64 { return item.Replication.LagSeconds }},
+		{field: "uptime", value: func(item MySQLInstanceSummary) *float64 { return item.UptimeSeconds }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.field, func(t *testing.T) {
+			for _, order := range []string{"asc", "desc"} {
+				page, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{
+					Sort: tt.field, Order: order, Page: 1, PageSize: 100,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				assertAvailableValuesBeforeMissing(t, page.Instances, tt.value)
+			}
+		})
+	}
+}
+
+func TestMySQLInstancesSortsInstanceAndStatusWithStableIDTies(t *testing.T) {
+	for _, field := range []string{"instance", "status"} {
+		for _, order := range []string{"asc", "desc"} {
+			page, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{
+				Sort: field, Order: order, Page: 1, PageSize: 100,
+			})
+			if err != nil {
+				t.Fatalf("sort %s %s: %v", field, order, err)
+			}
+			if len(page.Instances) != 3 {
+				t.Fatalf("sort %s %s returned %#v", field, order, page)
+			}
+			if field == "status" {
+				assertEqualStatusUsesStableIDTieBreak(t, page.Instances)
+			}
+		}
+	}
+}
+
+func TestMySQLInstancesRejectsUnsupportedQueryBeforeLoadingSnapshot(t *testing.T) {
+	tests := []struct {
+		name  string
+		query MySQLQuery
+	}{
+		{name: "page", query: MySQLQuery{Page: 0, PageSize: 20}},
+		{name: "page size", query: MySQLQuery{Page: 1, PageSize: 1}},
+		{name: "status", query: MySQLQuery{Status: "degraded", Page: 1, PageSize: 20}},
+		{name: "role", query: MySQLQuery{Role: "replica", Page: 1, PageSize: 20}},
+		{name: "sort", query: MySQLQuery{Sort: "address", Page: 1, PageSize: 20}},
+		{name: "order", query: MySQLQuery{Order: "sideways", Page: 1, PageSize: 20}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider, _, svc := newCachingMySQLService(fixtureMySQLSnapshot())
+			_, _, err := svc.Instances(context.Background(), tt.query)
+			if !errors.Is(err, ErrInvalidQuery) {
+				t.Fatalf("error = %v, want ErrInvalidQuery", err)
+			}
+			if provider.calls != 0 {
+				t.Fatalf("provider calls = %d, want 0", provider.calls)
+			}
+		})
+	}
+}
+
+func TestMySQLInstancesAcceptsOnlySupportedPageSizesAndHandlesOverflow(t *testing.T) {
+	for _, pageSize := range []int{0, 1, 19, 21, 101} {
+		_, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{Page: 1, PageSize: pageSize})
+		if !errors.Is(err, ErrInvalidQuery) {
+			t.Fatalf("page size %d error = %v", pageSize, err)
+		}
+	}
+	for _, pageSize := range []int{20, 50, 100} {
+		if _, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{Page: 1, PageSize: pageSize}); err != nil {
+			t.Fatalf("page size %d error = %v", pageSize, err)
+		}
+	}
+	page, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{
+		Page: math.MaxInt, PageSize: 20,
+	})
+	if err != nil || len(page.Instances) != 0 || page.Total != 3 {
+		t.Fatalf("overflow page = %#v, err = %v", page, err)
+	}
+}
+
+func TestMySQLInstancesPaginatesAfterFilteringAndSorting(t *testing.T) {
+	svc := newMySQLServiceWithSnapshot(pagedMySQLFixtureSnapshot())
+	first, _, err := svc.Instances(context.Background(), MySQLQuery{
+		Page: 1, PageSize: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, _, err := svc.Instances(context.Background(), MySQLQuery{
+		Page: 2, PageSize: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Total != 21 || len(first.Instances) != 20 ||
+		second.Total != 21 || len(second.Instances) != 1 ||
+		second.Instances[0].Name != "fixture-mysql-21" {
+		t.Fatalf("first = %#v, second = %#v", first, second)
+	}
+}
+
 func boolPointer(value bool) *bool        { return &value }
 func floatPointer(value float64) *float64 { return &value }
+
+type mysqlTestClock struct{ now time.Time }
+
+func (c *mysqlTestClock) Now() time.Time              { return c.now }
+func (c *mysqlTestClock) Advance(delta time.Duration) { c.now = c.now.Add(delta) }
+
+func newCachingMySQLService(snapshot mysql.Snapshot) (*recordingMySQLProvider, *mysqlTestClock, *MySQLService) {
+	provider := &recordingMySQLProvider{snapshot: snapshot}
+	clock := &mysqlTestClock{now: time.Date(2026, 7, 28, 0, 0, 0, 0, time.UTC)}
+	svc := NewMySQL(provider, cache.New(clock.Now), MySQLOptions{
+		CurrentMetricsTTL: 15 * time.Second,
+		MaxStale:          5 * time.Minute,
+		Clock:             clock.Now,
+	})
+	return provider, clock, svc
+}
+
+func newMySQLServiceWithSnapshot(snapshot mysql.Snapshot) *MySQLService {
+	_, _, svc := newCachingMySQLService(snapshot)
+	return svc
+}
+
+func fixtureMySQLService() *MySQLService {
+	return newMySQLServiceWithSnapshot(fixtureMySQLSnapshot())
+}
+
+func fixtureMySQLSnapshot() mysql.Snapshot {
+	first := instanceWithChannels(mysql.ReplicationChannel{
+		IORunning: boolPointer(true), SQLRunning: boolPointer(true), LagSeconds: floatPointer(2),
+	})
+	first.UptimeSeconds = floatPointer(3600)
+	first.Connections = floatPointer(20)
+	first.MaxConnections = floatPointer(100)
+	first.ThreadsRunning = floatPointer(3)
+	first.QPS = floatPointer(10)
+	first.SlowQueriesPerSecond = floatPointer(0.5)
+	first.BufferPoolUsagePercent = floatPointer(70)
+
+	second := instanceWithChannels(mysql.ReplicationChannel{
+		IORunning: boolPointer(true), SQLRunning: boolPointer(true), LagSeconds: floatPointer(8),
+	})
+	second.ID = mysql.StableInstanceID("fixture-host-b", "fixture-mysql-b", "192.0.2.11:3306")
+	second.Name = "fixture-mysql-b"
+	second.Address = "192.0.2.11:3306"
+	second.Host = "fixture-host-b"
+	second.UptimeSeconds = floatPointer(7200)
+	second.Connections = floatPointer(50)
+	second.MaxConnections = floatPointer(100)
+	second.ThreadsRunning = floatPointer(8)
+	second.QPS = floatPointer(10)
+	second.SlowQueriesPerSecond = floatPointer(1)
+	second.BufferPoolUsagePercent = floatPointer(80)
+
+	third := mysql.Instance{
+		ID:           mysql.StableInstanceID("fixture-host-c", "fixture-mysql-c", "192.0.2.12:3306"),
+		Name:         "fixture-mysql-c",
+		Address:      "192.0.2.12:3306",
+		Host:         "fixture-host-c",
+		Availability: mysql.AvailabilityUp,
+		Role:         mysql.RoleWritable,
+	}
+	return mysql.Snapshot{Instances: []mysql.Instance{first, second, third}}
+}
+
+func pagedMySQLFixtureSnapshot() mysql.Snapshot {
+	instances := make([]mysql.Instance, 21)
+	for i := range instances {
+		name := fmt.Sprintf("fixture-mysql-%02d", i+1)
+		instances[i] = mysql.Instance{
+			ID:           name,
+			Name:         name,
+			Address:      fmt.Sprintf("192.0.2.%d:3306", i+1),
+			Host:         fmt.Sprintf("fixture-host-%02d", i+1),
+			Availability: mysql.AvailabilityUp,
+			Role:         mysql.RoleWritable,
+		}
+	}
+	return mysql.Snapshot{Instances: instances}
+}
+
+func assertAvailableValuesBeforeMissing(
+	t *testing.T,
+	items []MySQLInstanceSummary,
+	value func(MySQLInstanceSummary) *float64,
+) {
+	t.Helper()
+	seenMissing := false
+	for _, item := range items {
+		if value(item) == nil {
+			seenMissing = true
+		} else if seenMissing {
+			t.Fatal("available metric sorted after a missing metric")
+		}
+	}
+}
+
+func assertStableIDTieBreak(t *testing.T, items []MySQLInstanceSummary) {
+	t.Helper()
+	for i := 1; i < len(items); i++ {
+		left := items[i-1]
+		right := items[i]
+		if left.QPS != nil && right.QPS != nil && *left.QPS == *right.QPS && left.ID > right.ID {
+			t.Fatalf("equal QPS IDs not ascending: %q before %q", left.ID, right.ID)
+		}
+	}
+}
+
+func assertEqualStatusUsesStableIDTieBreak(t *testing.T, items []MySQLInstanceSummary) {
+	t.Helper()
+	for i := 1; i < len(items); i++ {
+		left := items[i-1]
+		right := items[i]
+		if left.Status == right.Status && left.ID > right.ID {
+			t.Fatalf("equal status IDs not ascending: %q before %q", left.ID, right.ID)
+		}
+	}
+}
+
+func alertCategoryFixtureSnapshot() mysql.Snapshot {
+	normal := mysql.Instance{
+		ID:           "fixture-normal",
+		Name:         "fixture-normal",
+		Availability: mysql.AvailabilityUp,
+		Role:         mysql.RoleWritable,
+	}
+	unknownAvailability := normal
+	unknownAvailability.ID = "fixture-availability-unknown"
+	unknownAvailability.Name = "fixture-availability-unknown"
+	unknownAvailability.Availability = mysql.AvailabilityUnknown
+	down := normal
+	down.ID = "fixture-down"
+	down.Name = "fixture-down"
+	down.Availability = mysql.AvailabilityDown
+
+	stopped := instanceWithChannels(mysql.ReplicationChannel{
+		IORunning: boolPointer(false), SQLRunning: boolPointer(true), LagSeconds: floatPointer(2),
+	})
+	stopped.ID = "fixture-stopped"
+	stopped.Name = "fixture-stopped"
+	warningLag := readOnlyInstanceWithLag(8)
+	warningLag.ID = "fixture-lag-warning"
+	warningLag.Name = "fixture-lag-warning"
+	criticalLag := readOnlyInstanceWithLag(35)
+	criticalLag.ID = "fixture-lag-critical"
+	criticalLag.Name = "fixture-lag-critical"
+	incompleteThreads := instanceWithChannels(mysql.ReplicationChannel{
+		SQLRunning: boolPointer(true), LagSeconds: floatPointer(1),
+	})
+	incompleteThreads.ID = "fixture-threads-incomplete"
+	incompleteThreads.Name = "fixture-threads-incomplete"
+	missingLag := instanceWithChannels(mysql.ReplicationChannel{
+		IORunning: boolPointer(true), SQLRunning: boolPointer(true),
+	})
+	missingLag.ID = "fixture-lag-missing"
+	missingLag.Name = "fixture-lag-missing"
+	unknownRole := mysql.Instance{
+		ID:           "fixture-role-unknown",
+		Name:         "fixture-role-unknown",
+		Availability: mysql.AvailabilityUp,
+		Role:         mysql.RoleUnknown,
+	}
+
+	return mysql.Snapshot{Instances: []mysql.Instance{
+		normal,
+		unknownAvailability,
+		down,
+		stopped,
+		warningLag,
+		criticalLag,
+		incompleteThreads,
+		missingLag,
+		unknownRole,
+	}}
+}
 
 func readOnlyInstanceWithLag(lag float64) mysql.Instance {
 	return instanceWithChannels(mysql.ReplicationChannel{

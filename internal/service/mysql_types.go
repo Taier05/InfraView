@@ -22,6 +22,37 @@ type MySQLQuery struct {
 	PageSize int
 }
 
+type MySQLAlertCount struct {
+	Warning  int
+	Critical int
+}
+
+type MySQLOverviewAlerts struct {
+	Availability       MySQLAlertCount
+	ReplicationThreads MySQLAlertCount
+	ReplicationLag     MySQLAlertCount
+	ReplicationData    MySQLAlertCount
+}
+
+type MySQLOverview struct {
+	Total             int
+	Normal            int
+	Warning           int
+	Critical          int
+	Unknown           int
+	AffectedInstances int
+	WarningInstances  int
+	CriticalInstances int
+	Alerts            MySQLOverviewAlerts
+}
+
+type MySQLPage struct {
+	Instances []MySQLInstanceSummary
+	Total     int
+	Page      int
+	PageSize  int
+}
+
 type MySQLReplicationState string
 
 const (
