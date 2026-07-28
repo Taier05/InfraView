@@ -14,8 +14,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Taier05/InfraView/internal/adapters/nightingale"
 	"github.com/Taier05/InfraView/internal/config"
 	"github.com/Taier05/InfraView/internal/datasource"
+	"github.com/Taier05/InfraView/internal/mysql"
+	"github.com/Taier05/InfraView/internal/mysql/mysqltest"
 )
 
 func TestRunCommandRequiresExactlyOneCommand(t *testing.T) {
@@ -197,7 +200,7 @@ func TestBuildHandlerWiresAuthenticatedMockAPI(t *testing.T) {
 	}
 }
 
-func TestDataSourceProviderWiresNightingaleConfiguration(t *testing.T) {
+func TestDataSourceProvidersWiresNightingaleConfiguration(t *testing.T) {
 	const token = "fixture-main-token"
 	called := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
@@ -214,19 +217,51 @@ func TestDataSourceProviderWiresNightingaleConfiguration(t *testing.T) {
 	defer server.Close()
 
 	clock := func() time.Time { return time.Unix(1785123060, 0).UTC() }
-	provider := dataSourceProvider(config.Config{
+	providers := dataSourceProviders(config.Config{
 		DataSource:                       "nightingale",
 		NightingaleBaseURL:               server.URL,
 		NightingaleToken:                 token,
 		NightingaleInterfaceExcludeRegex: `lo|veth.*`,
 		NightingaleAllowInsecureHTTP:     true,
 	}, clock)
-	health, err := provider.Health(context.Background())
+	health, err := providers.Hosts.Health(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !called || !health.Healthy || !health.CheckedAt.Equal(clock()) {
 		t.Fatalf("health = %#v, called = %v", health, called)
+	}
+}
+
+func TestProviderSetUsesMockForHostsAndMySQL(t *testing.T) {
+	providers := dataSourceProviders(config.Config{
+		DataSource: "mock", MockHostCount: 8,
+	}, time.Now)
+	if providers.Hosts == nil || providers.MySQL == nil {
+		t.Fatalf("providers = %#v", providers)
+	}
+	mysqltest.RunContract(t, providers.MySQL)
+}
+
+func TestProviderSetSharesOneNightingaleProvider(t *testing.T) {
+	providers := dataSourceProviders(config.Config{
+		DataSource:         "nightingale",
+		NightingaleBaseURL: "https://n9e.example.com",
+		NightingaleToken:   "fixture-token",
+	}, time.Now)
+	hostProvider, hostOK := providers.Hosts.(*nightingale.Provider)
+	mysqlProvider, mysqlOK := providers.MySQL.(*nightingale.Provider)
+	if !hostOK || !mysqlOK || hostProvider != mysqlProvider {
+		t.Fatalf("providers do not share one Nightingale client")
+	}
+}
+
+func TestMySQLTimeoutProviderCancelsSlowSnapshot(t *testing.T) {
+	provider := withMySQLUpstreamTimeout(blockingMySQLProvider{}, 10*time.Millisecond)
+	start := time.Now()
+	_, err := provider.MySQLSnapshot(context.Background())
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > time.Second {
+		t.Fatalf("error = %v, elapsed = %s", err, time.Since(start))
 	}
 }
 
@@ -331,6 +366,13 @@ type controlledServer struct {
 type deadlineCheckingProvider struct {
 	t     *testing.T
 	calls int
+}
+
+type blockingMySQLProvider struct{}
+
+func (blockingMySQLProvider) MySQLSnapshot(ctx context.Context) (mysql.Snapshot, error) {
+	<-ctx.Done()
+	return mysql.Snapshot{}, ctx.Err()
 }
 
 func (p *deadlineCheckingProvider) check(ctx context.Context) {

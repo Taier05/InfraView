@@ -19,6 +19,7 @@ import (
 	"github.com/Taier05/InfraView/internal/config"
 	"github.com/Taier05/InfraView/internal/datasource"
 	"github.com/Taier05/InfraView/internal/httpapi"
+	"github.com/Taier05/InfraView/internal/mysql"
 	"github.com/Taier05/InfraView/internal/service"
 )
 
@@ -82,8 +83,8 @@ func serve(cfg config.Config) error {
 }
 
 func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger) http.Handler {
-	provider := dataSourceProvider(cfg, clock)
-	provider = withUpstreamTimeout(provider, cfg.UpstreamTimeout)
+	providers := dataSourceProviders(cfg, clock)
+	provider := withUpstreamTimeout(providers.Hosts, cfg.UpstreamTimeout)
 	store := cache.New(clock)
 	queryService := service.New(provider, store, service.Options{
 		InventoryTTL:       cfg.InventoryTTL,
@@ -106,22 +107,49 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 	})
 }
 
-func dataSourceProvider(cfg config.Config, clock func() time.Time) datasource.Provider {
+type providerSet struct {
+	Hosts datasource.Provider
+	MySQL mysql.Provider
+}
+
+func dataSourceProviders(cfg config.Config, clock func() time.Time) providerSet {
 	switch cfg.DataSource {
 	case "mock":
-		return mock.New(cfg.MockHostCount, clock)
+		return providerSet{
+			Hosts: mock.New(cfg.MockHostCount, clock),
+			MySQL: mock.NewMySQL(),
+		}
 	case "nightingale":
-		return nightingale.New(nightingale.Options{
+		provider := nightingale.New(nightingale.Options{
 			BaseURL:              cfg.NightingaleBaseURL,
 			Token:                cfg.NightingaleToken,
 			InterfaceExcludeExpr: cfg.NightingaleInterfaceExcludeRegex,
 			Clock:                clock,
 			AllowInsecureHTTP:    cfg.NightingaleAllowInsecureHTTP,
 		})
+		return providerSet{Hosts: provider, MySQL: provider}
 	default:
-		return nightingale.New(nightingale.Options{})
+		provider := nightingale.New(nightingale.Options{})
+		return providerSet{Hosts: provider, MySQL: provider}
 	}
 }
+
+type mysqlTimeoutProvider struct {
+	provider mysql.Provider
+	timeout  time.Duration
+}
+
+func withMySQLUpstreamTimeout(provider mysql.Provider, timeout time.Duration) mysql.Provider {
+	return &mysqlTimeoutProvider{provider: provider, timeout: timeout}
+}
+
+func (p *mysqlTimeoutProvider) MySQLSnapshot(ctx context.Context) (mysql.Snapshot, error) {
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+	return p.provider.MySQLSnapshot(ctx)
+}
+
+var _ mysql.Provider = (*mysqlTimeoutProvider)(nil)
 
 type timeoutProvider struct {
 	provider datasource.Provider
