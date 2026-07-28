@@ -30,7 +30,7 @@
 | CPU 使用率 | `cpu_usage_active` | 每个 `ident` 单序列 | 百分比 |
 | 内存使用率 | `mem_used_percent` | 每个 `ident` 单序列 | 百分比 |
 | 1 分钟负载 | `system_load1` | 每个 `ident` 单序列 | 标量 |
-| IO 忙碌度 | `diskio_io_util` | 每主机存在多磁盘序列；已验证使用 `max by (ident)` 聚合 | 百分比 |
+| IO 忙碌度 | `diskio_io_util` | 验证环境已确认每主机存在多磁盘序列并使用 `max by (ident)` 聚合；生产试运行待 Categraf 升级后复验 | 百分比 |
 | 网络发送/接收 | `net_bytes_sent` / `net_bytes_recv` | 累计计数器，需 `rate()`；存在物理、Docker、Calico、veth、bridge、tunnel 接口，必须使用受控可配置过滤规则 | 字节计数器，换算 B/s |
 | 运行时间 | `system_uptime` | 每个 `ident` 单序列 | 秒 |
 | CPU 核数 | `system_n_cpus`；`machine_cpu_cores` 可作交叉验证 | 每个 `ident` 单序列 | 核 |
@@ -61,11 +61,19 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 - `GetCurrentMetrics`：对全部目标使用固定、代码内置的 PromQL 通过一次 `/query-instant-batch` 批量查询，按 `ident` 归并，禁止按主机 N+1。
 - `QueryRange`：使用 `/query-range-batch`，只允许领域指标映射生成的固定查询，不接受前端或用户提交 PromQL。
 - `QueryAggregateRange`：使用批量范围查询直接在上游按 `ident`/全局聚合，保持总览每指标单序列和最多 600 点约束。
-- IO 使用 `max by (ident) (diskio_io_util{ident!=""})`。当前环境即时验证值正常。
+- IO 使用 `max by (ident) (diskio_io_util{ident!=""})`。v8.4.1 验证环境的即时查询已通过；生产试运行环境待 Categraf 升级后重新确认该指标。
 - 网络使用 `rate(net_bytes_sent[2m])` / `rate(net_bytes_recv[2m])` 并执行配置化接口过滤；当前环境排除虚拟接口后得到合理 B/s。不得硬编码 任何物理接口名。
 - 不使用 `/api/n9e/proxy/:id/*` 实现任意代理，不向 InfraView API 或页面暴露任意数据源 URL、查询表达式或原始 Nightingale 请求体。
 
 真实凭据只存在于被 Git 忽略、权限受限的私有环境文件中，公开仓库不记录其路径、账号或权限。即时查询实际返回 `dat[查询索引][序列]`，其中单点值为 `[Unix秒, 字符串值]`；区间查询对应 `values=[[Unix秒, 字符串值], ...]`。无 Token 和错误 Token 均返回 HTTP 401 与 `text/plain`，因此错误解析不能假设 JSON。仓库已加入完全脱敏的分页、即时、区间、空结果和错误夹具。
+
+## 生产试运行观察（2026-07-28）
+
+- 当前版本在生产试运行中，除 IO 忙碌度显示“暂无数据”外，已有板块指标正常。
+- InfraView 当前只使用固定查询 `max by (ident) (diskio_io_util{ident!=""})`；生产环境现有数据可通过 `max by (ident) (rate(diskio_io_time{ident!="",name!~"^(loop|ram|fd).*"}[1m]) / 10)` 派生近似 IO 利用率。
+- 两种结果表达相同的“采样窗口内设备忙碌占比”概念，但采样窗口、聚合和计算路径不同，不能假设数值完全相等，也不能在缺少契约证据时自动切换 PromQL。
+- 用户决定暂不修改 InfraView，先升级生产 Categraf。升级后至少等待两个采集周期，再只读确认 `diskio_io_util` 是否出现，并观察当前页面 15 秒自动刷新后是否恢复展示；通常不需要主动重启 InfraView。
+- 若升级后仍缺失，后续只收集脱敏的指标名、标签形状、单位和查询状态；必须获得用户明确授权，才按 TDD 增加兼容逻辑。
 
 ## 禁止猜测
 
