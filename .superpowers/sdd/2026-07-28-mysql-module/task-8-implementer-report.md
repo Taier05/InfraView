@@ -348,3 +348,129 @@ git commit -m "fix: 拒绝 MySQL 空查询参数"
 - `docker ... go test ./... -count=1`：PASS；所有 Go 包 0 failures
 - 14 个 empty/bare 子测试：全部 400，provider 调用为 0
 - 完整 schema、nullable null、空快照数组契约：PASS
+
+---
+
+# Fix Round 2
+
+## 复审回归与修复
+
+- 修正基线：`ea1a3ef464557a7b393d7f03b4719560416cb795`
+- 回归根因：Fix Round 1 把“唯一值必须非空”加入共享 `queryParameters`，导致所有使用该 parser 的既有 Host API 在进入 `valueOrDefault` 或 Service 默认逻辑前返回 400。
+- 兼容证据：前端已有 `status=` URL 语义；overview 和 metrics 的 handler 使用 `valueOrDefault(r, "range", "24h")`，明确把空 `range` 解释为默认 24h。
+- RED 回归覆盖：
+  - `GET /api/v1/overview?range=` 必须保持 200；
+  - `GET /api/v1/hosts?status=` 必须保持 200；
+  - `GET /api/v1/hosts/{id}/metrics?range=` 必须保持 200。
+- RED 证据：首个 overview 请求得到 400。
+- 最小修复：
+  - 共享 `queryParameters` 恢复为只校验解析错误、允许键和单值数量，不改变既有默认行为；
+  - `mysqlInstances` 在解析后调用 MySQL 专属 `hasEmptyMySQLQueryParameter`，在分页解析与 Service 调用前拒绝任一空值。
+- 双向 GREEN：
+  - 三个 Host 显式空值请求全部 200；
+  - MySQL 七参数 × bare/显式空值共 14 个子测试继续全部 400，provider 调用保持 0；
+  - 完整 JSON schema、nullable `null`、空快照 `instances: []` 契约不退化。
+- 未改变 Host handler、Host Service、MySQL API 设计、路由或生产装配。
+
+## Fix Round 2 变更文件
+
+- 修改：`internal/httpapi/query_handlers.go`
+- 修改：`internal/httpapi/mysql_handlers.go`
+- 修改：`internal/httpapi/api_test.go`
+- 追加：本报告
+
+所有受跟踪文件修改均通过 `apply_patch` 完成；`gofmt` 仅对三个 Go 文件做机械格式化。
+
+## Fix Round 2 实际命令（按执行顺序）
+
+1. 核对修正基线、工作树与既有 Host 空值调用：
+
+```bash
+git rev-parse HEAD
+git status --short
+sed -n '105,245p' internal/httpapi/query_handlers.go
+sed -n '292,325p' internal/httpapi/query_handlers.go
+sed -n '85,125p' internal/httpapi/mysql_handlers.go
+rg -n 'overview\?range=|metrics\?range=|hosts\?.*status=|status=' internal/httpapi/api_test.go web/src
+```
+
+2. Host 显式空值语义 RED：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm go test ./internal/httpapi -run 'TestExistingHostRoutesPreserveExplicitEmptyQueryDefaults' -count=1
+```
+
+3. 移动校验边界后的 Host+MySQL 双向 GREEN：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm go test ./internal/httpapi -run 'Test(ExistingHostRoutesPreserveExplicitEmptyQueryDefaults|MySQLInstancesRejectsEmptyAllowedParametersBeforeProvider)' -count=1
+```
+
+4. 格式化：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/src" -w /src golang:1.24-bookworm gofmt -w internal/httpapi/api_test.go internal/httpapi/query_handlers.go internal/httpapi/mysql_handlers.go
+```
+
+5. 完整 Host+MySQL 聚焦回归：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm go test ./internal/httpapi -run 'Test(MySQL|ExistingHostRoutesPreserveExplicitEmptyQueryDefaults)' -count=1
+```
+
+6. 全仓 Go 回归：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm go test ./... -count=1
+```
+
+7. 差异与范围审查：
+
+```bash
+git status --short
+git diff --check
+git diff --stat
+git diff -- internal/httpapi/query_handlers.go internal/httpapi/mysql_handlers.go internal/httpapi/api_test.go
+rg -n 'PreserveExplicitEmpty|hasEmptyMySQL|parameterValues\[0\]' internal/httpapi/api_test.go internal/httpapi/mysql_handlers.go internal/httpapi/query_handlers.go
+```
+
+8. 最终格式与差异门检：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/src" -w /src golang:1.24-bookworm gofmt -l internal/httpapi/api_test.go internal/httpapi/query_handlers.go internal/httpapi/mysql_handlers.go
+git diff --check
+git status --short
+```
+
+9. 精确暂存 Fix Round 2 Go 文件：
+
+```bash
+git add internal/httpapi/query_handlers.go internal/httpapi/mysql_handlers.go internal/httpapi/api_test.go
+```
+
+10. 仅强制暂存任务明确要求的原报告：
+
+```bash
+git add -f .superpowers/sdd/2026-07-28-mysql-module/task-8-implementer-report.md
+```
+
+11. 提交前检查：
+
+```bash
+git diff --cached --check
+git diff --cached --stat
+```
+
+12. 单独修正提交：
+
+```bash
+git commit -m "fix: 保持主机空查询默认语义"
+```
+
+## Fix Round 2 最终验证结果
+
+- Host `range=` / `status=` 聚焦回归：PASS
+- MySQL 14 个 empty/bare 子测试：全部 400，provider 调用为 0
+- MySQL 完整 schema、nullable null、空快照数组契约：PASS
+- `docker ... go test ./internal/httpapi -run 'Test(MySQL|ExistingHostRoutesPreserveExplicitEmptyQueryDefaults)' -count=1`：PASS
+- `docker ... go test ./... -count=1`：PASS；所有 Go 包 0 failures

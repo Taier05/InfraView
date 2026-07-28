@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/Taier05/InfraView/internal/mysql"
 	"github.com/Taier05/InfraView/internal/service"
@@ -92,7 +93,7 @@ func (a *api) mysqlOverview(w http.ResponseWriter, r *http.Request) {
 
 func (a *api) mysqlInstances(w http.ResponseWriter, r *http.Request) {
 	query, ok := queryParameters(r, "search", "status", "role", "sort", "order", "page", "page_size")
-	if !ok {
+	if !ok || hasEmptyMySQLQueryParameter(query) {
 		writeError(w, r, http.StatusBadRequest, "invalid_query", "查询参数无效", false)
 		return
 	}
@@ -137,6 +138,15 @@ func (a *api) mysqlInstances(w http.ResponseWriter, r *http.Request) {
 		PageSize:   value.PageSize,
 		TotalPages: totalPages,
 	}, meta)
+}
+
+func hasEmptyMySQLQueryParameter(query url.Values) bool {
+	for _, values := range query {
+		if len(values) == 0 || values[0] == "" {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *api) mysqlServiceAvailable(w http.ResponseWriter, r *http.Request) bool {

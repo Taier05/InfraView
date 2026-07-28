@@ -337,6 +337,21 @@ func TestMySQLRoutesFailSafelyWithoutService(t *testing.T) {
 	}
 }
 
+func TestExistingHostRoutesPreserveExplicitEmptyQueryDefaults(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	sessionCookie := loginCookie(t, handler)
+	for _, path := range []string{
+		"/api/v1/overview?range=",
+		"/api/v1/hosts?status=",
+		"/api/v1/hosts/mock-host-001/metrics?range=",
+	} {
+		response := request(t, handler, http.MethodGet, path, "", sessionCookie)
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s status = %d", path, response.Code)
+		}
+	}
+}
+
 func TestLoginSessionAndLogout(t *testing.T) {
 	handler := newTestAPI(t, mock.New(3, testNow))
 	login := request(t, handler, http.MethodPost, "/api/v1/session", `{"username":"admin","password":"correct-password"}`, nil)
