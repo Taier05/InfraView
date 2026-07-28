@@ -284,7 +284,7 @@ git commit -m "docs: 将 Nightingale v8.4.1 设为主要验证版本"
 - Consumes: Task 1 的兼容实现、Task 2 的支持矩阵和私密环境文件。
 - Produces: 可复现的容器验证证据、真实 v8.4.1 只读验收结论和用户预览。
 
-- [ ] **Step 1: 构建完整验证镜像**
+- [x] **Step 1: 构建完整验证镜像**
 
 ```bash
 docker build --tag infraview:nightingale-v8-compat-verify .
@@ -292,7 +292,7 @@ docker build --tag infraview:nightingale-v8-compat-verify .
 
 期望：前端 45/45、类型检查、生产构建、Go 普通测试、race 测试和 Go 构建全部通过。
 
-- [ ] **Step 2: 运行隔离 Mock E2E**
+- [x] **Step 2: 运行隔离 Mock E2E**
 
 ```bash
 INFRAVIEW_E2E_PROJECT=infraview-v8-compat-0728 \

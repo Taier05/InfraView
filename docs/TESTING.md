@@ -30,7 +30,7 @@ cd web
 npm run e2e
 ```
 
-脚本构建独立 Compose 栈，先跑 smoke，再使用固定版本 Playwright 容器。若想在已运行服务上调试，可设置 `INFRAVIEW_E2E_BASE_URL` 后运行 `npm run e2e:run`，宿主必须自行具备 Chromium 依赖。
+脚本构建独立 Compose 栈，先跑 smoke，再使用固定版本 Playwright 容器。浏览器容器会在随 `--rm` 清理的匿名 `node_modules` 卷中执行锁文件 `npm ci`，因此不依赖或污染宿主/工作树依赖目录。若想在已运行服务上调试，可设置 `INFRAVIEW_E2E_BASE_URL` 后运行 `npm run e2e:run`，宿主必须自行具备 Chromium 依赖。
 
 ## 缓存延迟
 

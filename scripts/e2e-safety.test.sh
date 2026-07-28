@@ -28,10 +28,27 @@ printf '%s\n' \
 	'    printf "%s\n" orphan-container-id' \
 	'    exit 0' \
 	'    ;;' \
+	'  full:*" up "*) exit 0 ;;' \
 	'  *" up "*) exit 71 ;;' \
 	'  *) exit 0 ;;' \
 	'esac' >"$test_dir/bin/docker"
 chmod +x "$test_dir/bin/docker"
+
+printf '%s\n' \
+	'#!/bin/sh' \
+	'case "$*" in' \
+	'  *"--request "*) printf "%s" 404 ;;' \
+	'  *"--write-out %{http_code}"*"api/v1/session"*) printf "%s" 204 ;;' \
+	'  *"/healthz"*) printf "%s" '\''{"status":"ok"}'\'' ;;' \
+	'  *"api/v1/session"*) printf "%s" '\''{"authenticated":true}'\'' ;;' \
+	'  *"api/v1/overview"*) printf "%s" '\''{"total":1}'\'' ;;' \
+	'  *"api/v1/hosts?page"*) printf "%s" '\''{"hosts":[]}'\'' ;;' \
+	'  *"mock-host-001/metrics"*) printf "%s" '\''{"series":[]}'\'' ;;' \
+	'  *"mock-host-001"*) printf "%s" '\''{"id":"mock-host-001"}'\'' ;;' \
+	'  *"api/v1/datasource/status"*) printf "%s" '\''{"healthy":true}'\'' ;;' \
+	'  *) printf "%s" '\''<div id="root"></div>'\'' ;;' \
+	'esac' >"$test_dir/bin/curl"
+chmod +x "$test_dir/bin/curl"
 
 status=0
 PATH="$test_dir/bin:$PATH" \
@@ -120,6 +137,26 @@ while [ "$run" -le 2 ]; do
 done
 [ "$first_project" != "$second_project" ] || {
 	echo "e2e-safety: FAIL: 连续运行复用了默认项目名 $first_project" >&2
+	exit 1
+}
+
+: >"$call_log"
+status=0
+PATH="$test_dir/bin:$PATH" \
+	DOCKER_CALL_LOG="$call_log" \
+	DOCKER_SCENARIO=full \
+	INFRAVIEW_E2E_PROJECT=infraview-dependency-test \
+	"$repo_root/scripts/e2e.sh" >"$output_log" 2>&1 || status=$?
+[ "$status" -eq 0 ] || {
+	echo "e2e-safety: FAIL: 假成功场景未执行到 Playwright 容器" >&2
+	exit 1
+}
+grep -Fq -- '-v /work/web/node_modules' "$call_log" || {
+	echo "e2e-safety: FAIL: Playwright 容器未隔离 node_modules" >&2
+	exit 1
+}
+grep -Fq -- 'sh -c npm ci && npx playwright test' "$call_log" || {
+	echo "e2e-safety: FAIL: Playwright 容器未从锁文件安装依赖" >&2
 	exit 1
 }
 

@@ -128,6 +128,7 @@ docker run --rm --network host --ipc=host \
 	-e INFRAVIEW_E2E_USERNAME="$username" \
 	-e INFRAVIEW_E2E_PASSWORD="$password" \
 	-v "$repo_root:/work" \
+	-v /work/web/node_modules \
 	-w /work/web \
 	"$playwright_image" \
-	npx playwright test
+	sh -c 'npm ci && npx playwright test'
