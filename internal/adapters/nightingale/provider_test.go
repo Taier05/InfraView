@@ -155,6 +155,16 @@ func TestMapTargetRecordsSelectsCompatibleStatusTime(t *testing.T) {
 			raw:  `[{"ident":"fixture-node-01","update_at":253402300800}]`,
 			want: time.Time{},
 		},
+		{
+			name: "zero update_at stays missing",
+			raw:  `[{"ident":"fixture-node-01","update_at":0}]`,
+			want: time.Time{},
+		},
+		{
+			name: "negative update_at stays missing",
+			raw:  `[{"ident":"fixture-node-01","update_at":-1}]`,
+			want: time.Time{},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -14,6 +14,8 @@ v8.4.1 上游只读契约预检已经通过；Target 在当前环境提供 `upda
 
 当前主要真实验证版本为 v8.4.1；v9.x 保留脱敏夹具和既有协议回归，但不再声明为当前真实验证环境。`/api/n9e/versions` 可提供 v8.4.1 版本信息，InfraView 运行时不依赖该接口。认证 profile、Target 分页、默认 Prometheus 类型数据源、即时批量和区间批量接口的状态、JSON Content-Type、`dat`/`err` envelope 与外层结构已完成安全预检；没有输出 Token、认证头、响应正文、真实标识、数量或指标值。
 
+最终独立代码审查结论为 Critical 0、Important 0、Minor 2。`update_at=0` 和负数保持零时间的直接回归用例已补充；另一个 Minor 将在本轮最终验证后通过勾选实施计划 Step 7 闭环。
+
 ### 2026-07-27 Nightingale 审查修复
 
 已完成第二阶段审查阻断项修复：Provider 拒绝重定向且不转发认证信息；拒绝 `dat:null`、缺失分页字段和批量结果数失配；主机历史读取先验证主机可见性；Mock 模式隔离 Nightingale 专属校验；构造器拒绝不安全 Base URL；内存、运行时间、指标时间和 Target `beat_time` 在越界前视为缺失；Content-Type 仅接受 `application/json`。数据源发现现在同时合并成功和失败 flight，失败不缓存，后续请求可重试，等待者可独立响应 context 取消。新增固定 PromQL 白名单、未知主机 404 和完整协议/数值/并发边界测试。
