@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"math"
 	"testing"
 
 	"github.com/Taier05/InfraView/internal/mysql"
@@ -37,6 +39,20 @@ func TestMySQLSummaryMakesStoppedThreadCritical(t *testing.T) {
 	if summary.Status != LevelCritical ||
 		summary.Replication.State != ReplicationThreadsStopped {
 		t.Fatalf("instance = %#v", summary)
+	}
+}
+
+func TestMySQLSummaryPreservesMaximumLagWhenThreadStopped(t *testing.T) {
+	instance := instanceWithChannels(
+		mysql.ReplicationChannel{IORunning: boolPointer(false), SQLRunning: boolPointer(true), LagSeconds: floatPointer(2)},
+		mysql.ReplicationChannel{IORunning: boolPointer(true), SQLRunning: boolPointer(true), LagSeconds: floatPointer(11)},
+	)
+	summary := summarizeMySQLInstance(instance)
+	if summary.Replication.State != ReplicationThreadsStopped ||
+		summary.Replication.Level != LevelCritical ||
+		summary.Replication.LagSeconds == nil ||
+		*summary.Replication.LagSeconds != 11 {
+		t.Fatalf("replication = %#v", summary.Replication)
 	}
 }
 
@@ -91,6 +107,32 @@ func TestMySQLSummaryMakesIncompleteCriticalReplicationDataUnknown(t *testing.T)
 		summary.Replication.Level != LevelUnknown ||
 		summary.Status != LevelUnknown {
 		t.Fatalf("instance = %#v", summary)
+	}
+}
+
+func TestMySQLSummaryTreatsInvalidReplicationLagAsMissing(t *testing.T) {
+	tests := []struct {
+		name string
+		lag  float64
+	}{
+		{name: "negative", lag: -1},
+		{name: "nan", lag: math.NaN()},
+		{name: "positive infinity", lag: math.Inf(1)},
+		{name: "negative infinity", lag: math.Inf(-1)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			summary := summarizeMySQLInstance(readOnlyInstanceWithLag(tt.lag))
+			if summary.Replication.State != ReplicationUnknown ||
+				summary.Replication.Level != LevelUnknown ||
+				summary.Replication.LagSeconds != nil ||
+				summary.Status != LevelUnknown {
+				t.Fatalf("instance = %#v", summary)
+			}
+			if _, err := json.Marshal(summary); err != nil {
+				t.Fatalf("marshal summary: %v", err)
+			}
+		})
 	}
 }
 

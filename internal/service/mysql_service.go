@@ -1,6 +1,7 @@
 package service
 
 import (
+	"math"
 	"time"
 
 	"github.com/Taier05/InfraView/internal/cache"
@@ -68,16 +69,25 @@ func replicationSummary(role mysql.Role, channels []mysql.ReplicationChannel) My
 
 	var maximumLag *float64
 	incomplete := false
+	threadStopped := false
 	for _, channel := range channels {
 		if channel.IORunning != nil && !*channel.IORunning ||
 			channel.SQLRunning != nil && !*channel.SQLRunning {
-			return MySQLReplicationSummary{State: ReplicationThreadsStopped, Level: LevelCritical}
+			threadStopped = true
 		}
-		if channel.IORunning == nil || channel.SQLRunning == nil || channel.LagSeconds == nil {
+		validLag := validMySQLLag(channel.LagSeconds)
+		if channel.IORunning == nil || channel.SQLRunning == nil || !validLag {
 			incomplete = true
 		}
-		if channel.LagSeconds != nil && (maximumLag == nil || *channel.LagSeconds > *maximumLag) {
+		if validLag && (maximumLag == nil || *channel.LagSeconds > *maximumLag) {
 			maximumLag = cloneFloat(channel.LagSeconds)
+		}
+	}
+	if threadStopped {
+		return MySQLReplicationSummary{
+			State:      ReplicationThreadsStopped,
+			LagSeconds: maximumLag,
+			Level:      LevelCritical,
 		}
 	}
 	if maximumLag == nil {
@@ -102,6 +112,10 @@ func replicationSummary(role mysql.Role, channels []mysql.ReplicationChannel) My
 		LagSeconds: maximumLag,
 		Level:      level,
 	}
+}
+
+func validMySQLLag(value *float64) bool {
+	return value != nil && *value >= 0 && !math.IsNaN(*value) && !math.IsInf(*value, 0)
 }
 
 func mysqlHigherLevel(left, right Level) Level {
