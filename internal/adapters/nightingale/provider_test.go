@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,9 +16,228 @@ import (
 	"time"
 
 	"github.com/Taier05/InfraView/internal/datasource"
+	"github.com/Taier05/InfraView/internal/mysql"
 )
 
 const fixtureToken = "fixture-token-must-never-appear"
+
+func TestMySQLPromQLIsFixed(t *testing.T) {
+	want := []string{
+		"mysql_up",
+		"mysql_version_info",
+		"mysql_global_status_uptime",
+		"mysql_global_variables_read_only",
+		"mysql_global_status_threads_connected",
+		"mysql_global_variables_max_connections",
+		"mysql_global_status_threads_running",
+		"rate(mysql_global_status_questions[5m])",
+		"rate(mysql_global_status_slow_queries[5m])",
+		"mysql_global_status_buffer_pool_pages_utilization",
+		"mysql_slave_status_seconds_behind_master",
+		"mysql_slave_status_slave_io_running",
+		"mysql_slave_status_slave_sql_running",
+	}
+	if got := mysqlPromQL(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("mysqlPromQL() = %#v, want %#v", got, want)
+	}
+}
+
+func TestMySQLSnapshotUsesOneBatchAndMergesInstances(t *testing.T) {
+	var batchCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		assertAuthenticatedJSONRequest(t, request)
+		switch request.URL.Path {
+		case "/api/n9e/datasource/brief":
+			writeFixture(t, w, "datasource-brief.json")
+		case "/api/n9e/query-instant-batch":
+			batchCalls++
+			assertMySQLBatchRequest(t, request, mysqlPromQL())
+			writeFixture(t, w, "mysql-instant-batch.json")
+		default:
+			t.Fatalf("unexpected path %q", request.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	provider := New(Options{
+		BaseURL: server.URL, AllowInsecureHTTP: true,
+		Token: fixtureToken, HTTPClient: server.Client(), Clock: fixedClock,
+	})
+	snapshot, err := provider.MySQLSnapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if batchCalls != 1 || len(snapshot.Instances) != 3 {
+		t.Fatalf("calls = %d, snapshot = %#v", batchCalls, snapshot)
+	}
+
+	first := snapshot.Instances[0]
+	if first.ID != mysql.StableInstanceID("fixture-host-a", "fixture-mysql-a", "192.0.2.10:3306") ||
+		first.Host != "fixture-host-a" || first.Name != "fixture-mysql-a" ||
+		first.Address != "192.0.2.10:3306" || first.Version != "fixture-version-a" ||
+		first.Availability != mysql.AvailabilityUp || first.Role != mysql.RoleWritable {
+		t.Fatalf("first instance identity/status = %#v", first)
+	}
+	assertFloat(t, first.UptimeSeconds, 172800)
+	assertFloat(t, first.Connections, 24)
+	assertFloat(t, first.MaxConnections, 160)
+	assertFloat(t, first.ThreadsRunning, 4)
+	assertFloat(t, first.QPS, 32)
+	assertFloat(t, first.SlowQueriesPerSecond, 0)
+	assertFloat(t, first.BufferPoolUsagePercent, 48)
+	if len(first.ReplicationChannels) != 2 {
+		t.Fatalf("first replication channels = %#v", first.ReplicationChannels)
+	}
+	assertFloat(t, first.ReplicationChannels[0].LagSeconds, 3)
+	assertBool(t, first.ReplicationChannels[0].IORunning, true)
+	assertBool(t, first.ReplicationChannels[0].SQLRunning, true)
+	assertFloat(t, first.ReplicationChannels[1].LagSeconds, 8)
+	assertBool(t, first.ReplicationChannels[1].IORunning, true)
+	assertBool(t, first.ReplicationChannels[1].SQLRunning, false)
+
+	second := snapshot.Instances[1]
+	if second.Availability != mysql.AvailabilityDown || second.Role != mysql.RoleReadOnly ||
+		len(second.ReplicationChannels) != 1 {
+		t.Fatalf("second instance = %#v", second)
+	}
+	assertFloat(t, second.ReplicationChannels[0].LagSeconds, 12)
+	assertBool(t, second.ReplicationChannels[0].IORunning, true)
+	if second.ReplicationChannels[0].SQLRunning != nil {
+		t.Fatalf("missing SQL metric = %#v", second.ReplicationChannels[0].SQLRunning)
+	}
+
+	third := snapshot.Instances[2]
+	if third.Availability != mysql.AvailabilityUnknown || third.Role != mysql.RoleUnknown {
+		t.Fatalf("non-binary status = %#v", third)
+	}
+	for _, instance := range snapshot.Instances {
+		if instance.Host == "fixture-ghost-host" {
+			t.Fatalf("auxiliary series created ghost instance: %#v", instance)
+		}
+	}
+}
+
+func TestMySQLSnapshotRejectsInvalidBaseIdentity(t *testing.T) {
+	tests := []struct {
+		name string
+		up   []any
+	}{
+		{
+			name: "missing complete identity",
+			up: []any{mysqlFixtureSeries(map[string]string{
+				"__name__": "mysql_up", "ident": "fixture-host-a", "instance": "fixture-mysql-a",
+			}, 1785123000, "1")},
+		},
+		{
+			name: "duplicate complete identity",
+			up: []any{
+				mysqlFixtureSeries(mysqlFixtureLabels("mysql_up"), 1785123000, "1"),
+				mysqlFixtureSeries(mysqlFixtureLabels("mysql_up"), 1785123001, "1"),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			groups := make([][]any, len(mysqlPromQL()))
+			groups[0] = tt.up
+			provider, closeServer := newMySQLResponseProvider(t, groups)
+			defer closeServer()
+
+			if _, err := provider.MySQLSnapshot(context.Background()); !errors.Is(err, mysql.ErrUnavailable) {
+				t.Fatalf("MySQLSnapshot() error = %v, want mysql.ErrUnavailable", err)
+			}
+		})
+	}
+}
+
+func TestMySQLSnapshotLatestConflictsBecomeMissing(t *testing.T) {
+	groups := make([][]any, len(mysqlPromQL()))
+	labels := mysqlFixtureLabels("mysql_up")
+	groups[0] = []any{mysqlFixtureSeries(labels, 1785123000, "1")}
+	groups[1] = []any{
+		mysqlFixtureSeries(mysqlVersionLabels("fixture-version-a"), 1785123000, "1"),
+		mysqlFixtureSeries(mysqlVersionLabels("fixture-version-b"), 1785123000, "1"),
+	}
+	groups[2] = []any{
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_status_uptime"), 1785122900, "10"),
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_status_uptime"), 1785123000, "20"),
+	}
+	groups[4] = []any{
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_status_threads_connected"), 1785123000, "24"),
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_status_threads_connected"), 1785123000, "25"),
+	}
+	groups[10] = []any{
+		mysqlFixtureSeries(mysqlReplicationLabels("mysql_slave_status_seconds_behind_master"), 1785123000, "3"),
+		mysqlFixtureSeries(mysqlReplicationLabels("mysql_slave_status_seconds_behind_master"), 1785123000, "4"),
+	}
+
+	provider, closeServer := newMySQLResponseProvider(t, groups)
+	defer closeServer()
+	snapshot, err := provider.MySQLSnapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Instances) != 1 {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+	instance := snapshot.Instances[0]
+	if instance.Version != "" || instance.Connections != nil {
+		t.Fatalf("same-time conflicts survived: %#v", instance)
+	}
+	assertFloat(t, instance.UptimeSeconds, 20)
+	if len(instance.ReplicationChannels) != 1 || instance.ReplicationChannels[0].LagSeconds != nil {
+		t.Fatalf("replication conflict = %#v", instance.ReplicationChannels)
+	}
+}
+
+func TestMySQLIdentityRequiresCompleteTuple(t *testing.T) {
+	labels := mysqlFixtureLabels("mysql_up")
+	host, name, address, key, ok := mysqlIdentity(labels)
+	if !ok || host != "fixture-host-a" || name != "fixture-mysql-a" ||
+		address != "192.0.2.10:3306" ||
+		key != "fixture-host-a\x00fixture-mysql-a\x00192.0.2.10:3306" {
+		t.Fatalf("mysqlIdentity() = %q, %q, %q, %q, %v", host, name, address, key, ok)
+	}
+	delete(labels, "address")
+	if _, _, _, _, ok := mysqlIdentity(labels); ok {
+		t.Fatal("mysqlIdentity() accepted an incomplete tuple")
+	}
+}
+
+func TestMySQLBinaryAcceptsOnlyZeroAndOne(t *testing.T) {
+	for _, tt := range []struct {
+		value string
+		want  bool
+		ok    bool
+	}{
+		{value: "0", want: false, ok: true},
+		{value: "1", want: true, ok: true},
+		{value: "2", ok: false},
+		{value: "NaN", ok: false},
+	} {
+		got, timestamp, ok := mysqlBinary(mysqlInstantSeries(mysqlFixtureLabels("mysql_up"), 1785123000, tt.value))
+		if ok != tt.ok || !timestamp.Equal(time.Unix(1785123000, 0).UTC()) && tt.ok {
+			t.Fatalf("mysqlBinary(%q) = %#v, %s, %v", tt.value, got, timestamp, ok)
+		}
+		if ok && (got == nil || *got != tt.want) {
+			t.Fatalf("mysqlBinary(%q) = %#v, want %v", tt.value, got, tt.want)
+		}
+	}
+}
+
+func TestMergeMySQLScalarSelectsLatestAndClearsTies(t *testing.T) {
+	var target *float64
+	var timestamp time.Time
+	mergeMySQLScalar(&target, &timestamp, mysqlInstantSeries(nil, 1785122900, "10"))
+	mergeMySQLScalar(&target, &timestamp, mysqlInstantSeries(nil, 1785123000, "20"))
+	assertFloat(t, target, 20)
+	mergeMySQLScalar(&target, &timestamp, mysqlInstantSeries(nil, 1785123000, "21"))
+	if target != nil {
+		t.Fatalf("same-time conflict = %#v", target)
+	}
+	mergeMySQLScalar(&target, &timestamp, mysqlInstantSeries(nil, 1785123100, "30"))
+	assertFloat(t, target, 30)
+}
 
 func TestListHostsPaginatesMapsAssetsAndAvoidsNPlusOne(t *testing.T) {
 	var mu sync.Mutex
@@ -1211,6 +1431,81 @@ func assertAuthenticatedJSONRequest(t *testing.T, request *http.Request) {
 	}
 }
 
+func assertMySQLBatchRequest(t *testing.T, request *http.Request, want []string) {
+	t.Helper()
+	if request.Method != http.MethodPost {
+		t.Fatalf("MySQL batch method = %s, want POST", request.Method)
+	}
+	var body batchRequest
+	decodeRequest(t, request, &body)
+	if body.DatasourceID != 7 || len(body.Queries) != len(want) {
+		t.Fatalf("MySQL batch = %#v", body)
+	}
+	for index, query := range body.Queries {
+		if query.Query != want[index] || query.Time != fixedClock().Unix() {
+			t.Fatalf("MySQL query %d = %#v, want %q at %d", index, query, want[index], fixedClock().Unix())
+		}
+	}
+}
+
+func newMySQLResponseProvider(t *testing.T, groups [][]any) (*Provider, func()) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		assertAuthenticatedJSONRequest(t, request)
+		switch request.URL.Path {
+		case "/api/n9e/datasource/brief":
+			writeFixture(t, w, "datasource-brief.json")
+		case "/api/n9e/query-instant-batch":
+			assertMySQLBatchRequest(t, request, mysqlPromQL())
+			writeEnvelope(t, w, groups)
+		default:
+			t.Fatalf("unexpected path %q", request.URL.Path)
+		}
+	}))
+	provider := New(Options{
+		BaseURL: server.URL, AllowInsecureHTTP: true,
+		Token: fixtureToken, HTTPClient: server.Client(), Clock: fixedClock,
+	})
+	return provider, server.Close
+}
+
+func mysqlFixtureLabels(metric string) map[string]string {
+	return map[string]string{
+		"__name__": metric,
+		"ident":    "fixture-host-a",
+		"instance": "fixture-mysql-a",
+		"address":  "192.0.2.10:3306",
+	}
+}
+
+func mysqlVersionLabels(version string) map[string]string {
+	labels := mysqlFixtureLabels("mysql_version_info")
+	labels["version"] = version
+	return labels
+}
+
+func mysqlReplicationLabels(metric string) map[string]string {
+	labels := mysqlFixtureLabels(metric)
+	labels["channel_name"] = "fixture-channel-a"
+	labels["master_host"] = "fixture-source-a"
+	labels["master_uuid"] = "00000000-0000-4000-8000-000000000001"
+	return labels
+}
+
+func mysqlFixtureSeries(labels map[string]string, timestamp int64, value string) map[string]any {
+	return map[string]any{"metric": labels, "value": []any{timestamp, value}}
+}
+
+func mysqlInstantSeries(labels map[string]string, timestamp int64, value string) instantSeries {
+	return instantSeries{
+		Metric: labels,
+		Value: []json.RawMessage{
+			json.RawMessage(strconv.FormatInt(timestamp, 10)),
+			json.RawMessage(strconv.Quote(value)),
+		},
+	}
+}
+
 func decodeRequest(t *testing.T, request *http.Request, target any) {
 	t.Helper()
 	defer request.Body.Close()
@@ -1242,6 +1537,13 @@ func fixedClock() time.Time {
 }
 
 func assertFloat(t *testing.T, value *float64, want float64) {
+	t.Helper()
+	if value == nil || *value != want {
+		t.Fatalf("value = %#v, want %v", value, want)
+	}
+}
+
+func assertBool(t *testing.T, value *bool, want bool) {
 	t.Helper()
 	if value == nil || *value != want {
 		t.Fatalf("value = %#v, want %v", value, want)

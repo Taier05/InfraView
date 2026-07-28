@@ -1,0 +1,356 @@
+{
+  "dat": [
+    [
+      {
+        "metric": {
+          "__name__": "mysql_up",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306"
+        },
+        "value": [1785123000, "1"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_up",
+          "ident": "fixture-host-b",
+          "instance": "fixture-mysql-b",
+          "address": "192.0.2.11:3306"
+        },
+        "value": [1785123000, "0"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_up",
+          "ident": "fixture-host-c",
+          "instance": "fixture-mysql-c",
+          "address": "192.0.2.12:3306"
+        },
+        "value": [1785123000, "2"]
+      }
+    ],
+    [
+      {
+        "metric": {
+          "__name__": "mysql_version_info",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306",
+          "version": "fixture-version-old"
+        },
+        "value": [1785122900, "1"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_version_info",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306",
+          "version": "fixture-version-a"
+        },
+        "value": [1785123000, "1"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_version_info",
+          "ident": "fixture-host-b",
+          "instance": "fixture-mysql-b",
+          "address": "192.0.2.11:3306",
+          "version": "fixture-version-b"
+        },
+        "value": [1785123000, "1"]
+      }
+    ],
+    [
+      {
+        "metric": {
+          "__name__": "mysql_global_status_uptime",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306"
+        },
+        "value": [1785123000, "172800"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_global_status_uptime",
+          "ident": "fixture-host-b",
+          "instance": "fixture-mysql-b",
+          "address": "192.0.2.11:3306"
+        },
+        "value": [1785123000, "86400"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_global_status_uptime",
+          "ident": "fixture-ghost-host",
+          "instance": "fixture-ghost-mysql",
+          "address": "192.0.2.200:3306"
+        },
+        "value": [1785123000, "999999"]
+      }
+    ],
+    [
+      {
+        "metric": {
+          "__name__": "mysql_global_variables_read_only",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306"
+        },
+        "value": [1785123000, "0"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_global_variables_read_only",
+          "ident": "fixture-host-b",
+          "instance": "fixture-mysql-b",
+          "address": "192.0.2.11:3306"
+        },
+        "value": [1785123000, "1"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_global_variables_read_only",
+          "ident": "fixture-host-c",
+          "instance": "fixture-mysql-c",
+          "address": "192.0.2.12:3306"
+        },
+        "value": [1785123000, "2"]
+      }
+    ],
+    [
+      {
+        "metric": {
+          "__name__": "mysql_global_status_threads_connected",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306"
+        },
+        "value": [1785122900, "20"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_global_status_threads_connected",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306"
+        },
+        "value": [1785123000, "24"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_global_status_threads_connected",
+          "ident": "fixture-host-b",
+          "instance": "fixture-mysql-b",
+          "address": "192.0.2.11:3306"
+        },
+        "value": [1785123000, "12"]
+      }
+    ],
+    [
+      {
+        "metric": {
+          "__name__": "mysql_global_variables_max_connections",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306"
+        },
+        "value": [1785123000, "160"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_global_variables_max_connections",
+          "ident": "fixture-host-b",
+          "instance": "fixture-mysql-b",
+          "address": "192.0.2.11:3306"
+        },
+        "value": [1785123000, "200"]
+      }
+    ],
+    [
+      {
+        "metric": {
+          "__name__": "mysql_global_status_threads_running",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306"
+        },
+        "value": [1785123000, "4"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_global_status_threads_running",
+          "ident": "fixture-host-b",
+          "instance": "fixture-mysql-b",
+          "address": "192.0.2.11:3306"
+        },
+        "value": [1785123000, "2"]
+      }
+    ],
+    [
+      {
+        "metric": {
+          "__name__": "mysql_global_status_questions",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306"
+        },
+        "value": [1785123000, "32"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_global_status_questions",
+          "ident": "fixture-host-b",
+          "instance": "fixture-mysql-b",
+          "address": "192.0.2.11:3306"
+        },
+        "value": [1785123000, "16"]
+      }
+    ],
+    [
+      {
+        "metric": {
+          "__name__": "mysql_global_status_slow_queries",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306"
+        },
+        "value": [1785123000, "0"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_global_status_slow_queries",
+          "ident": "fixture-host-b",
+          "instance": "fixture-mysql-b",
+          "address": "192.0.2.11:3306"
+        },
+        "value": [1785123000, "0.5"]
+      }
+    ],
+    [
+      {
+        "metric": {
+          "__name__": "mysql_global_status_buffer_pool_pages_utilization",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306"
+        },
+        "value": [1785123000, "48"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_global_status_buffer_pool_pages_utilization",
+          "ident": "fixture-host-b",
+          "instance": "fixture-mysql-b",
+          "address": "192.0.2.11:3306"
+        },
+        "value": [1785123000, "55"]
+      }
+    ],
+    [
+      {
+        "metric": {
+          "__name__": "mysql_slave_status_seconds_behind_master",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306",
+          "channel_name": "fixture-channel-a",
+          "master_host": "fixture-source-a",
+          "master_uuid": "00000000-0000-4000-8000-000000000001"
+        },
+        "value": [1785123000, "3"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_slave_status_seconds_behind_master",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306",
+          "channel_name": "fixture-channel-a",
+          "master_host": "fixture-source-b",
+          "master_uuid": "00000000-0000-4000-8000-000000000002"
+        },
+        "value": [1785123000, "8"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_slave_status_seconds_behind_master",
+          "ident": "fixture-host-b",
+          "instance": "fixture-mysql-b",
+          "address": "192.0.2.11:3306",
+          "channel_name": "fixture-channel-b",
+          "master_host": "fixture-source-c",
+          "master_uuid": "00000000-0000-4000-8000-000000000003"
+        },
+        "value": [1785123000, "12"]
+      }
+    ],
+    [
+      {
+        "metric": {
+          "__name__": "mysql_slave_status_slave_io_running",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306",
+          "channel_name": "fixture-channel-a",
+          "master_host": "fixture-source-a",
+          "master_uuid": "00000000-0000-4000-8000-000000000001"
+        },
+        "value": [1785123000, "1"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_slave_status_slave_io_running",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306",
+          "channel_name": "fixture-channel-a",
+          "master_host": "fixture-source-b",
+          "master_uuid": "00000000-0000-4000-8000-000000000002"
+        },
+        "value": [1785123000, "1"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_slave_status_slave_io_running",
+          "ident": "fixture-host-b",
+          "instance": "fixture-mysql-b",
+          "address": "192.0.2.11:3306",
+          "channel_name": "fixture-channel-b",
+          "master_host": "fixture-source-c",
+          "master_uuid": "00000000-0000-4000-8000-000000000003"
+        },
+        "value": [1785123000, "1"]
+      }
+    ],
+    [
+      {
+        "metric": {
+          "__name__": "mysql_slave_status_slave_sql_running",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306",
+          "channel_name": "fixture-channel-a",
+          "master_host": "fixture-source-a",
+          "master_uuid": "00000000-0000-4000-8000-000000000001"
+        },
+        "value": [1785123000, "1"]
+      },
+      {
+        "metric": {
+          "__name__": "mysql_slave_status_slave_sql_running",
+          "ident": "fixture-host-a",
+          "instance": "fixture-mysql-a",
+          "address": "192.0.2.10:3306",
+          "channel_name": "fixture-channel-a",
+          "master_host": "fixture-source-b",
+          "master_uuid": "00000000-0000-4000-8000-000000000002"
+        },
+        "value": [1785123000, "0"]
+      }
+    ]
+  ],
+  "err": "",
+  "request_id": "fixture-mysql-batch"
+}

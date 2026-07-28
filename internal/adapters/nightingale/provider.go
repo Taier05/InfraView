@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Taier05/InfraView/internal/datasource"
+	"github.com/Taier05/InfraView/internal/mysql"
 )
 
 const (
@@ -45,7 +46,7 @@ type Provider struct {
 	datasourceFly *datasourceDiscovery
 }
 
-func New(option Options) datasource.Provider {
+func New(option Options) *Provider {
 	provider := &Provider{configErr: datasource.ErrNotConfigured}
 	baseURL, err := url.Parse(strings.TrimSpace(option.BaseURL))
 	if err != nil || !baseURL.IsAbs() || (baseURL.Scheme != "http" && baseURL.Scheme != "https") || baseURL.Host == "" || baseURL.User != nil || baseURL.RawQuery != "" || baseURL.Fragment != "" || strings.TrimSpace(option.Token) == "" {
@@ -459,6 +460,7 @@ func unavailableError() error {
 }
 
 var _ datasource.Provider = (*Provider)(nil)
+var _ mysql.Provider = (*Provider)(nil)
 
 func sortDatasourceRecords(records []datasourceRecord) {
 	sort.Slice(records, func(i, j int) bool {
