@@ -14,7 +14,7 @@ v8.4.1 上游只读契约预检已经通过；Target 在当前环境提供 `upda
 
 当前主要真实验证版本为 v8.4.1；v9.x 保留脱敏夹具和既有协议回归，但不再声明为当前真实验证环境。`/api/n9e/versions` 可提供 v8.4.1 版本信息，InfraView 运行时不依赖该接口。认证 profile、Target 分页、默认 Prometheus 类型数据源、即时批量和区间批量接口的状态、JSON Content-Type、`dat`/`err` envelope 与外层结构已完成安全预检；没有输出 Token、认证头、响应正文、真实标识、数量或指标值。
 
-最终独立代码审查结论为 Critical 0、Important 0、Minor 2。`update_at=0` 和负数保持零时间的直接回归用例已补充；另一个 Minor 将在本轮最终验证后通过勾选实施计划 Step 7 闭环。
+最终独立代码审查结论为 Critical 0、Important 0、Minor 2，两个 Minor 均已处理：补充 `update_at=0` 和负数保持零时间的直接回归用例，并在最终验证后勾选实施计划 Step 7。
 
 ### 2026-07-27 Nightingale 审查修复
 

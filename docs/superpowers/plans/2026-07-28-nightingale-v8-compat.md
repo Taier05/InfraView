@@ -424,7 +424,7 @@ git diff --cached --check
 git commit -m "docs: 记录 Nightingale v8.4.1 真实验证"
 ```
 
-- [ ] **Step 7: 最终分支核验**
+- [x] **Step 7: 最终分支核验**
 
 ```bash
 git status --short
