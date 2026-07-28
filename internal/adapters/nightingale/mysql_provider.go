@@ -140,17 +140,39 @@ func mysqlBinary(series instantSeries) (*bool, time.Time, bool) {
 
 func mergeMySQLScalar(target **float64, targetTime *time.Time, candidate instantSeries) {
 	value, timestamp, ok := parseInstantValue(candidate.Value)
-	if !ok || timestamp.Before(*targetTime) {
+	if !ok {
 		return
 	}
-	if timestamp.After(*targetTime) || targetTime.IsZero() && *target == nil {
-		*target = &value
-		*targetTime = timestamp
-		return
-	}
-	if *target != nil && **target != value {
+	if newestMySQLValue(target, targetTime, value, timestamp) && !nonNegative(value) {
 		*target = nil
 	}
+}
+
+func nonNegative(value float64) bool {
+	return value >= 0
+}
+
+func percentage(value float64) bool {
+	return nonNegative(value) && value <= 100
+}
+
+func newestMySQLValue(current **float64, currentAt *time.Time, candidate float64, candidateAt time.Time) bool {
+	if candidateAt.Before(*currentAt) {
+		return false
+	}
+	if candidateAt.After(*currentAt) || currentAt.IsZero() && *current == nil {
+		*current = &candidate
+		*currentAt = candidateAt
+		return true
+	}
+	if *current == nil {
+		return false
+	}
+	if **current != candidate {
+		*current = nil
+		return false
+	}
+	return true
 }
 
 func mergeMySQLScalars(states map[string]*mysqlInstanceState, results [][]instantSeries) {
@@ -170,6 +192,9 @@ func mergeMySQLScalars(states map[string]*mysqlInstanceState, results [][]instan
 			}
 			scalar := &state.scalars[scalarIndex]
 			mergeMySQLScalar(&scalar.value, &scalar.timestamp, series)
+			if scalarIndex == mysqlBufferPoolUsage && scalar.value != nil && !percentage(*scalar.value) {
+				scalar.value = nil
+			}
 		}
 	}
 }

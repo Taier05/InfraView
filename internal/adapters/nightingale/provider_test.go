@@ -239,6 +239,118 @@ func TestMergeMySQLScalarSelectsLatestAndClearsTies(t *testing.T) {
 	assertFloat(t, target, 30)
 }
 
+func TestMySQLSnapshotEnforcesIdentityAndBatchShape(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func([][]instantSeries) [][]instantSeries
+		wantErr bool
+		empty   bool
+	}{
+		{name: "missing identity", wantErr: true, mutate: func(result [][]instantSeries) [][]instantSeries {
+			delete(result[0][0].Metric, "ident")
+			return result
+		}},
+		{name: "duplicate full identity", wantErr: true, mutate: func(result [][]instantSeries) [][]instantSeries {
+			result[0] = append(result[0], result[0][0])
+			return result
+		}},
+		{name: "wrong outer cardinality", wantErr: true, mutate: func(result [][]instantSeries) [][]instantSeries {
+			return result[:len(result)-1]
+		}},
+		{name: "successful empty up vector", empty: true, mutate: func(result [][]instantSeries) [][]instantSeries {
+			result[0] = []instantSeries{}
+			return result
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			snapshot, err := runMySQLBatch(t, tt.mutate(mysqlBatchResultsFixture()))
+			if tt.wantErr != errors.Is(err, mysql.ErrUnavailable) {
+				t.Fatalf("error = %v, want unavailable=%v", err, tt.wantErr)
+			}
+			if tt.empty && (err != nil || len(snapshot.Instances) != 0) {
+				t.Fatalf("snapshot = %#v, err = %v", snapshot, err)
+			}
+		})
+	}
+}
+
+func TestMySQLSnapshotNormalizesValuesAndConflicts(t *testing.T) {
+	result := mysqlBatchResultsFixture()
+	result[0][0].Value = rawInstantValue(1785200000, "2")
+	result[2][0].Value = rawInstantValue(1785200000, "-1")
+	result[7][0].Value = rawInstantValue(1785200000, "-1")
+	result[9][0].Value = rawInstantValue(1785200000, "101")
+	result[4] = append(result[4],
+		instantSeries{Metric: cloneLabels(result[4][0].Metric), Value: rawInstantValue(1785200100, "20")},
+		instantSeries{Metric: cloneLabels(result[4][0].Metric), Value: rawInstantValue(1785200100, "21")},
+	)
+	snapshot, err := runMySQLBatch(t, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance := snapshot.Instances[0]
+	if instance.Availability != mysql.AvailabilityUnknown ||
+		instance.UptimeSeconds != nil ||
+		instance.QPS != nil ||
+		instance.BufferPoolUsagePercent != nil ||
+		instance.Connections != nil {
+		t.Fatalf("instance = %#v", instance)
+	}
+}
+
+func TestMySQLSnapshotKeepsReplicationChannelsSeparateAndSelectsNewestValue(t *testing.T) {
+	result := mysqlBatchResultsFixture()
+	result[4] = append(result[4], instantSeries{
+		Metric: cloneLabels(result[4][0].Metric),
+		Value:  rawInstantValue(1785200100, "22"),
+	})
+	addSecondFixtureReplicationChannel(result)
+	snapshot, err := runMySQLBatch(t, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance := snapshot.Instances[0]
+	if instance.Connections == nil || *instance.Connections != 22 ||
+		len(instance.ReplicationChannels) != 2 {
+		t.Fatalf("instance = %#v", instance)
+	}
+}
+
+func TestMySQLSnapshotErrorDoesNotExposeTokenBodyLabelsOrQueries(t *testing.T) {
+	provider := providerReturningMySQLHTTPError(t, "fixture-secret-token", "fixture-mysql-sensitive")
+	_, err := provider.MySQLSnapshot(context.Background())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, forbidden := range []string{
+		"fixture-secret-token", "fixture-mysql-sensitive", "mysql_up", "<html>",
+		"https://fixture-mysql.invalid/upstream",
+	} {
+		if strings.Contains(err.Error(), forbidden) {
+			t.Fatalf("error leaked %q", forbidden)
+		}
+	}
+	if !errors.Is(err, mysql.ErrUnavailable) {
+		t.Fatalf("error = %v, want mysql.ErrUnavailable", err)
+	}
+}
+
+func TestMySQLSnapshotUsesOnlyDiscoveryAndOneInstantBatch(t *testing.T) {
+	var paths []string
+	provider := providerRecordingMySQLPaths(t, &paths, mysqlBatchResultsFixture())
+	if _, err := provider.MySQLSnapshot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"/api/n9e/datasource/brief",
+		"/api/n9e/query-instant-batch",
+	}
+	if !reflect.DeepEqual(paths, want) {
+		t.Fatalf("paths = %#v, want %#v", paths, want)
+	}
+}
+
 func TestListHostsPaginatesMapsAssetsAndAvoidsNPlusOne(t *testing.T) {
 	var mu sync.Mutex
 	calls := map[string]int{}
@@ -1504,6 +1616,131 @@ func mysqlInstantSeries(labels map[string]string, timestamp int64, value string)
 			json.RawMessage(strconv.Quote(value)),
 		},
 	}
+}
+
+func runMySQLBatch(t *testing.T, groups [][]instantSeries) (mysql.Snapshot, error) {
+	t.Helper()
+	provider, closeServer := newMySQLInstantSeriesProvider(t, groups, nil)
+	defer closeServer()
+	return provider.MySQLSnapshot(context.Background())
+}
+
+func mysqlBatchResultsFixture() [][]instantSeries {
+	metricValues := []struct {
+		metric string
+		value  string
+	}{
+		{metric: "mysql_up", value: "1"},
+		{metric: "mysql_version_info", value: "1"},
+		{metric: "mysql_global_status_uptime", value: "3600"},
+		{metric: "mysql_global_variables_read_only", value: "0"},
+		{metric: "mysql_global_status_threads_connected", value: "12"},
+		{metric: "mysql_global_variables_max_connections", value: "200"},
+		{metric: "mysql_global_status_threads_running", value: "3"},
+		{metric: "mysql_global_status_questions", value: "18"},
+		{metric: "mysql_global_status_slow_queries", value: "0.5"},
+		{metric: "mysql_global_status_buffer_pool_pages_utilization", value: "42"},
+	}
+	result := make([][]instantSeries, len(mysqlPromQL()))
+	for index, item := range metricValues {
+		labels := mysqlFixtureLabels(item.metric)
+		if index == 1 {
+			labels["version"] = "fixture-version-a"
+		}
+		result[index] = []instantSeries{{
+			Metric: labels,
+			Value:  rawInstantValue(1785200000, item.value),
+		}}
+	}
+	for index, item := range []struct {
+		metric string
+		value  string
+	}{
+		{metric: "mysql_slave_status_seconds_behind_master", value: "2"},
+		{metric: "mysql_slave_status_slave_io_running", value: "1"},
+		{metric: "mysql_slave_status_slave_sql_running", value: "1"},
+	} {
+		result[index+10] = []instantSeries{{
+			Metric: mysqlReplicationLabels(item.metric),
+			Value:  rawInstantValue(1785200000, item.value),
+		}}
+	}
+	return result
+}
+
+func addSecondFixtureReplicationChannel(result [][]instantSeries) {
+	for queryIndex := 10; queryIndex <= 12; queryIndex++ {
+		labels := cloneLabels(result[queryIndex][0].Metric)
+		labels["channel_name"] = "fixture-channel-b"
+		labels["master_host"] = "fixture-source-b"
+		labels["master_uuid"] = "00000000-0000-4000-8000-000000000002"
+		result[queryIndex] = append(result[queryIndex], instantSeries{
+			Metric: labels,
+			Value:  rawInstantValue(1785200000, "1"),
+		})
+	}
+}
+
+func providerReturningMySQLHTTPError(t *testing.T, token, sensitive string) *Provider {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = io.WriteString(w, "<html>"+sensitive+" mysql_up https://fixture-mysql.invalid/upstream</html>")
+	}))
+	t.Cleanup(server.Close)
+	return New(Options{
+		BaseURL: server.URL, AllowInsecureHTTP: true,
+		Token: token, HTTPClient: server.Client(), Clock: fixedClock,
+	})
+}
+
+func providerRecordingMySQLPaths(t *testing.T, paths *[]string, groups [][]instantSeries) *Provider {
+	t.Helper()
+	provider, closeServer := newMySQLInstantSeriesProvider(t, groups, paths)
+	t.Cleanup(closeServer)
+	return provider
+}
+
+func newMySQLInstantSeriesProvider(t *testing.T, groups [][]instantSeries, paths *[]string) (*Provider, func()) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		assertAuthenticatedJSONRequest(t, request)
+		if paths != nil {
+			*paths = append(*paths, request.URL.Path)
+		}
+		switch request.URL.Path {
+		case "/api/n9e/datasource/brief":
+			writeEnvelope(t, w, []datasourceRecord{{
+				ID: 7, PluginType: "prometheus", IsDefault: true,
+			}})
+		case "/api/n9e/query-instant-batch":
+			assertMySQLBatchRequest(t, request, mysqlPromQL())
+			writeEnvelope(t, w, groups)
+		default:
+			t.Fatalf("unexpected path %q", request.URL.Path)
+		}
+	}))
+	provider := New(Options{
+		BaseURL: server.URL, AllowInsecureHTTP: true,
+		Token: fixtureToken, HTTPClient: server.Client(), Clock: fixedClock,
+	})
+	return provider, server.Close
+}
+
+func rawInstantValue(timestamp int64, value string) []json.RawMessage {
+	return []json.RawMessage{
+		json.RawMessage(strconv.FormatInt(timestamp, 10)),
+		json.RawMessage(strconv.Quote(value)),
+	}
+}
+
+func cloneLabels(labels map[string]string) map[string]string {
+	cloned := make(map[string]string, len(labels))
+	for key, value := range labels {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 func decodeRequest(t *testing.T, request *http.Request, target any) {
