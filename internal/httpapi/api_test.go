@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -22,6 +23,7 @@ import (
 	"github.com/Taier05/InfraView/internal/cache"
 	"github.com/Taier05/InfraView/internal/config"
 	"github.com/Taier05/InfraView/internal/datasource"
+	"github.com/Taier05/InfraView/internal/mysql"
 	"github.com/Taier05/InfraView/internal/service"
 )
 
@@ -55,6 +57,112 @@ func TestProtectedRoutesRequireAuthentication(t *testing.T) {
 				t.Fatalf("Cache-Control = %q", response.Header().Get("Cache-Control"))
 			}
 		})
+	}
+}
+
+func TestMySQLRoutesRequireAuthentication(t *testing.T) {
+	handler, _ := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
+	for _, path := range []string{"/api/v1/mysql/overview", "/api/v1/mysql/instances"} {
+		response := request(t, handler, http.MethodGet, path, "", nil)
+		if response.Code != http.StatusUnauthorized {
+			t.Fatalf("%s status = %d", path, response.Code)
+		}
+	}
+}
+
+func TestMySQLOverviewAndInstancesReturnReadOnlyViews(t *testing.T) {
+	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
+	overview := request(t, handler, http.MethodGet, "/api/v1/mysql/overview", "", sessionCookie)
+	if overview.Code != http.StatusOK ||
+		!jsonPathIsNumber(t, overview.Body.Bytes(), "data.total") ||
+		!jsonPathIsObject(t, overview.Body.Bytes(), "data.alerts.replication_lag") {
+		t.Fatal("invalid overview response")
+	}
+	instances := request(t, handler, http.MethodGet, "/api/v1/mysql/instances?page=1&page_size=20", "", sessionCookie)
+	if instances.Code != http.StatusOK ||
+		!jsonPathIsArray(t, instances.Body.Bytes(), "data.instances") ||
+		!jsonPathAllowsNull(t, instances.Body.Bytes(), "data.instances.0.qps") {
+		t.Fatal("invalid instances response")
+	}
+}
+
+func TestMySQLRoutesRejectMutationMethods(t *testing.T) {
+	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		for _, path := range []string{"/api/v1/mysql/overview", "/api/v1/mysql/instances"} {
+			response := request(t, handler, method, path, "", sessionCookie)
+			if response.Code != http.StatusMethodNotAllowed || response.Header().Get("Allow") != http.MethodGet {
+				t.Fatalf("%s %s status=%d allow=%q", method, path, response.Code, response.Header().Get("Allow"))
+			}
+		}
+	}
+}
+
+func TestMySQLOverviewRejectsQueryParameters(t *testing.T) {
+	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
+	response := request(t, handler, http.MethodGet, "/api/v1/mysql/overview?search=fixture", "", sessionCookie)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d", response.Code)
+	}
+}
+
+func TestMySQLInstancesRejectsUnknownOrRepeatedQueryParameters(t *testing.T) {
+	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
+	for _, query := range []string{
+		"?unknown=value",
+		"?status=normal&status=warning",
+		"?role=primary",
+		"?sort=raw_promql",
+		"?page_size=10",
+	} {
+		response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances"+query, "", sessionCookie)
+		if response.Code != http.StatusBadRequest {
+			t.Fatalf("query %q status = %d", query, response.Code)
+		}
+	}
+}
+
+func TestMySQLInstancesRejectsMalformedOrEmptyPaginationParameters(t *testing.T) {
+	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
+	for _, query := range []string{
+		"?page=",
+		"?page_size=",
+		"?search=fixture;sort=instance",
+	} {
+		response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances"+query, "", sessionCookie)
+		if response.Code != http.StatusBadRequest {
+			t.Fatalf("query %q status = %d", query, response.Code)
+		}
+	}
+
+	response := requestWithRawQuery(t, handler, sessionCookie, "/api/v1/mysql/instances", "unknown=%ZZ")
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("malformed escape status = %d", response.Code)
+	}
+}
+
+func TestMySQLInstancesMapsUnavailableToSafe503(t *testing.T) {
+	handler, sessionCookie := newMySQLAPIErrorHandler(t, mysql.ErrUnavailable)
+	response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances", "", sessionCookie)
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d", response.Code)
+	}
+	body := response.Body.String()
+	for _, forbidden := range []string{"mysql_up", "fixture-token", "dat", "err"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("safe error leaked %q", forbidden)
+		}
+	}
+}
+
+func TestMySQLRoutesFailSafelyWithoutService(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	sessionCookie := loginCookie(t, handler)
+	for _, path := range []string{"/api/v1/mysql/overview", "/api/v1/mysql/instances"} {
+		response := request(t, handler, http.MethodGet, path, "", sessionCookie)
+		if response.Code != http.StatusServiceUnavailable {
+			t.Fatalf("%s status = %d", path, response.Code)
+		}
 	}
 }
 
@@ -545,6 +653,125 @@ func newTestAPI(t *testing.T, provider datasource.Provider) http.Handler {
 	return newTestAPIAt(t, provider, testNow)
 }
 
+func newMySQLAPITestHandler(t *testing.T, snapshot mysql.Snapshot) (http.Handler, *http.Cookie) {
+	t.Helper()
+	return newMySQLAPIProviderTestHandler(t, &mysqlSnapshotProvider{snapshot: snapshot})
+}
+
+func newMySQLAPIErrorHandler(t *testing.T, err error) (http.Handler, *http.Cookie) {
+	t.Helper()
+	return newMySQLAPIProviderTestHandler(t, &mysqlSnapshotProvider{
+		err: errors.Join(err, errors.New("mysql_up fixture-token dat err")),
+	})
+}
+
+func newMySQLAPIProviderTestHandler(t *testing.T, provider mysql.Provider) (http.Handler, *http.Cookie) {
+	t.Helper()
+	cfg := config.Config{
+		Username:          "admin",
+		Password:          "correct-password",
+		SessionTTL:        12 * time.Hour,
+		DataSource:        "mock",
+		InventoryTTL:      time.Minute,
+		CurrentMetricsTTL: 20 * time.Second,
+		RangeTTL:          time.Minute,
+		HealthTTL:         15 * time.Second,
+		MaxStale:          5 * time.Minute,
+		WarningPercent:    80,
+		CriticalPercent:   90,
+	}
+	store := cache.New(testNow)
+	handler := New(Dependencies{
+		Config:  cfg,
+		Auth:    auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, testNow),
+		Limiter: auth.NewLimiter(5, time.Minute, testNow),
+		Service: service.New(mock.New(3, testNow), store, service.Options{
+			InventoryTTL:      cfg.InventoryTTL,
+			CurrentMetricsTTL: cfg.CurrentMetricsTTL,
+			RangeTTL:          cfg.RangeTTL,
+			HealthTTL:         cfg.HealthTTL,
+			MaxStale:          cfg.MaxStale,
+			WarningPercent:    cfg.WarningPercent,
+			CriticalPercent:   cfg.CriticalPercent,
+			Clock:             testNow,
+		}),
+		MySQLService: service.NewMySQL(provider, store, service.MySQLOptions{
+			CurrentMetricsTTL: cfg.CurrentMetricsTTL,
+			MaxStale:          cfg.MaxStale,
+			Clock:             testNow,
+		}),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	return handler, loginCookie(t, handler)
+}
+
+func fixtureMySQLSnapshot() mysql.Snapshot {
+	return mysql.Snapshot{Instances: []mysql.Instance{{
+		ID:           mysql.StableInstanceID("fixture-host-a", "fixture-mysql-a", "192.0.2.10:3306"),
+		Name:         "fixture-mysql-a",
+		Address:      "192.0.2.10:3306",
+		Host:         "fixture-host-a",
+		Version:      "8.4.0",
+		Availability: mysql.AvailabilityUp,
+		Role:         mysql.RoleWritable,
+	}}}
+}
+
+func jsonPathIsNumber(t *testing.T, body []byte, path string) bool {
+	t.Helper()
+	_, ok := jsonPathValue(t, body, path).(float64)
+	return ok
+}
+
+func jsonPathIsObject(t *testing.T, body []byte, path string) bool {
+	t.Helper()
+	_, ok := jsonPathValue(t, body, path).(map[string]any)
+	return ok
+}
+
+func jsonPathIsArray(t *testing.T, body []byte, path string) bool {
+	t.Helper()
+	_, ok := jsonPathValue(t, body, path).([]any)
+	return ok
+}
+
+func jsonPathAllowsNull(t *testing.T, body []byte, path string) bool {
+	t.Helper()
+	value := jsonPathValue(t, body, path)
+	if value == nil {
+		return true
+	}
+	_, ok := value.(float64)
+	return ok
+}
+
+func jsonPathValue(t *testing.T, body []byte, path string) any {
+	t.Helper()
+	var value any
+	if err := json.Unmarshal(body, &value); err != nil {
+		t.Fatalf("response is not valid JSON: %v", err)
+	}
+	for _, segment := range strings.Split(path, ".") {
+		switch current := value.(type) {
+		case map[string]any:
+			var ok bool
+			value, ok = current[segment]
+			if !ok {
+				t.Fatalf("JSON path %q is missing", path)
+			}
+		case []any:
+			index, err := strconv.Atoi(segment)
+			if err != nil || index < 0 || index >= len(current) {
+				t.Fatalf("JSON path %q has invalid array index", path)
+			}
+			value = current[index]
+		default:
+			t.Fatalf("JSON path %q cannot traverse %q", path, segment)
+		}
+	}
+	return value
+}
+
 func newTestAPIAt(t *testing.T, provider datasource.Provider, clock func() time.Time) http.Handler {
 	t.Helper()
 	cfg := config.Config{
@@ -629,6 +856,17 @@ func request(t *testing.T, handler http.Handler, method, path, body string, cook
 	return recorder
 }
 
+func requestWithRawQuery(t *testing.T, handler http.Handler, cookie *http.Cookie, path, rawQuery string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com"+path, nil)
+	req.URL.RawQuery = rawQuery
+	req.RemoteAddr = "192.0.2.10:12345"
+	req.AddCookie(cookie)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	return recorder
+}
+
 func decodeJSON(t *testing.T, response *httptest.ResponseRecorder, target any) {
 	t.Helper()
 	if err := json.Unmarshal(response.Body.Bytes(), target); err != nil {
@@ -683,6 +921,15 @@ func testNow() time.Time {
 }
 
 type unavailableProvider struct{}
+
+type mysqlSnapshotProvider struct {
+	snapshot mysql.Snapshot
+	err      error
+}
+
+func (p *mysqlSnapshotProvider) MySQLSnapshot(context.Context) (mysql.Snapshot, error) {
+	return p.snapshot, p.err
+}
 
 type aggregateFailureProvider struct {
 	datasource.Provider

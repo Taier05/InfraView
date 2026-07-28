@@ -198,6 +198,14 @@ func TestBuildHandlerWiresAuthenticatedMockAPI(t *testing.T) {
 	if overview.Code != http.StatusOK || !strings.Contains(overview.Body.String(), `"total":3`) {
 		t.Fatalf("overview response = %d %s", overview.Code, overview.Body.String())
 	}
+
+	mysqlOverviewRequest := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/mysql/overview", nil)
+	mysqlOverviewRequest.AddCookie(login.Result().Cookies()[0])
+	mysqlOverview := httptest.NewRecorder()
+	handler.ServeHTTP(mysqlOverview, mysqlOverviewRequest)
+	if mysqlOverview.Code != http.StatusOK || !strings.Contains(mysqlOverview.Body.String(), `"total":7`) {
+		t.Fatalf("MySQL overview status = %d", mysqlOverview.Code)
+	}
 }
 
 func TestDataSourceProvidersWiresNightingaleConfiguration(t *testing.T) {

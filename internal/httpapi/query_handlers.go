@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/Taier05/InfraView/internal/datasource"
+	"github.com/Taier05/InfraView/internal/mysql"
 	"github.com/Taier05/InfraView/internal/service"
 )
 
@@ -279,6 +281,8 @@ func (a *api) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 		writeError(w, r, http.StatusBadRequest, "invalid_query", "查询参数无效", false)
 	case errors.Is(err, service.ErrNotFound):
 		writeError(w, r, http.StatusNotFound, "host_not_found", "该主机当前不在数据源中", false)
+	case errors.Is(err, mysql.ErrUnavailable):
+		writeError(w, r, http.StatusServiceUnavailable, "mysql_unavailable", "数据源暂时不可用，请稍后重试", true)
 	case errors.Is(err, datasource.ErrUnavailable), errors.Is(err, datasource.ErrNotConfigured), errors.Is(err, context.DeadlineExceeded):
 		writeError(w, r, http.StatusServiceUnavailable, "datasource_unavailable", "数据源暂时不可用，请稍后重试", true)
 	default:
@@ -288,16 +292,25 @@ func (a *api) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 }
 
 func onlyQueryParameters(r *http.Request, allowed ...string) bool {
+	_, ok := queryParameters(r, allowed...)
+	return ok
+}
+
+func queryParameters(r *http.Request, allowed ...string) (url.Values, bool) {
+	values, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		return nil, false
+	}
 	allowedSet := make(map[string]struct{}, len(allowed))
 	for _, name := range allowed {
 		allowedSet[name] = struct{}{}
 	}
-	for name, values := range r.URL.Query() {
-		if _, ok := allowedSet[name]; !ok || len(values) != 1 {
-			return false
+	for name, parameterValues := range values {
+		if _, ok := allowedSet[name]; !ok || len(parameterValues) != 1 {
+			return nil, false
 		}
 	}
-	return true
+	return values, true
 }
 
 func valueOrDefault(r *http.Request, name, fallback string) string {
@@ -308,11 +321,19 @@ func valueOrDefault(r *http.Request, name, fallback string) string {
 }
 
 func intParameter(r *http.Request, name string, fallback int) (int, error) {
-	raw := r.URL.Query().Get(name)
-	if raw == "" {
+	values, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		return 0, err
+	}
+	return intQueryParameter(values, name, fallback)
+}
+
+func intQueryParameter(values url.Values, name string, fallback int) (int, error) {
+	rawValues, ok := values[name]
+	if !ok {
 		return fallback, nil
 	}
-	return strconv.Atoi(raw)
+	return strconv.Atoi(rawValues[0])
 }
 
 func metricView(value service.MetricValue) metricValueView {

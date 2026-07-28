@@ -84,9 +84,10 @@ func serve(cfg config.Config) error {
 
 func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger) http.Handler {
 	providers := dataSourceProviders(cfg, clock)
-	provider := withUpstreamTimeout(providers.Hosts, cfg.UpstreamTimeout)
+	hostProvider := withUpstreamTimeout(providers.Hosts, cfg.UpstreamTimeout)
+	mysqlProvider := withMySQLUpstreamTimeout(providers.MySQL, cfg.UpstreamTimeout)
 	store := cache.New(clock)
-	queryService := service.New(provider, store, service.Options{
+	queryService := service.New(hostProvider, store, service.Options{
 		InventoryTTL:       cfg.InventoryTTL,
 		CurrentMetricsTTL:  cfg.CurrentMetricsTTL,
 		RangeTTL:           cfg.RangeTTL,
@@ -98,12 +99,18 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 		NetworkCriticalBPS: cfg.NetworkCriticalBPS,
 		Clock:              clock,
 	})
+	mysqlService := service.NewMySQL(mysqlProvider, store, service.MySQLOptions{
+		CurrentMetricsTTL: cfg.CurrentMetricsTTL,
+		MaxStale:          cfg.MaxStale,
+		Clock:             clock,
+	})
 	return httpapi.New(httpapi.Dependencies{
-		Config:  cfg,
-		Auth:    auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, clock),
-		Limiter: auth.NewLimiter(5, time.Minute, clock),
-		Service: queryService,
-		Logger:  logger,
+		Config:       cfg,
+		Auth:         auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, clock),
+		Limiter:      auth.NewLimiter(5, time.Minute, clock),
+		Service:      queryService,
+		MySQLService: mysqlService,
+		Logger:       logger,
 	})
 }
 

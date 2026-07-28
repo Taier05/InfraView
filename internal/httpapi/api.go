@@ -15,20 +15,22 @@ import (
 const sessionCookieName = "infraview_session"
 
 type Dependencies struct {
-	Config  config.Config
-	Auth    *auth.Manager
-	Limiter *auth.Limiter
-	Service *service.Service
-	Logger  *slog.Logger
+	Config       config.Config
+	Auth         *auth.Manager
+	Limiter      *auth.Limiter
+	Service      *service.Service
+	MySQLService *service.MySQLService
+	Logger       *slog.Logger
 }
 
 type api struct {
-	config      config.Config
-	auth        *auth.Manager
-	limiter     *auth.Limiter
-	service     *service.Service
-	logger      *slog.Logger
-	verifyLogin func(string, string) (auth.Session, bool)
+	config       config.Config
+	auth         *auth.Manager
+	limiter      *auth.Limiter
+	service      *service.Service
+	mysqlService *service.MySQLService
+	logger       *slog.Logger
+	verifyLogin  func(string, string) (auth.Session, bool)
 }
 
 func New(dependencies Dependencies) http.Handler {
@@ -48,12 +50,13 @@ func New(dependencies Dependencies) http.Handler {
 		dependencies.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	server := &api{
-		config:      dependencies.Config,
-		auth:        dependencies.Auth,
-		limiter:     dependencies.Limiter,
-		service:     dependencies.Service,
-		logger:      dependencies.Logger,
-		verifyLogin: dependencies.Auth.Login,
+		config:       dependencies.Config,
+		auth:         dependencies.Auth,
+		limiter:      dependencies.Limiter,
+		service:      dependencies.Service,
+		mysqlService: dependencies.MySQLService,
+		logger:       dependencies.Logger,
+		verifyLogin:  dependencies.Auth.Login,
 	}
 
 	mux := http.NewServeMux()
@@ -66,12 +69,16 @@ func New(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/hosts/{id}", server.requireAuthentication(http.HandlerFunc(server.host)))
 	mux.Handle("GET /api/v1/hosts/{id}/metrics", server.requireAuthentication(http.HandlerFunc(server.metrics)))
 	mux.Handle("GET /api/v1/datasource/status", server.requireAuthentication(http.HandlerFunc(server.datasourceStatus)))
+	mux.Handle("GET /api/v1/mysql/overview", server.requireAuthentication(http.HandlerFunc(server.mysqlOverview)))
+	mux.Handle("GET /api/v1/mysql/instances", server.requireAuthentication(http.HandlerFunc(server.mysqlInstances)))
 
 	mux.HandleFunc("/api/v1/session", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/overview", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/hosts", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/hosts/", server.hostsFallback)
 	mux.HandleFunc("/api/v1/datasource/status", server.methodNotAllowed)
+	mux.HandleFunc("/api/v1/mysql/overview", server.methodNotAllowed)
+	mux.HandleFunc("/api/v1/mysql/instances", server.methodNotAllowed)
 	mux.HandleFunc("/api", server.notFound)
 	mux.HandleFunc("/api/", server.notFound)
 
