@@ -302,7 +302,7 @@ INFRAVIEW_E2E_PORT=18084 \
 
 期望：独立 Compose smoke 和 Chromium 4/4 通过，脚本只清理自己创建的项目资源。
 
-- [ ] **Step 3: 重建当前 InfraView 服务**
+- [x] **Step 3: 重建当前 InfraView 服务**
 
 先只输出私密环境文件权限和 Git 忽略状态，不输出内容：
 
@@ -321,7 +321,7 @@ INFRAVIEW_ENV_FILE="$private_env_file" \
   docker compose -p infraview up -d --build
 ```
 
-- [ ] **Step 4: 执行安全真实 API 冒烟**
+- [x] **Step 4: 执行安全真实 API 冒烟**
 
 从私密环境文件读取 InfraView 登录凭据到 shell 变量；登录响应只提取 Cookie，不输出。执行：
 
@@ -394,7 +394,7 @@ echo '真实 v8.4.1 InfraView 只读冒烟：通过'
 
 任何失败只由 `curl --fail` 或 `jq -e` 返回非零状态；脚本不输出 Cookie、主机 ID、数量、值或响应正文。
 
-- [ ] **Step 5: 验证容器与只读边界**
+- [x] **Step 5: 验证容器与只读边界**
 
 ```bash
 INFRAVIEW_ENV_FILE="$private_env_file" \
@@ -407,7 +407,7 @@ docker inspect \
 
 期望：容器 `healthy`、用户 `10001:10001`、只读根文件系统、能力全部删除。
 
-- [ ] **Step 6: 记录真实验证结果**
+- [x] **Step 6: 记录真实验证结果**
 
 只记录：
 
