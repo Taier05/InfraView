@@ -31,6 +31,7 @@ type targetRecord struct {
 	HostIP   string `json:"host_ip"`
 	OS       string `json:"os"`
 	BeatTime int64  `json:"beat_time"`
+	UpdateAt int64  `json:"update_at"`
 	TargetUp int    `json:"target_up"`
 	CPUNum   int    `json:"cpu_num"`
 }

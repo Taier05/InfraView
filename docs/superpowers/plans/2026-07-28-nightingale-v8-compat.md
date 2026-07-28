@@ -31,7 +31,7 @@
 - Consumes: `targetRecord`、`mapTargetRecords([]targetRecord)`、`jsonUnixTime(int64, int64)`。
 - Produces: `targetRecord.UpdateAt int64` 和按 `beat_time`、`update_at` 顺序选择的 `datasource.Host.StatusTime`。
 
-- [ ] **Step 1: 添加完全脱敏的 v8.4.1 Target 夹具**
+- [x] **Step 1: 添加完全脱敏的 v8.4.1 Target 夹具**
 
 创建 `internal/adapters/nightingale/testdata/targets-v8-page-1.json`：
 
@@ -56,7 +56,7 @@
 }
 ```
 
-- [ ] **Step 2: 写失败测试**
+- [x] **Step 2: 写失败测试**
 
 在 `provider_test.go` 增加：
 
@@ -137,7 +137,7 @@ func TestMapTargetRecordsSelectsCompatibleStatusTime(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: 运行聚焦测试确认 RED**
+- [x] **Step 3: 运行聚焦测试确认 RED**
 
 ```bash
 docker run --rm \
@@ -152,7 +152,7 @@ docker run --rm \
 
 期望：`update_at` 被现有结构忽略，至少一个用例因 `StatusTime` 为零而失败。
 
-- [ ] **Step 4: 实现最小兼容逻辑**
+- [x] **Step 4: 实现最小兼容逻辑**
 
 在 `client.go` 的 `targetRecord` 增加：
 
@@ -182,7 +182,7 @@ func targetStatusTime(record targetRecord) time.Time {
 host.StatusTime = targetStatusTime(record)
 ```
 
-- [ ] **Step 5: 容器化格式化并确认 GREEN**
+- [x] **Step 5: 容器化格式化并确认 GREEN**
 
 ```bash
 docker run --rm \
@@ -202,7 +202,7 @@ docker run --rm \
 
 期望：Nightingale 包全部通过。
 
-- [ ] **Step 6: 提交 Target 兼容实现**
+- [x] **Step 6: 提交 Target 兼容实现**
 
 ```bash
 git add internal/adapters/nightingale

@@ -359,11 +359,7 @@ func mapTargetRecords(records []targetRecord) ([]datasource.Host, []string, erro
 			OS:     record.OS,
 			Status: targetStatus(record.TargetUp),
 		}
-		if record.BeatTime > 0 {
-			if statusTime, ok := jsonUnixTime(record.BeatTime, 0); ok {
-				host.StatusTime = statusTime
-			}
-		}
+		host.StatusTime = targetStatusTime(record)
 		if record.CPUNum > 0 {
 			cpuCores := record.CPUNum
 			host.CPUCores = &cpuCores
@@ -372,6 +368,18 @@ func mapTargetRecords(records []targetRecord) ([]datasource.Host, []string, erro
 		ids = append(ids, record.Ident)
 	}
 	return hosts, ids, nil
+}
+
+func targetStatusTime(record targetRecord) time.Time {
+	for _, candidate := range []int64{record.BeatTime, record.UpdateAt} {
+		if candidate <= 0 {
+			continue
+		}
+		if statusTime, ok := jsonUnixTime(candidate, 0); ok {
+			return statusTime
+		}
+	}
+	return time.Time{}
 }
 
 func targetStatus(value int) datasource.HostStatus {

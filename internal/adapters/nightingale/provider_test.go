@@ -102,6 +102,77 @@ func TestListHostsPaginatesMapsAssetsAndAvoidsNPlusOne(t *testing.T) {
 	}
 }
 
+func TestListHostsUsesV8UpdateAtWhenBeatTimeMissing(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		assertAuthenticatedJSONRequest(t, request)
+		switch request.URL.Path {
+		case "/api/n9e/targets":
+			writeFixture(t, w, "targets-v8-page-1.json")
+		case "/api/n9e/datasource/brief":
+			writeFixture(t, w, "datasource-brief.json")
+		case "/api/n9e/query-instant-batch":
+			writeEnvelope(t, w, [][]any{
+				{map[string]any{"metric": map[string]string{"ident": "fixture-node-01"}, "value": []any{"1785122700", "8589934592"}}},
+				{map[string]any{"metric": map[string]string{"ident": "fixture-node-01"}, "value": []any{"1785122700", "3600"}}},
+			})
+		default:
+			t.Fatalf("unexpected path %q", request.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	provider := New(Options{
+		BaseURL: server.URL, AllowInsecureHTTP: true,
+		Token: fixtureToken, HTTPClient: server.Client(), Clock: fixedClock,
+	})
+	hosts, err := provider.ListHosts(context.Background())
+	if err != nil {
+		t.Fatalf("ListHosts() error = %v", err)
+	}
+	if len(hosts) != 1 || !hosts[0].StatusTime.Equal(time.Unix(1785122700, 0).UTC()) {
+		t.Fatalf("hosts = %#v, want v8 update_at status time", hosts)
+	}
+}
+
+func TestMapTargetRecordsSelectsCompatibleStatusTime(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want time.Time
+	}{
+		{
+			name: "beat_time wins when both are valid",
+			raw:  `[{"ident":"fixture-node-01","beat_time":1785123000,"update_at":1785122700}]`,
+			want: time.Unix(1785123000, 0).UTC(),
+		},
+		{
+			name: "valid update_at replaces invalid beat_time",
+			raw:  `[{"ident":"fixture-node-01","beat_time":253402300800,"update_at":1785122700}]`,
+			want: time.Unix(1785122700, 0).UTC(),
+		},
+		{
+			name: "invalid update_at stays missing",
+			raw:  `[{"ident":"fixture-node-01","update_at":253402300800}]`,
+			want: time.Time{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var records []targetRecord
+			if err := json.Unmarshal([]byte(tt.raw), &records); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v", err)
+			}
+			hosts, _, err := mapTargetRecords(records)
+			if err != nil {
+				t.Fatalf("mapTargetRecords() error = %v", err)
+			}
+			if len(hosts) != 1 || !hosts[0].StatusTime.Equal(tt.want) {
+				t.Fatalf("hosts = %#v, want status time %s", hosts, tt.want)
+			}
+		})
+	}
+}
+
 func TestGetCurrentMetricsUsesOneNestedBatchAndMapsMissingValues(t *testing.T) {
 	instantCalls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {

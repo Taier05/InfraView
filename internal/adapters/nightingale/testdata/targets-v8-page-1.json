@@ -1,0 +1,18 @@
+{
+  "dat": {
+    "list": [
+      {
+        "ident": "fixture-node-01",
+        "host_ip": "192.0.2.21",
+        "os": "linux",
+        "agent_version": "v0.0.0-fixture",
+        "update_at": 1785122700,
+        "target_up": 2,
+        "cpu_num": 4
+      }
+    ],
+    "total": 1
+  },
+  "err": "",
+  "request_id": "fixture-targets-v8-page-1"
+}
