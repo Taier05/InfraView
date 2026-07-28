@@ -1,0 +1,15 @@
+{
+  "dat": [
+    [
+      {"metric": {"__name__": "mem_total", "ident": "host-alpha"}, "value": [1785123000, "17179869184"]},
+      {"metric": {"__name__": "mem_total", "ident": "host-gamma"}, "value": [1785123000, "8589934592"]}
+    ],
+    [
+      {"metric": {"__name__": "system_uptime", "ident": "host-alpha"}, "value": [1785123000, "3600"]},
+      {"metric": {"__name__": "system_uptime", "ident": "host-beta"}, "value": [1785123000, "90.5"]},
+      {"metric": {"__name__": "system_uptime", "ident": "host-gamma"}, "value": [1785123000, "NaN"]}
+    ]
+  ],
+  "err": "",
+  "request_id": "fixture-inventory-instant"
+}

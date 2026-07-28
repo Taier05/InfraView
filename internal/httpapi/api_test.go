@@ -341,6 +341,29 @@ func TestAuthenticatedReadOnlyQueriesUseApprovedSnakeCaseViews(t *testing.T) {
 	}
 }
 
+func TestDataSourceStatusReturnsRuntimeConfiguration(t *testing.T) {
+	handler := newTestAPIWithConfig(t, mock.New(3, testNow), config.Config{
+		DataSource:      "nightingale",
+		RefreshInterval: 15 * time.Second,
+	})
+	cookie := loginCookie(t, handler)
+	response := request(t, handler, http.MethodGet, "/api/v1/datasource/status", "", cookie)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+
+	var body struct {
+		Data struct {
+			Type                   string `json:"type"`
+			RefreshIntervalSeconds int64  `json:"refresh_interval_seconds"`
+		} `json:"data"`
+	}
+	decodeJSON(t, response, &body)
+	if body.Data.Type != "nightingale" || body.Data.RefreshIntervalSeconds != 15 {
+		t.Fatalf("datasource runtime config = %#v", body.Data)
+	}
+}
+
 func TestOverviewReturnsNormalizedAggregateTrends(t *testing.T) {
 	handler := newTestAPI(t, mock.New(3, testNow))
 	cookie := loginCookie(t, handler)
@@ -441,6 +464,7 @@ func TestQueryValidationAndMissingHost(t *testing.T) {
 		{path: "/api/v1/hosts?sort=password&page=1&page_size=20", status: http.StatusBadRequest, code: "invalid_query", message: "查询参数无效"},
 		{path: "/api/v1/hosts/mock-host-001/metrics?range=2h", status: http.StatusBadRequest, code: "invalid_range", message: "时间范围无效"},
 		{path: "/api/v1/hosts/unknown-host", status: http.StatusNotFound, code: "host_not_found", message: "该主机当前不在数据源中"},
+		{path: "/api/v1/hosts/unknown-host/metrics?range=1h", status: http.StatusNotFound, code: "host_not_found", message: "该主机当前不在数据源中"},
 	}
 	for _, test := range tests {
 		response := request(t, handler, http.MethodGet, test.path, "", cookie)
@@ -528,6 +552,7 @@ func newTestAPIAt(t *testing.T, provider datasource.Provider, clock func() time.
 		Password:          "correct-password",
 		SessionTTL:        12 * time.Hour,
 		DataSource:        "mock",
+		RefreshInterval:   30 * time.Second,
 		InventoryTTL:      time.Minute,
 		CurrentMetricsTTL: 20 * time.Second,
 		RangeTTL:          time.Minute,
@@ -558,6 +583,12 @@ func newTestAPIWithConfigAt(t *testing.T, provider datasource.Provider, clock fu
 		WarningPercent:    80,
 		CriticalPercent:   90,
 		TrustedProxyCIDRs: overrides.TrustedProxyCIDRs,
+	}
+	if overrides.DataSource != "" {
+		cfg.DataSource = overrides.DataSource
+	}
+	if overrides.RefreshInterval > 0 {
+		cfg.RefreshInterval = overrides.RefreshInterval
 	}
 	return New(Dependencies{
 		Config:  cfg,

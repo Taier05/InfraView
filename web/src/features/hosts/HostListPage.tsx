@@ -18,6 +18,7 @@ import type {
 import { ErrorPanel } from '../../components/ErrorPanel'
 import { RefreshControl } from '../../components/RefreshControl'
 import { StaleBanner } from '../../components/StaleBanner'
+import { useRefreshIntervalMs } from '../../app/runtime'
 
 const pageSizes = [20, 50, 100] as const
 type PageSize = (typeof pageSizes)[number]
@@ -113,6 +114,7 @@ function StatusText({ status }: { status: HostStatus }) {
 }
 
 export function HostListPage() {
+  const refreshIntervalMs = useRefreshIntervalMs()
   const [searchParams, setSearchParams] = useSearchParams()
   const querySearch = searchParams.get('q') ?? ''
   const queryStatus = searchParams.get('status')
@@ -185,7 +187,7 @@ export function HostListPage() {
         `/api/v1/hosts?${requestParameters.toString()}`,
         { signal },
       ),
-    refetchInterval: 30_000,
+    refetchInterval: refreshIntervalMs,
     refetchIntervalInBackground: false,
   })
   const responsePage = hosts.data?.data.page
@@ -413,6 +415,7 @@ export function HostListPage() {
           isFetching={hosts.isFetching}
           dataUpdatedAt={hosts.dataUpdatedAt}
           onRefresh={() => void hosts.refetch()}
+          refreshIntervalSeconds={refreshIntervalMs / 1_000}
           ariaLabel="刷新主机列表"
         />
       </div>

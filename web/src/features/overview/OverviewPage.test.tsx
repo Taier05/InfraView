@@ -96,7 +96,52 @@ it('总览只展示可进入主机板块的告警摘要卡', async () => {
   expect(
     within(controls).getByText(/上次刷新 \d{2}:\d{2}:\d{2}/),
   ).toBeInTheDocument()
-  expect(within(controls).getByText(/每 30 秒自动刷新/)).toBeInTheDocument()
+  expect(within(controls).getByText(/每 15 秒自动刷新/)).toBeInTheDocument()
+})
+
+it('全正常时用绿色无异常文案展示所有零值状态', async () => {
+  vi.mocked(globalThis.fetch).mockResolvedValue(
+    jsonResponse(
+      overviewFixture({
+        data: {
+          total: 3,
+          online: 3,
+          offline: 0,
+          unknown: 0,
+          alerts: {
+            affected_hosts: 0,
+            warning_hosts: 0,
+            critical_hosts: 0,
+            cpu: { warning: 0, critical: 0 },
+            memory: { warning: 0, critical: 0 },
+            io: { warning: 0, critical: 0 },
+            network: { warning: 0, critical: 0 },
+          },
+        },
+      }),
+    ),
+  )
+  renderOverview()
+
+  const hostCard = await screen.findByRole('link', {
+    name: '查看 Linux 主机板块',
+  })
+  expect(hostCard).toHaveAttribute('data-level', 'normal')
+  for (const label of ['无严重', '无警告', '无离线', '无未知']) {
+    expect(within(hostCard).getByText(label)).toHaveAttribute(
+      'data-level',
+      'normal',
+    )
+  }
+  const metricAlerts = hostCard.querySelectorAll('.module-metric-alert')
+  expect(metricAlerts).toHaveLength(4)
+  for (const metricAlert of metricAlerts) {
+    expect(metricAlert).toHaveAttribute('data-level', 'normal')
+    expect(within(metricAlert as HTMLElement).getByText('无异常')).toBeInTheDocument()
+  }
+  expect(within(hostCard).queryByText(/严重 0/)).not.toBeInTheDocument()
+  expect(within(hostCard).queryByText(/警告 0/)).not.toBeInTheDocument()
+  expect(within(hostCard).queryByText(/离线 0/)).not.toBeInTheDocument()
 })
 
 it('使用固定查询范围且不显示总览时间范围控件', async () => {
@@ -129,7 +174,7 @@ it('手动刷新会重新请求当前范围', async () => {
   )
 })
 
-it('每 30 秒刷新且前一请求未完成时不发起重叠请求', async () => {
+it('每 15 秒刷新且前一请求未完成时不发起重叠请求', async () => {
   vi.useFakeTimers()
   let requestCount = 0
   let resolveRefresh!: (response: Response) => void
@@ -147,7 +192,7 @@ it('每 30 秒刷新且前一请求未完成时不发起重叠请求', async () 
   await act(async () => vi.advanceTimersByTimeAsync(0))
   expect(requestCount).toBe(1)
 
-  await act(async () => vi.advanceTimersByTimeAsync(30_000))
+  await act(async () => vi.advanceTimersByTimeAsync(15_000))
   expect(requestCount).toBe(2)
 
   await act(async () => vi.advanceTimersByTimeAsync(60_000))
@@ -157,7 +202,7 @@ it('每 30 秒刷新且前一请求未完成时不发起重叠请求', async () 
     resolveRefresh(jsonResponse(overviewFixture()))
     await vi.advanceTimersByTimeAsync(0)
   })
-  await act(async () => vi.advanceTimersByTimeAsync(30_000))
+  await act(async () => vi.advanceTimersByTimeAsync(15_000))
   expect(requestCount).toBe(3)
 })
 

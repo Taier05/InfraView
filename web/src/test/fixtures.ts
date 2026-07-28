@@ -316,8 +316,10 @@ export const handlers = [
   http.get('/api/v1/datasource/status', () =>
     HttpResponse.json({
       data: {
+        type: 'mock',
         healthy: true,
         checked_at: '2026-07-22T02:03:04.000Z',
+        refresh_interval_seconds: 15,
       },
       meta: {
         request_id: 'req-datasource-default-001',

@@ -97,7 +97,7 @@ func TestOverviewSummarizesMetricAlertsAndUsesHighestHostLevel(t *testing.T) {
 	}
 }
 
-func TestServiceDefaultsCurrentMetricsTTLToTwentySeconds(t *testing.T) {
+func TestServiceDefaultsCurrentMetricsTTLToFifteenSeconds(t *testing.T) {
 	clock := newServiceClock()
 	provider := fixtureProvider(clock.Now())
 	svc := service.New(provider, cache.New(clock.Now), service.Options{
@@ -112,19 +112,19 @@ func TestServiceDefaultsCurrentMetricsTTLToTwentySeconds(t *testing.T) {
 	if _, _, err := svc.Hosts(context.Background(), query); err != nil {
 		t.Fatalf("first Hosts() error = %v", err)
 	}
-	clock.Advance(19 * time.Second)
+	clock.Advance(14 * time.Second)
 	if _, _, err := svc.Hosts(context.Background(), query); err != nil {
 		t.Fatalf("Hosts() before default TTL error = %v", err)
 	}
 	if provider.currentCalls != 1 {
-		t.Fatalf("current metric calls before 20s = %d, want 1", provider.currentCalls)
+		t.Fatalf("current metric calls before 15s = %d, want 1", provider.currentCalls)
 	}
 	clock.Advance(2 * time.Second)
 	if _, _, err := svc.Hosts(context.Background(), query); err != nil {
 		t.Fatalf("Hosts() after default TTL error = %v", err)
 	}
 	if provider.currentCalls != 2 {
-		t.Fatalf("current metric calls after 20s = %d, want 2", provider.currentCalls)
+		t.Fatalf("current metric calls after 15s = %d, want 2", provider.currentCalls)
 	}
 }
 
@@ -522,6 +522,24 @@ func TestMetricsSupportsNamedRangesWithAtMostSixHundredPoints(t *testing.T) {
 	}
 }
 
+func TestMetricsRejectsUnknownHostBeforeRangeQueries(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	provider.getHostErr = datasource.ErrNotFound
+	svc := newService(provider, clock)
+
+	_, _, err := svc.Metrics(context.Background(), "unknown-host", "1h")
+	if !errors.Is(err, service.ErrNotFound) {
+		t.Fatalf("Metrics() error = %v, want ErrNotFound", err)
+	}
+	if provider.getHostCalls != 1 {
+		t.Fatalf("GetHost() calls = %d, want 1", provider.getHostCalls)
+	}
+	if len(provider.rangeRequests) != 0 {
+		t.Fatalf("QueryRange() calls = %d, want 0", len(provider.rangeRequests))
+	}
+}
+
 func TestMetricsReturnsAnIndependentCopyOfCachedRange(t *testing.T) {
 	clock := newServiceClock()
 	provider := fixtureProvider(clock.Now())
@@ -547,6 +565,9 @@ func TestMetricsReturnsAnIndependentCopyOfCachedRange(t *testing.T) {
 	}
 	if provider.rangeRequests == nil || len(provider.rangeRequests) != 8 {
 		t.Fatalf("range requests = %d, want one cached load of 8 metrics", len(provider.rangeRequests))
+	}
+	if provider.getHostCalls != 1 {
+		t.Fatalf("GetHost() calls = %d, want one cached load validation", provider.getHostCalls)
 	}
 }
 

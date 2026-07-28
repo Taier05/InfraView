@@ -44,4 +44,4 @@ Vite 将 `/api` 和 `/healthz` 代理到 `127.0.0.1:8080`，需要另行启动 G
 
 ## Nightingale 开发入口
 
-在测试环境版本、认证和真实只读响应证据齐全前，不修改 `internal/adapters/nightingale` 去猜 API。开始集成前先更新 [Nightingale 文档](datasources/NIGHTINGALE.md)、脱敏夹具和独立实施计划。
+Nightingale v9 适配器已按真实只读契约实现。后续修改仍必须先更新 [Nightingale 文档](datasources/NIGHTINGALE.md) 和完全脱敏夹具，不得猜测新端点、指标、标签或错误形状；新增查询只能来自代码内置领域映射，不能接受前端 PromQL 或任意代理路径。

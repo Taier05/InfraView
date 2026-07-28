@@ -1,0 +1,16 @@
+{
+  "dat": [
+    [
+      {
+        "metric": {"ident": "host-alpha"},
+        "values": [[1785119400, "10.5"], [1785119460, "11.25"]]
+      },
+      {
+        "metric": {"ident": "host-beta"},
+        "values": [[1785119400, "NaN"], [1785119460, "22.5"]]
+      }
+    ]
+  ],
+  "err": "",
+  "request_id": "fixture-range"
+}

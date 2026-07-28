@@ -108,8 +108,10 @@ export interface HostPageData {
 export type HostPageResponse = ApiResponse<HostPageData>
 
 export interface DataSourceStatusData {
+  type: 'mock' | 'nightingale'
   healthy: boolean
   checked_at: string
+  refresh_interval_seconds: number
 }
 
 export type DataSourceStatusResponse = ApiResponse<DataSourceStatusData>

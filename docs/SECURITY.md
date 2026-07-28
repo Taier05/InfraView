@@ -10,6 +10,7 @@
 - 运行容器 UID/GID 10001、只读根文件系统、`/tmp` noexec/nosuid/nodev、capabilities 全删、禁止提权。
 - 生产 InfraView 应用容器不挂 Docker Socket，不使用特权模式、宿主 PID/host network 或业务写卷。
 - 静态路径拒绝 dotfile、路径穿越和缺失资源 SPA fallback；只有指纹资源可 immutable。
+- Nightingale 客户端只拼接代码内置路径和 PromQL 白名单，默认只允许 HTTPS；HTTP 必须通过测试环境专用开关显式选择。客户端校验 HTTP 状态、JSON Content-Type、envelope `err` 和 8 MiB 响应上限；401、非 JSON 与上游正文统一转换为不含 Token 的领域错误。
 
 ## 信任边界与限制
 
@@ -17,11 +18,12 @@
 
 - 固定账号意味着所有使用者共享身份，无用户审计、RBAC、MFA 或密码找回。
 - 直接 HTTP 访问会明文传输凭据和会话；不可信网络必须使用 Nginx/Caddy HTTPS，并设置 Secure Cookie。
+- `INFRAVIEW_NIGHTINGALE_ALLOW_INSECURE_HTTP=true` 会允许通过 HTTP 明文发送上游 Token，只能用于隔离测试环境；生产必须保持关闭并使用 HTTPS。
 - 会话和限速只在单进程内存，不适合多副本共享状态。
 - 可信代理 CIDR 必须只包含直接连接 InfraView 的代理；范围过宽会允许该网段伪造限速来源。
 - `/healthz` 不证明数据源健康；需查看页面或数据源状态 API。
-- Mock 数据不代表真实基础设施；Nightingale 未接入前不得将其用于真实运维判断。
-- InfraView 的只读边界不替代上游最小权限；未来 Nightingale 凭据也必须只具查询权限。
+- Mock 数据不代表真实基础设施；部署时必须根据 `INFRAVIEW_DATA_SOURCE` 明确区分演示与真实数据。
+- InfraView 的只读边界不替代上游最小权限；Nightingale 必须使用专用最小只读 Token，公开仓库不记录实际部署账号或凭据权限。
 
 ## 凭据处理
 

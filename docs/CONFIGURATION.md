@@ -13,15 +13,19 @@
 | `INFRAVIEW_COOKIE_SECURE` | `false` | 布尔值；HTTPS 反代必须设为 `true` |
 | `INFRAVIEW_SESSION_TTL` | `12h` | 正时长；内存会话有效期，重启后仍会失效 |
 | `INFRAVIEW_TRUSTED_PROXY_CIDRS` | 空 | 默认不信任转发头；反代时填写直接连接 InfraView 的代理 CIDR，多个值以英文逗号分隔；只有可信代理提供的单值合法 `X-Real-IP` 用于登录限速 |
-| `INFRAVIEW_DATA_SOURCE` | `mock` | 当前版本只接受 `mock`；不得填写未实现的 `nightingale` |
+| `INFRAVIEW_DATA_SOURCE` | `mock` | 接受 `mock` 或 `nightingale`；切换后需重新创建容器 |
 | `INFRAVIEW_MOCK_HOST_COUNT` | `32` | 整数 1–100 |
-| `INFRAVIEW_REFRESH_INTERVAL` | `30s` | 正时长；当前后端会校验并保留该配置，Mock MVP 浏览器刷新周期仍固定为 30 秒 |
+| `INFRAVIEW_NIGHTINGALE_BASE_URL` | 空 | Nightingale 模式必填；默认必须是无用户信息、查询参数和片段的 HTTPS 绝对 URL |
+| `INFRAVIEW_NIGHTINGALE_TOKEN` | 空 | Nightingale 模式必填；通过 `X-User-Token` 发送，只能保存在私密环境文件中 |
+| `INFRAVIEW_NIGHTINGALE_ALLOW_INSECURE_HTTP` | `false` | 布尔值；仅受控测试环境确实没有 TLS 时可显式设为 `true`，允许通过 HTTP 发送 Token；生产必须保持 `false` |
+| `INFRAVIEW_NIGHTINGALE_INTERFACE_EXCLUDE_REGEX` | `lo\|docker.*\|veth.*\|cali.*\|br-.*\|tunl.*` | 有效 RE2 正则；排除回环和常见虚拟接口，作为 PromQL 字符串安全转义，不接受前端覆盖 |
+| `INFRAVIEW_REFRESH_INTERVAL` | `15s` | 不小于 `1s` 的整秒时长；通过数据源状态 API 下发，驱动当前可见页面与左下角数据源状态的自动刷新周期 |
 | `INFRAVIEW_INVENTORY_TTL` | `60s` | 正时长，主机清单缓存 |
-| `INFRAVIEW_CURRENT_METRICS_TTL` | `20s` | 正时长，当前指标缓存 |
+| `INFRAVIEW_CURRENT_METRICS_TTL` | `15s` | 正时长，当前指标缓存 |
 | `INFRAVIEW_RANGE_TTL` | `60s` | 正时长，历史范围缓存 |
 | `INFRAVIEW_HEALTH_TTL` | `15s` | 正时长，数据源健康缓存 |
 | `INFRAVIEW_MAX_STALE` | `5m` | 正时长且不得超过 5 分钟，旧缓存最大可展示时间 |
-| `INFRAVIEW_UPSTREAM_TIMEOUT` | `10s` | 正时长；为真实数据源调用边界预留，Mock 不发网络请求 |
+| `INFRAVIEW_UPSTREAM_TIMEOUT` | `10s` | 正时长；限制每次 Provider 调用，Mock 不发网络请求 |
 | `INFRAVIEW_WARNING_PERCENT` | `80` | 0–100 有限数值，必须低于危险阈值 |
 | `INFRAVIEW_CRITICAL_PERCENT` | `90` | 0–100 有限数值，必须高于警告阈值 |
 | `INFRAVIEW_NETWORK_WARNING_BPS` | `83886080` | 正有限数值，单方向网络速率达到该 B/s 值时标记为警告；默认 80 MiB/s |
@@ -29,7 +33,7 @@
 | `TZ` | `Asia/Hong_Kong` | 容器系统时区；API 时间戳仍按 RFC 3339 表达 |
 | `INFRAVIEW_ENV_FILE` | `.env` | Compose 工具变量，可指向专用环境文件；应用本身不读取此变量 |
 
-Go 时长使用 `time.ParseDuration` 语法，例如 `20s`、`5m`、`12h`。错误配置会使进程拒绝启动，错误信息不会输出密码。
+Go 时长使用 `time.ParseDuration` 语法，例如 `15s`、`5m`、`12h`。错误配置会使进程拒绝启动，错误信息不会输出密码或 Nightingale Token。
 
 ## 验收专用变量
 
@@ -39,5 +43,6 @@ Go 时长使用 `time.ParseDuration` 语法，例如 `20s`、`5m`、`12h`。错�
 
 - `.env` 已被 Git 忽略；不要提交、复制到聊天或写入日志。
 - 使用随机长密码，限制文件权限和读取人员。
+- Nightingale Token 权限等同于其绑定用户；只允许使用专用最小只读 Token，公开仓库不记录实际部署凭据。
 - 正式部署前执行人工检查，确认 `.env` 不等同于 `.env.example`。
 - 修改账号密码后重新创建容器；旧内存会话随重启失效。

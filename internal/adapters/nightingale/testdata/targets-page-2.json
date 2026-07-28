@@ -1,0 +1,18 @@
+{
+  "dat": {
+    "list": [
+      {
+        "ident": "host-gamma",
+        "host_ip": "192.0.2.12",
+        "os": "linux",
+        "agent_version": "v0.0.0-test",
+        "beat_time": 1785122880,
+        "target_up": 0,
+        "cpu_num": 4
+      }
+    ],
+    "total": 3
+  },
+  "err": "",
+  "request_id": "fixture-targets-page-2"
+}

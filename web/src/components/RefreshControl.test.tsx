@@ -12,12 +12,13 @@ it('展示刷新中状态、自动刷新周期并触发只读刷新回调', asyn
       isFetching={false}
       dataUpdatedAt={Date.now()}
       onRefresh={onRefresh}
+      refreshIntervalSeconds={15}
       ariaLabel="刷新测试数据"
     />,
   )
 
   expect(screen.getByText(/上次刷新 \d{2}:\d{2}:\d{2}/)).toBeInTheDocument()
-  expect(screen.getByText(/每 30 秒自动刷新/)).toBeInTheDocument()
+  expect(screen.getByText(/每 15 秒自动刷新/)).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: '刷新测试数据' }))
   expect(onRefresh).toHaveBeenCalledTimes(1)
 
@@ -26,6 +27,7 @@ it('展示刷新中状态、自动刷新周期并触发只读刷新回调', asyn
       isFetching
       dataUpdatedAt={Date.now()}
       onRefresh={onRefresh}
+      refreshIntervalSeconds={15}
       ariaLabel="刷新测试数据"
     />,
   )

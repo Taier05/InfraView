@@ -31,7 +31,7 @@ func New(provider datasource.Provider, store *cache.Store, options Options) *Ser
 		options.InventoryTTL = time.Minute
 	}
 	if options.CurrentMetricsTTL <= 0 {
-		options.CurrentMetricsTTL = 20 * time.Second
+		options.CurrentMetricsTTL = 15 * time.Second
 	}
 	if options.RangeTTL <= 0 {
 		options.RangeTTL = time.Minute

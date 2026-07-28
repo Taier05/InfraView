@@ -1,0 +1,27 @@
+{
+  "dat": {
+    "list": [
+      {
+        "ident": "host-alpha",
+        "host_ip": "192.0.2.10",
+        "os": "linux",
+        "agent_version": "v0.0.0-test",
+        "beat_time": 1785123000,
+        "target_up": 2,
+        "cpu_num": 8
+      },
+      {
+        "ident": "host-beta",
+        "host_ip": "192.0.2.11",
+        "os": "linux",
+        "agent_version": "v0.0.0-test",
+        "beat_time": 1785122940,
+        "target_up": 1,
+        "cpu_num": -1
+      }
+    ],
+    "total": 3
+  },
+  "err": "",
+  "request_id": "fixture-targets-page-1"
+}

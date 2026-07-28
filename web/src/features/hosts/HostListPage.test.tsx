@@ -113,7 +113,7 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
   const appName = await screen.findByText('linux-app-01')
 
   expect(screen.getByText(/上次刷新 \d{2}:\d{2}:\d{2}/)).toBeInTheDocument()
-  expect(screen.getByText(/每 30 秒自动刷新/)).toBeInTheDocument()
+  expect(screen.getByText(/每 15 秒自动刷新/)).toBeInTheDocument()
 
   for (const label of [
     '主机名',
@@ -475,7 +475,7 @@ it('支持手动刷新并在请求期间禁用刷新按钮', async () => {
   expect(screen.getByText(/上次刷新 \d{2}:\d{2}:\d{2}/)).toBeInTheDocument()
 })
 
-it('每 30 秒非重叠自动刷新主机列表', async () => {
+it('每 15 秒非重叠自动刷新主机列表', async () => {
   vi.useFakeTimers()
   let resolveInitial!: (response: Response) => void
   vi.mocked(globalThis.fetch).mockImplementationOnce(
@@ -497,7 +497,7 @@ it('每 30 秒非重叠自动刷新主机列表', async () => {
   })
   expect(screen.getByText('linux-app-01')).toBeInTheDocument()
 
-  await act(async () => vi.advanceTimersByTimeAsync(29_999))
+  await act(async () => vi.advanceTimersByTimeAsync(14_999))
   expect(requestedURLs).toHaveLength(1)
   await act(async () => vi.advanceTimersByTimeAsync(1))
   expect(requestedURLs).toHaveLength(2)

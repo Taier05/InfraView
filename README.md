@@ -2,7 +2,7 @@
 
 InfraView 是一个轻量、只读的 Linux 基础设施可视化平台。当前版本具备固定账号登录、板块状态总览、紧凑主机清单、搜索/筛选/排序/分页、指标阈值着色、旧缓存提示和统一错误展示。
 
-生产形态是一个非 root InfraView 容器：Go 同源提供只读 API 与 React 静态页面，无业务数据库、任务队列、SSH 客户端或远程执行器。当前只支持确定性 Mock 数据源；真实 Nightingale 适配器必须等待测试环境证据，不猜测 API。
+生产形态是一个非 root InfraView 容器：Go 同源提供只读 API 与 React 静态页面，无业务数据库、任务队列、SSH 客户端或远程执行器。数据源支持确定性 Mock 和经过真实 Nightingale v9 契约验证的只读适配器；浏览器只接收归一化 InfraView API，不接触 Token 或任意 PromQL。
 
 ## 安全边界
 
@@ -16,7 +16,7 @@ InfraView 是一个轻量、只读的 Linux 基础设施可视化平台。当前
 
 ```bash
 cp .env.example .env
-# 必须编辑 .env，更换示例密码并确认端口、Cookie 与时区
+# 必须编辑 .env，更换示例密码并确认端口、Cookie、时区与数据源配置
 docker compose up -d --build
 docker compose ps
 ```
@@ -43,6 +43,6 @@ make verify
 - [开发](docs/DEVELOPMENT.md)
 - [测试](docs/TESTING.md)
 - [安全](docs/SECURITY.md)
-- [Nightingale 接入前置证据](docs/datasources/NIGHTINGALE.md)
+- [Nightingale 接入与验证](docs/datasources/NIGHTINGALE.md)
 - [TODO](docs/TODO.md)
 - [架构决策记录](docs/decisions/0001-single-container-go-react.md)

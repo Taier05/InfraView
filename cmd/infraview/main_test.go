@@ -197,6 +197,39 @@ func TestBuildHandlerWiresAuthenticatedMockAPI(t *testing.T) {
 	}
 }
 
+func TestDataSourceProviderWiresNightingaleConfiguration(t *testing.T) {
+	const token = "fixture-main-token"
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		called = true
+		if request.Method != http.MethodGet || request.URL.Path != "/api/n9e/self/profile" {
+			t.Fatalf("request = %s %s", request.Method, request.URL.Path)
+		}
+		if request.Header.Get("X-User-Token") != token {
+			t.Fatalf("Nightingale token header was not injected")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"dat":{},"err":"","request_id":"fixture"}`)
+	}))
+	defer server.Close()
+
+	clock := func() time.Time { return time.Unix(1785123060, 0).UTC() }
+	provider := dataSourceProvider(config.Config{
+		DataSource:                       "nightingale",
+		NightingaleBaseURL:               server.URL,
+		NightingaleToken:                 token,
+		NightingaleInterfaceExcludeRegex: `lo|veth.*`,
+		NightingaleAllowInsecureHTTP:     true,
+	}, clock)
+	health, err := provider.Health(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !called || !health.Healthy || !health.CheckedAt.Equal(clock()) {
+		t.Fatalf("health = %#v, called = %v", health, called)
+	}
+}
+
 func TestComposeUsesUnlessStoppedRestartPolicy(t *testing.T) {
 	compose, err := os.ReadFile("../../docker-compose.yml")
 	if err != nil {

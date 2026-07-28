@@ -4,31 +4,37 @@ import (
 	"fmt"
 	"math"
 	"net/netip"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
 type Config struct {
-	ListenAddr         string
-	Username           string
-	Password           string
-	SessionTTL         time.Duration
-	CookieSecure       bool
-	TrustedProxyCIDRs  []netip.Prefix
-	DataSource         string
-	MockHostCount      int
-	RefreshInterval    time.Duration
-	InventoryTTL       time.Duration
-	CurrentMetricsTTL  time.Duration
-	RangeTTL           time.Duration
-	HealthTTL          time.Duration
-	MaxStale           time.Duration
-	UpstreamTimeout    time.Duration
-	WarningPercent     float64
-	CriticalPercent    float64
-	NetworkWarningBPS  float64
-	NetworkCriticalBPS float64
+	ListenAddr                       string
+	Username                         string
+	Password                         string
+	SessionTTL                       time.Duration
+	CookieSecure                     bool
+	TrustedProxyCIDRs                []netip.Prefix
+	DataSource                       string
+	NightingaleBaseURL               string
+	NightingaleToken                 string
+	NightingaleInterfaceExcludeRegex string
+	NightingaleAllowInsecureHTTP     bool
+	MockHostCount                    int
+	RefreshInterval                  time.Duration
+	InventoryTTL                     time.Duration
+	CurrentMetricsTTL                time.Duration
+	RangeTTL                         time.Duration
+	HealthTTL                        time.Duration
+	MaxStale                         time.Duration
+	UpstreamTimeout                  time.Duration
+	WarningPercent                   float64
+	CriticalPercent                  float64
+	NetworkWarningBPS                float64
+	NetworkCriticalBPS               float64
 }
 
 func Load(getenv func(string) string) (Config, error) {
@@ -58,8 +64,43 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	cfg.DataSource = valueOrDefault(getenv, "INFRAVIEW_DATA_SOURCE", "mock")
-	if cfg.DataSource != "mock" {
-		return Config{}, fmt.Errorf("INFRAVIEW_DATA_SOURCE 仅支持 %q，当前值为 %q", "mock", cfg.DataSource)
+	if cfg.DataSource != "mock" && cfg.DataSource != "nightingale" {
+		return Config{}, fmt.Errorf("INFRAVIEW_DATA_SOURCE 仅支持 %q 或 %q，当前值为 %q", "mock", "nightingale", cfg.DataSource)
+	}
+	cfg.NightingaleBaseURL = strings.TrimSpace(getenv("INFRAVIEW_NIGHTINGALE_BASE_URL"))
+	cfg.NightingaleToken = strings.TrimSpace(getenv("INFRAVIEW_NIGHTINGALE_TOKEN"))
+	cfg.NightingaleInterfaceExcludeRegex = valueOrDefault(
+		getenv,
+		"INFRAVIEW_NIGHTINGALE_INTERFACE_EXCLUDE_REGEX",
+		`lo|docker.*|veth.*|cali.*|br-.*|tunl.*`,
+	)
+	if cfg.DataSource == "nightingale" {
+		if cfg.NightingaleAllowInsecureHTTP, err = boolValue(
+			getenv,
+			"INFRAVIEW_NIGHTINGALE_ALLOW_INSECURE_HTTP",
+			"false",
+		); err != nil {
+			return Config{}, err
+		}
+		if cfg.NightingaleBaseURL == "" {
+			return Config{}, fmt.Errorf("INFRAVIEW_NIGHTINGALE_BASE_URL 在 Nightingale 模式下必填")
+		}
+		parsedBaseURL, err := url.Parse(cfg.NightingaleBaseURL)
+		if err != nil || !parsedBaseURL.IsAbs() || parsedBaseURL.Host == "" || (parsedBaseURL.Scheme != "http" && parsedBaseURL.Scheme != "https") {
+			return Config{}, fmt.Errorf("INFRAVIEW_NIGHTINGALE_BASE_URL 必须是有效的 HTTP(S) 绝对 URL")
+		}
+		if parsedBaseURL.User != nil || parsedBaseURL.RawQuery != "" || parsedBaseURL.Fragment != "" {
+			return Config{}, fmt.Errorf("INFRAVIEW_NIGHTINGALE_BASE_URL 不得包含用户信息、查询参数或片段")
+		}
+		if parsedBaseURL.Scheme == "http" && !cfg.NightingaleAllowInsecureHTTP {
+			return Config{}, fmt.Errorf("INFRAVIEW_NIGHTINGALE_BASE_URL 使用 HTTP 时必须显式启用 INFRAVIEW_NIGHTINGALE_ALLOW_INSECURE_HTTP")
+		}
+		if cfg.NightingaleToken == "" {
+			return Config{}, fmt.Errorf("INFRAVIEW_NIGHTINGALE_TOKEN 在 Nightingale 模式下必填")
+		}
+		if _, err := regexp.Compile(cfg.NightingaleInterfaceExcludeRegex); err != nil {
+			return Config{}, fmt.Errorf("INFRAVIEW_NIGHTINGALE_INTERFACE_EXCLUDE_REGEX 必须是有效的 RE2 正则表达式")
+		}
 	}
 	if cfg.MockHostCount, err = intValue(getenv, "INFRAVIEW_MOCK_HOST_COUNT", "32"); err != nil {
 		return Config{}, err
@@ -68,13 +109,19 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, fmt.Errorf("INFRAVIEW_MOCK_HOST_COUNT 必须在 1 到 100 之间")
 	}
 
-	if cfg.RefreshInterval, err = durationValue(getenv, "INFRAVIEW_REFRESH_INTERVAL", "30s"); err != nil {
+	if cfg.RefreshInterval, err = durationValue(getenv, "INFRAVIEW_REFRESH_INTERVAL", "15s"); err != nil {
 		return Config{}, err
+	}
+	if cfg.RefreshInterval < time.Second || cfg.RefreshInterval%time.Second != 0 {
+		return Config{}, fmt.Errorf(
+			"INFRAVIEW_REFRESH_INTERVAL 必须是不小于 1s 的整秒时长，当前值为 %q",
+			valueOrDefault(getenv, "INFRAVIEW_REFRESH_INTERVAL", "15s"),
+		)
 	}
 	if cfg.InventoryTTL, err = durationValue(getenv, "INFRAVIEW_INVENTORY_TTL", "60s"); err != nil {
 		return Config{}, err
 	}
-	if cfg.CurrentMetricsTTL, err = durationValue(getenv, "INFRAVIEW_CURRENT_METRICS_TTL", "20s"); err != nil {
+	if cfg.CurrentMetricsTTL, err = durationValue(getenv, "INFRAVIEW_CURRENT_METRICS_TTL", "15s"); err != nil {
 		return Config{}, err
 	}
 	if cfg.RangeTTL, err = durationValue(getenv, "INFRAVIEW_RANGE_TTL", "60s"); err != nil {

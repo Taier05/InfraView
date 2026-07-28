@@ -1,0 +1,25 @@
+{
+  "dat": [
+    [
+      {"metric": {"__name__": "cpu_usage_active", "cpu": "cpu-total", "ident": "host-alpha"}, "value": [1785123001, "12.5"]},
+      {"metric": {"__name__": "cpu_usage_active", "cpu": "cpu-total", "ident": "host-beta"}, "value": [1785123001, "NaN"]}
+    ],
+    [
+      {"metric": {"__name__": "mem_used_percent", "ident": "host-alpha"}, "value": [1785123002, "63.25"]}
+    ],
+    [
+      {"metric": {"__name__": "system_load1", "ident": "host-alpha"}, "value": [1785123003, "1.75"]}
+    ],
+    [
+      {"metric": {"ident": "host-alpha"}, "value": [1785123004, "8.5"]}
+    ],
+    [
+      {"metric": {"ident": "host-alpha"}, "value": [1785123005, "2048"]}
+    ],
+    [
+      {"metric": {"ident": "host-alpha"}, "value": [1785123006, "4096"]}
+    ]
+  ],
+  "err": "",
+  "request_id": "fixture-current-instant"
+}

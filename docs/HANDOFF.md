@@ -13,42 +13,78 @@
 
 继续开发时使用：
 
-- 工作目录：`/root/github/InfraView/.worktrees/compact-layout`
+- 工作目录：`<当前功能工作树>`
 - 分支：`feature/compact-layout`
-- Nightingale 私密环境文件：`/root/github/InfraView/.env`
-- 当前 InfraView 访问地址：`http://192.168.8.200:8080`
-- Nightingale API：`http://192.168.8.211:17000`
+- Nightingale 私密环境文件：`/secure/path/infraview.env`
+- 当前 InfraView 访问地址：由私有部署环境提供，不进入公开仓库
+- Nightingale API：由私有部署环境提供，不进入公开仓库
 
-不要在聊天、测试夹具、日志、错误消息或 Git 中输出 Nightingale Token。工作树内没有 Token；后续 Compose 若从当前 worktree 启动，应显式设置 `INFRAVIEW_ENV_FILE=/root/github/InfraView/.env`，不要复制私密文件进工作树。
+不要在聊天、测试夹具、日志、错误消息或 Git 中输出 Nightingale Token。工作树内没有 Token；后续 Compose 若从当前 worktree 启动，应显式设置 `INFRAVIEW_ENV_FILE=/secure/path/infraview.env`，不要复制私密文件进工作树。
+
+## 切换 Codex 账号后的恢复提示词
+
+在新账号的新对话中直接粘贴以下内容：
+
+```text
+继续开发 InfraView。请始终使用简体中文回复。
+
+工作目录：<当前功能工作树>
+分支：feature/compact-layout
+
+请先完整阅读并遵循：
+1. <当前功能工作树>/docs/HANDOFF.md
+2. <当前功能工作树>/docs/PROJECT_STATUS.md
+3. <当前功能工作树>/docs/TODO.md
+4. <当前功能工作树>/docs/datasources/NIGHTINGALE.md
+5. Nightingale 第二阶段规格与计划：
+   - docs/superpowers/specs/2026-07-27-nightingale-phase-2-design.md
+   - docs/superpowers/plans/2026-07-27-nightingale-phase-2.md
+
+当前功能分支包含 Nightingale 接入源码、测试、脱敏夹具和文档。不得执行 git reset、checkout、clean、restore 或任何会丢失/覆盖现有改动的操作。用户已授权提交、推送和创建合并请求，但不得未经确认直接合并 `main`。
+
+当前 8080 预览已经切换到真实 Nightingale，显示脱敏主机样本；容器健康，真实 API 与 Chromium 验收已通过。不要重复 SSH、版本探测、Token 认证实证或无必要的远端检查。绝对不要输出 /secure/path/infraview.env 的内容、Nightingale Token、认证头或上游响应正文。
+
+先只读执行 git status、git diff --check，并审查本轮差异。重点检查 Nightingale Provider 的错误边界、分页、并发缓存、PromQL 固定映射与安全转义、配置校验、无 N+1 和测试覆盖。先向我报告审查结论；除非我明确授权，不要修改代码、提交、推送、合并、重启服务或更改部署。
+
+持续维护设计、架构、开发进度、TODO、部署、测试、安全和 HANDOFF 文档，确保后续新对话仍可从仓库恢复完整上下文。
+```
 
 ## 当前暂停点
 
-本轮已经完成真实 Nightingale 的只读认证与 API 契约验证，但尚未开始修改 Nightingale 适配器源码，也尚未创建测试夹具。用户因长对话提示决定在此暂停，并在新对话继续。
+Nightingale 第二阶段已经完成实现、Docker 全量构建、脱敏 API 联调和 Chromium 页面验收。私有预览已切换为真实 Nightingale，资源数量不进入公开仓库，容器健康且数据非 stale。
 
-暂停时工作树无未提交源码修改；当前线上/预览容器仍使用 Mock 数据源和 32 台主机，没有切换 Nightingale，也没有重启或修改 Nightingale。
+随后按用户确认方案完成状态与刷新优化：总览零值使用绿色“无…”文案；数据源状态 API 返回真实类型和运行时刷新周期；当前页面与当前指标默认每 15 秒刷新，静态资产和历史缓存仍为 60 秒。左下角已进一步改为紧凑的“数据连接”汇总，健康 Nightingale 默认显示绿色 `1/1 正常`，展开后显示“指标 / Nightingale / 健康 / 最近检查”，Mock 明确使用黄色提示；后续日志等数据源可在同一入口扩展。前端 45/45、typecheck、production build、Go 全仓普通/race、生产镜像和隔离 Mock Chromium 4/4 均通过。私有预览重建后，登录、真实类型、15 秒周期、脱敏主机样本和总览 smoke 均通过且非 stale，并重新完成真实 Nightingale 1440×900 登录浏览器默认/展开状态视觉验收。
+
+### 2026-07-27 审查修复交接
+
+本功能分支又完成一轮审查阻断项 TDD 修复：Provider 复制 HTTP Client 并拒绝重定向；严格要求非 null envelope `dat`、精确空 `err`、分页 `list`/`total` 与批量外层基数；Content-Type 仅接受 `application/json`；历史指标缓存加载先精确验证一次主机；Mock 模式不校验未使用的 Nightingale 设置；构造器拒绝非 HTTP(S)、userinfo、query、fragment；数值转 `int64`、`time.Duration`、指标时间和 Target `beat_time` 前验证 JSON/RFC3339 范围；数据源成功或失败 discovery flight 都只发一次请求并广播结果，失败不缓存且后续可重试。
+
+最终修复后 Docker 相关包、全仓普通/race 测试和 `infraview:nightingale-review-fixes-verify` 生产镜像均重新通过；最终整分支审查 findings 已全部处理，唯一范围复审 PASS。随后按用户授权显式设置 `INFRAVIEW_ENV_FILE=/secure/path/infraview.env`，重建同一 `infraview` Compose 项目的 8080 服务；容器 healthy，登录、数据源状态、脱敏主机样本和总览只读 smoke 均通过。未输出 `.env`、Token、Cookie 或响应正文，未进行 SSH 或额外 Token 实证。用户已于 2026-07-28 确认预览并授权提交、推送和创建合并请求；未经用户后续确认仍不得直接合并 `main`。若重新执行全仓 shell 验证，`golang:1.24-bookworm` 的 `sh -lc` 会因登录 PATH 缺少 `/usr/local/go/bin` 而找不到 Go；使用 `sh -c`，并独立运行 race 命令。
+
+当前功能分支包含本轮 Nightingale 源码、测试、夹具和文档；尚未合并 `main`。Nightingale 本身没有被修改或重启，InfraView 运行时仍只有只读 HTTP 查询能力。
 
 宿主机没有安装 Go，直接执行 `go test ./...` 会得到 `go: command not found`。仓库现有 Dockerfile 会在构建阶段执行普通测试和 race 测试，后续应使用 Docker 构建完成 Go 验证，不需要在宿主机安装 Go。
 
 ## 本轮已完成的只读验证
 
-- `/root/github/InfraView/.env` 权限为 `600`，属主/属组均为 root。
-- `INFRAVIEW_NIGHTINGALE_BASE_URL` 和 `INFRAVIEW_NIGHTINGALE_TOKEN` 均存在；未输出变量值。
-- 用户确认测试和现阶段正式方案都暂时使用 Nightingale root 用户的个人 Token。
+- 私有环境文件必须被 Git 忽略并限制为 `600` 权限；公开仓库不记录实际路径、属主或内容。
+- `INFRAVIEW_NIGHTINGALE_BASE_URL` 和 `INFRAVIEW_NIGHTINGALE_TOKEN` 的真实值只存在于私有部署环境，未进入仓库。
+- Nightingale 凭据必须使用专用最小只读 Token；公开文档不记录当前部署账号或凭据权限。
 - `X-User-Token` 认证成功；以下接口均返回 HTTP 200、JSON、`err` 为空：
   - `GET /api/n9e/self/profile`
   - `GET /api/n9e/targets?limit=100&p=1`
   - `GET /api/n9e/targets/stats`
   - `GET /api/n9e/busi-groups`
   - `GET /api/n9e/datasource/brief`
-- 当前账号可见 3 台 Target、1 个业务组、1 个数据源。
+- 脱敏验证账号可读取 Target、业务组和数据源；真实数量不进入公开仓库。
 - 无 Token 和错误 Token 调用受保护接口均返回 HTTP 401，Content-Type 为 `text/plain; charset=utf-8`，不能假设所有错误都有 JSON envelope。
 - `POST /api/n9e/query-instant-batch` 和 `POST /api/n9e/query-range-batch` 已真实验证成功。
 - 批量查询返回结构：
   - 即时：`dat[查询索引][序列]`，序列含 `metric` 和 `value=[Unix秒, 字符串值]`。
   - 区间：`dat[查询索引][序列]`，序列含 `metric` 和 `values=[[Unix秒, 字符串值], ...]`。
 - 不存在主机的固定筛选查询返回 HTTP 200、`err` 为空及空序列，不是 404。
-- 当前 3 台 Target 的 `target_up` 都为 `2`；`cpu_num` 和 `beat_time` 都是整数，`beat_time` 是 Unix 秒。
-- 下列 9 个即时查询均各返回 3 条序列、覆盖 3 个 `ident`，值为字符串、时间戳为整数：CPU、内存、负载、IO 忙碌度、网络发送、网络接收、运行时间、CPU 核数、内存总量。
+- 脱敏 Target 样本的 `target_up`、`cpu_num` 和 `beat_time` 类型及映射均已验证，`beat_time` 是 Unix 秒。
+- 下列 9 个即时查询均按脱敏 `ident` 返回对应序列，值为字符串、时间戳为整数：CPU、内存、负载、IO 忙碌度、网络发送、网络接收、运行时间、CPU 核数、内存总量。
 - CPU 序列标签键为 `__name__`、`cpu`、`ident`；内存/负载/运行时间/配置指标含 `__name__`、`ident`；聚合后的 IO 和网络序列仅含 `ident`。
 
 ## 已确认实现决策
@@ -64,16 +100,22 @@
 - 只允许代码内置的指标到 PromQL 映射；不接受前端传入 URL、PromQL 或 Nightingale 原始请求体；不使用任意代理接口。
 - HTTP 客户端必须校验状态码、Content-Type、JSON envelope 和 `err`，限制响应体大小，并把 401/403、非 JSON、解析失败、上游错误统一映射为安全的领域错误，不能泄露 Token 或响应正文。
 
+## 本轮实现与验证
+
+- 新增第二阶段规格与计划，以及完全脱敏的 Target、数据源、即时、区间、空结果和错误夹具。
+- Provider 已实现 `Health`、Target 分页、默认 Prometheus 数据源成功缓存、资产批量、当前指标批量、历史与聚合范围查询。
+- HTTP 客户端校验状态码、JSON Content-Type、envelope `err` 和 8 MiB 上限；错误不包含 Token 或响应正文。
+- 配置支持 `nightingale`，校验 Base URL、Token 和接口排除 RE2；主程序已安全注入 Provider。
+- `docker build --tag infraview:nightingale-verify .` 通过前端、Go 普通/race 测试和构建。
+- 临时 18081 容器完成真实只读 API 与页面验证后已删除。
+- 私密 `.env` 的 `INFRAVIEW_DATA_SOURCE` 已改为 `nightingale`，并使用 `INFRAVIEW_ENV_FILE=/secure/path/infraview.env` 重建 8080 Compose 服务。
+- 正式 8080 验证：数据源健康，脱敏主机样本的资产/当前指标有值；CPU/内存/负载/网络历史有效；1440×900 页面无溢出，登录后无页面错误。
+
 ## 新对话的第一组任务
 
-1. 再次确认 `git status` 干净，不要重复做 SSH/版本探测。
-2. 编写 Nightingale 第二阶段规格与实施计划。
-3. 先添加完全脱敏的 `internal/adapters/nightingale/testdata` 契约夹具和失败测试：认证头、分页、嵌套批量响应、状态/单位映射、空结果、401、非 JSON、envelope `err`、响应大小限制、无 N+1。
-4. 以 TDD 实现 `internal/adapters/nightingale/provider.go` 及必要客户端代码。
-5. 扩展 `internal/config`：允许 `INFRAVIEW_DATA_SOURCE=nightingale`，校验 Base URL、Token 和网络接口排除规则；错误信息不得包含 Token。
-6. 修改 `cmd/infraview/main.go`，把配置安全注入 Nightingale Provider。
-7. 通过 Docker 构建运行 Go/前端测试；随后使用真实 `.env` 构建并切换 InfraView 数据源，验证 API 和浏览器页面。
-8. 只有在真实联调通过后才更新当前部署状态；不要合并 `main`，除非用户另行确认。
+1. 先查看 `git status`、`git log` 和合并请求状态，确认功能分支保持完整；不要重复已完成的 Nightingale 审查、SSH、版本探测或 Token 实证。
+2. 用户已确认紧凑布局、真实数据展示和数据连接汇总；允许提交、推送并创建合并请求，未经用户后续确认不要直接合并 `main`。
+3. 后续事项：专用最小只读 Token、磁盘容量/读写历史指标证据。
 
 ## 安全边界
 

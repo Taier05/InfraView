@@ -1,0 +1,27 @@
+{
+  "dat": [
+    {
+      "id": 9,
+      "name": "secondary-test-source",
+      "plugin_type": "prometheus",
+      "is_default": false,
+      "status": "enabled"
+    },
+    {
+      "id": 7,
+      "name": "default-test-source",
+      "plugin_type": "prometheus",
+      "is_default": true,
+      "status": "enabled"
+    },
+    {
+      "id": 3,
+      "name": "unrelated-test-source",
+      "plugin_type": "elasticsearch",
+      "is_default": true,
+      "status": "enabled"
+    }
+  ],
+  "err": "",
+  "request_id": "fixture-datasource-brief"
+}

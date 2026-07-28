@@ -82,15 +82,7 @@ func serve(cfg config.Config) error {
 }
 
 func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger) http.Handler {
-	var provider datasource.Provider
-	switch cfg.DataSource {
-	case "mock":
-		provider = mock.New(cfg.MockHostCount, clock)
-	case "nightingale":
-		provider = nightingale.New()
-	default:
-		provider = nightingale.New()
-	}
+	provider := dataSourceProvider(cfg, clock)
 	provider = withUpstreamTimeout(provider, cfg.UpstreamTimeout)
 	store := cache.New(clock)
 	queryService := service.New(provider, store, service.Options{
@@ -112,6 +104,23 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 		Service: queryService,
 		Logger:  logger,
 	})
+}
+
+func dataSourceProvider(cfg config.Config, clock func() time.Time) datasource.Provider {
+	switch cfg.DataSource {
+	case "mock":
+		return mock.New(cfg.MockHostCount, clock)
+	case "nightingale":
+		return nightingale.New(nightingale.Options{
+			BaseURL:              cfg.NightingaleBaseURL,
+			Token:                cfg.NightingaleToken,
+			InterfaceExcludeExpr: cfg.NightingaleInterfaceExcludeRegex,
+			Clock:                clock,
+			AllowInsecureHTTP:    cfg.NightingaleAllowInsecureHTTP,
+		})
+	default:
+		return nightingale.New(nightingale.Options{})
+	}
 }
 
 type timeoutProvider struct {

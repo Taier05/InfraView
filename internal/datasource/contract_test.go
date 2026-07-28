@@ -206,7 +206,7 @@ func (p *dynamicHostProvider) GetHost(ctx context.Context, hostID string) (datas
 }
 
 func TestNightingaleProviderIsNotConfigured(t *testing.T) {
-	provider := nightingale.New()
+	provider := nightingale.New(nightingale.Options{})
 	ctx := context.Background()
 	request := datasource.RangeRequest{}
 	aggregateRequest := datasource.AggregateRangeRequest{}

@@ -41,6 +41,9 @@ func (s *Service) Metrics(ctx context.Context, id, rangeName string) (MetricRang
 }
 
 func (s *Service) loadMetricRange(ctx context.Context, id, rangeName string, duration time.Duration) (MetricRange, error) {
+	if _, err := s.provider.GetHost(ctx, id); err != nil {
+		return MetricRange{}, err
+	}
 	to := s.options.Clock()
 	from := to.Add(-duration)
 	step := rangeStep(duration)

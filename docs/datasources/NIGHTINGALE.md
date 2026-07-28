@@ -1,23 +1,23 @@
 # Nightingale 数据源接入
 
-状态：测试环境证据采集中，真实适配器尚未实现。当前 `INFRAVIEW_DATA_SOURCE` 只接受 `mock`。
+状态：真实只读适配器已实现并在当前 8080 预览部署验证。`INFRAVIEW_DATA_SOURCE` 接受 `mock` 或 `nightingale`。
 
 最后采集：2026-07-27
 
-## 测试环境实证
+## 脱敏验证契约
 
 | 项目 | 已验证结果 |
 | --- | --- |
-| Nightingale | `v9.0.0-b78db21544584381def321fb5201ac80e48ad491` |
-| API 基础地址 | `http://192.168.8.211:17000`，当前为局域网 HTTP，无 TLS |
-| 部署方式 | `n9e.service` 与 `categraf.service`；MySQL、Redis 使用 Docker；VictoriaMetrics 为宿主机进程 |
-| Categraf | `v0.5.16`，15 秒采集周期，已有 3 台 Linux Target |
-| 指标存储 | VictoriaMetrics `http://192.168.8.211:8428`，Nightingale 默认 Prometheus 类型数据源 |
+| Nightingale | `v9.x` |
+| API 基础地址 | `https://n9e.example.com`；真实私有地址不进入公开仓库 |
+| 部署方式 | 私有部署拓扑不进入公开仓库；适配器只依赖已确认的 Nightingale HTTP API 契约 |
+| Categraf | 采集周期和节点规模属于私有部署信息；验证夹具使用虚构 Linux Target |
+| 指标存储 | `https://metrics.example.com`，Nightingale 默认 Prometheus 类型数据源 |
 | 认证能力 | `HTTP.TokenAuth.Enable=true`；个人 Token 请求头为 `X-User-Token: <token>`，不是 Bearer |
-| 当前认证阻塞 | 数据库中现有个人 Token 数为 0；只有 1 个 Admin 用户，尚未提供 InfraView 专用只读 Token |
-| 主机清单 | 数据库只读确认 3 台 Target：`y01`、`y02`、`y03`，均为 Categraf v0.5.16 Linux 主机 |
+| 当前认证状态 | 真实账号和凭据权限不进入公开仓库；部署时必须使用专用最小只读 Token |
+| 主机清单 | 脱敏夹具使用 `fixture-node-01`、`fixture-node-02`、`fixture-node-03` |
 | 指标现状 | VictoriaMetrics 已有实际时序数据；未认证 Nightingale Target API 返回 HTTP 401 `unauthorized` |
-| 官方源码匹配 | 运行二进制提交与官方 `ccfos/nightingale` 标签 `v9.0.0` 的提交 `b78db21544584381def321fb5201ac80e48ad491` 完全一致 |
+| 官方源码匹配 | 适配器按 Nightingale v9 系列已验证 API 契约实现，不记录私有部署构建号 |
 
 本次证据采集使用用户明确授权的开发期只读 SSH，只读取服务状态、版本、脱敏配置结构和只读数据库元数据/非敏感资产字段，没有修改或重启 Nightingale 组件。该行为不改变产品边界：InfraView 运行时不得包含 SSH 客户端、远程命令或自动化变更能力。
 
@@ -25,23 +25,23 @@
 
 | InfraView 字段 | Nightingale / Categraf 指标 | 标签与聚合 | 原始单位 |
 | --- | --- | --- | --- |
-| 主机 ID / 名称 | Target `ident` | 当前为 `y01`、`y02`、`y03` | 字符串 |
+| 主机 ID / 名称 | Target `ident` | 脱敏夹具使用 `fixture-node-01`、`fixture-node-02`、`fixture-node-03` | 字符串 |
 | IP | Target `host_ip`；`system_info` 也含 `host_ip` | 按 `ident` 映射 | IPv4 字符串 |
 | CPU 使用率 | `cpu_usage_active` | 每个 `ident` 单序列 | 百分比 |
 | 内存使用率 | `mem_used_percent` | 每个 `ident` 单序列 | 百分比 |
 | 1 分钟负载 | `system_load1` | 每个 `ident` 单序列 | 标量 |
-| IO 忙碌度 | `diskio_io_util` | 每主机存在多磁盘序列；暂定 `max by (ident)`，需用认证查询验证 Nightingale 返回结构 | 百分比 |
+| IO 忙碌度 | `diskio_io_util` | 每主机存在多磁盘序列；已验证使用 `max by (ident)` 聚合 | 百分比 |
 | 网络发送/接收 | `net_bytes_sent` / `net_bytes_recv` | 累计计数器，需 `rate()`；存在物理、Docker、Calico、veth、bridge、tunnel 接口，必须使用受控可配置过滤规则 | 字节计数器，换算 B/s |
 | 运行时间 | `system_uptime` | 每个 `ident` 单序列 | 秒 |
 | CPU 核数 | `system_n_cpus`；`machine_cpu_cores` 可作交叉验证 | 每个 `ident` 单序列 | 核 |
 | 内存总量 | `mem_total`；`machine_memory_bytes` 可作交叉验证 | 每个 `ident` 单序列 | 字节 |
 | 系统元数据 | `system_info` | 含 `ident`、`hostname`、`host_ip`、`kernel_version` | 标签 |
 
-当前 3 台测试机的 CPU 核数均为 8，内存总量均为 `16497283072` 字节。网络物理接口当前为 `ens34`，但适配器不能硬编码该名称；建议配置允许/排除正则，默认排除 `lo`、Docker、veth、Calico、bridge 和 tunnel 接口。
+CPU 核数、内存总量和网络接口映射已通过脱敏夹具验证。公开仓库不记录真实节点数量、硬件规格或物理接口名；适配器不能硬编码接口名称，默认排除 `lo`、Docker、veth、Calico、bridge 和 tunnel 接口。
 
 ## 已确认只读 API 契约
 
-以下契约来自与运行二进制完全匹配的官方 v9.0.0 源码和内置 API 文档；未认证访问受保护路由返回 401：
+以下契约来自 Nightingale v9 系列官方源码、内置 API 文档和脱敏响应证据；未认证访问受保护路由返回 401：
 
 - `GET /api/n9e/targets?limit=100&p=1`：分页主机清单，响应 `dat={"list":[...],"total":N}`。Target 包含 `ident`、`host_ip`、`os`、`agent_version`、`beat_time`、`target_up`、`cpu_num`、`cpu_util`、`mem_util`、`arch`、业务组和标签。
 - `GET /api/n9e/targets/stats`：可见主机总数、存活/离线数和 CPU/内存分桶。
@@ -55,17 +55,17 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 
 ## 已确认适配策略
 
-- `ListHosts`：分页调用 `/targets`，以 `ident` 作为稳定 ID 和显示主机名，映射 `host_ip`、`os`、`agent_version`；`target_up=2` 映射 online，`1` 映射 unknown，`0` 映射 offline。当前 3 台真实 Target 均返回 `target_up=2`。
+- `ListHosts`：分页调用 `/targets`，以 `ident` 作为稳定 ID 和显示主机名，映射 `host_ip`、`os`、`agent_version`；`target_up=2` 映射 online，`1` 映射 unknown，`0` 映射 offline。脱敏 Target 样本已覆盖该映射，真实资源数量和状态不进入公开仓库。
 - CPU 核数优先使用 Target 的 `cpu_num`，`-1` 映射未知；可使用 `system_n_cpus` 交叉验证。
 - 内存总容量使用 `mem_total` 批量即时查询，因为 Target 只直接提供 `mem_util`，不提供总字节数。
 - `GetCurrentMetrics`：对全部目标使用固定、代码内置的 PromQL 通过一次 `/query-instant-batch` 批量查询，按 `ident` 归并，禁止按主机 N+1。
 - `QueryRange`：使用 `/query-range-batch`，只允许领域指标映射生成的固定查询，不接受前端或用户提交 PromQL。
 - `QueryAggregateRange`：使用批量范围查询直接在上游按 `ident`/全局聚合，保持总览每指标单序列和最多 600 点约束。
 - IO 使用 `max by (ident) (diskio_io_util{ident!=""})`。当前环境即时验证值正常。
-- 网络使用 `rate(net_bytes_sent[2m])` / `rate(net_bytes_recv[2m])` 并执行配置化接口过滤；当前环境排除虚拟接口后得到合理 B/s。不得硬编码 `ens34`。
+- 网络使用 `rate(net_bytes_sent[2m])` / `rate(net_bytes_recv[2m])` 并执行配置化接口过滤；当前环境排除虚拟接口后得到合理 B/s。不得硬编码 任何物理接口名。
 - 不使用 `/api/n9e/proxy/:id/*` 实现任意代理，不向 InfraView API 或页面暴露任意数据源 URL、查询表达式或原始 Nightingale 请求体。
 
-真实 root 用户个人 Token 已写入权限为 600、被 Git 忽略的私密 `.env`，并完成认证实证。即时查询实际返回 `dat[查询索引][序列]`，其中单点值为 `[Unix秒, 字符串值]`；区间查询对应 `values=[[Unix秒, 字符串值], ...]`。无 Token 和错误 Token 均返回 HTTP 401 与 `text/plain`，因此错误解析不能假设 JSON。完全脱敏的仓库测试夹具尚未创建，应作为下一步 TDD 的第一项工作。
+真实凭据只存在于被 Git 忽略、权限受限的私有环境文件中，公开仓库不记录其路径、账号或权限。即时查询实际返回 `dat[查询索引][序列]`，其中单点值为 `[Unix秒, 字符串值]`；区间查询对应 `values=[[Unix秒, 字符串值], ...]`。无 Token 和错误 Token 均返回 HTTP 401 与 `text/plain`，因此错误解析不能假设 JSON。仓库已加入完全脱敏的分页、即时、区间、空结果和错误夹具。
 
 ## 禁止猜测
 
@@ -89,21 +89,21 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 
 ## 目标映射
 
-适配器最终只实现 `internal/datasource.Provider`：`Health`、`ListHosts`、`GetHost`、`GetCurrentMetrics`、`QueryRange`、`QueryAggregateRange`。前端和服务层不接收 Nightingale 原始请求体、任意 URL 或任意查询表达式。
+适配器只实现 `internal/datasource.Provider`：`Health`、`ListHosts`、`GetHost`、`GetCurrentMetrics`、`QueryRange`、`QueryAggregateRange`。前端和服务层不接收 Nightingale 原始请求体、任意 URL 或任意查询表达式。
 
 ## 实施顺序
 
-1. 更新本文件中的版本/认证/端点证据。
-2. 编写独立规格与计划。
-3. 先加入脱敏契约夹具和失败测试。
-4. 实现只读适配器、批量查询、超时、大小限制和错误分类。
-5. 验证 TTL、请求合并、stale、分页和 100 台规模。
-6. 更新配置、部署、安全、测试和项目状态文档。
+1. [x] 更新版本、认证和端点证据。
+2. [x] 编写独立规格与计划。
+3. [x] 加入脱敏契约夹具和失败测试。
+4. [x] 实现只读适配器、批量查询、超时、大小限制和错误分类。
+5. [x] 验证缓存组合、分页、批量、空结果和 100 台规模。
+6. [x] 更新配置、部署、安全、测试和项目状态文档。
 
 任何真实凭据都不得进入仓库、测试夹具、错误消息或日志。
 
 ## 当前凭据与后续动作
 
-用户已完成 Token 配置，并确认测试及现阶段正式方案暂时使用 Nightingale root 用户个人 Token。该选择便于当前联调，但权限面较大；InfraView 仍只调用已确认的只读接口。后续若用户决定收敛权限，再迁移到专用最小只读账号，不作为当前接入阻塞项。
+真实部署必须配置专用最小只读 Token；公开仓库不记录 Token 值、绑定账号或权限。InfraView 仍只调用已确认的只读接口，但应用只读边界不能替代上游最小权限。
 
-下一步不再重复远端版本探测，直接创建完全脱敏夹具和失败测试，以 TDD 实现适配器。恢复开发的详细入口见 `docs/HANDOFF.md`。
+当前 8080 服务已切换为 Nightingale：数据源健康，脱敏主机样本的资产字段、六类当前指标、CPU/内存/负载/网络历史和总览聚合均通过真实 API 验证；数据源状态 API 返回真实 `nightingale` 类型和 15 秒界面刷新周期，当前指标缓存为 15 秒，静态资产与历史缓存仍为 60 秒。左下角使用紧凑“数据连接”汇总，健康时显示绿色 `1/1 正常`，展开后显示指标来源、健康结果和最近检查时间。刷新优化重部署后完成 API smoke、隔离 Mock Chromium 4/4，并重新完成真实 Nightingale 1440×900 登录浏览器默认/展开状态视觉验收。磁盘容量、磁盘读写历史没有充分契约证据，适配器明确返回空序列。后续重点是最小权限 Token 和磁盘指标证据，恢复入口见 `docs/HANDOFF.md`。

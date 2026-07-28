@@ -11,6 +11,7 @@ import { ErrorPanel } from '../../components/ErrorPanel'
 import { RefreshControl } from '../../components/RefreshControl'
 import { StaleBanner } from '../../components/StaleBanner'
 import { StatusBadge } from '../../components/StatusBadge'
+import { useRefreshIntervalMs } from '../../app/runtime'
 
 function alertLevel(alerts: AlertCount): MetricLevel {
   if (alerts.critical > 0) return 'critical'
@@ -28,20 +29,23 @@ function MetricAlert({ label, alerts }: { label: string; alerts: AlertCount }) {
         <strong>{total}</strong>
       </div>
       <span>
-        严重 {alerts.critical} · 警告 {alerts.warning}
+        {total === 0
+          ? '无异常'
+          : `严重 ${alerts.critical} · 警告 ${alerts.warning}`}
       </span>
     </div>
   )
 }
 
 export function OverviewPage() {
+  const refreshIntervalMs = useRefreshIntervalMs()
   const overview = useQuery({
     queryKey: ['overview'],
     queryFn: ({ signal }) =>
       apiRequest<OverviewResponse>('/api/v1/overview?range=24h', {
         signal,
       }),
-    refetchInterval: 30_000,
+    refetchInterval: refreshIntervalMs,
     refetchIntervalInBackground: false,
   })
 
@@ -55,7 +59,8 @@ export function OverviewPage() {
           <p className="eyebrow">运行态势</p>
           <h1 id="overview-title">基础设施总览</h1>
           <p className="page-description">
-            集中查看各基础设施板块状态，每 30 秒自动刷新。
+            集中查看各基础设施板块状态，每{' '}
+            {refreshIntervalMs / 1_000} 秒自动刷新。
           </p>
         </div>
         <div className="overview-controls" role="group" aria-label="总览控制">
@@ -63,6 +68,7 @@ export function OverviewPage() {
             isFetching={overview.isFetching}
             dataUpdatedAt={overview.dataUpdatedAt}
             onRefresh={() => void overview.refetch()}
+            refreshIntervalSeconds={refreshIntervalMs / 1_000}
           />
         </div>
       </div>
@@ -128,12 +134,24 @@ export function OverviewPage() {
                   </div>
                   <div className="module-alert-levels">
                     <StatusBadge
-                      level="critical"
-                      label={`严重 ${alerts.critical_hosts}`}
+                      level={
+                        alerts.critical_hosts > 0 ? 'critical' : 'normal'
+                      }
+                      label={
+                        alerts.critical_hosts > 0
+                          ? `严重 ${alerts.critical_hosts}`
+                          : '无严重'
+                      }
                     />
                     <StatusBadge
-                      level="warning"
-                      label={`警告 ${alerts.warning_hosts}`}
+                      level={
+                        alerts.warning_hosts > 0 ? 'warning' : 'normal'
+                      }
+                      label={
+                        alerts.warning_hosts > 0
+                          ? `警告 ${alerts.warning_hosts}`
+                          : '无警告'
+                      }
                     />
                   </div>
                 </div>
@@ -152,12 +170,26 @@ export function OverviewPage() {
                       label={`在线 ${overview.data.data.online}`}
                     />
                     <StatusBadge
-                      level="critical"
-                      label={`离线 ${overview.data.data.offline}`}
+                      level={
+                        overview.data.data.offline > 0
+                          ? 'critical'
+                          : 'normal'
+                      }
+                      label={
+                        overview.data.data.offline > 0
+                          ? `离线 ${overview.data.data.offline}`
+                          : '无离线'
+                      }
                     />
                     <StatusBadge
-                      level="unknown"
-                      label={`未知 ${overview.data.data.unknown}`}
+                      level={
+                        overview.data.data.unknown > 0 ? 'unknown' : 'normal'
+                      }
+                      label={
+                        overview.data.data.unknown > 0
+                          ? `未知 ${overview.data.data.unknown}`
+                          : '无未知'
+                      }
                     />
                   </div>
                   <span className="module-status-action">

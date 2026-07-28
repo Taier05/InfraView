@@ -2,6 +2,7 @@ interface RefreshControlProps {
   isFetching: boolean
   dataUpdatedAt: number
   onRefresh: () => void
+  refreshIntervalSeconds: number
   ariaLabel?: string
 }
 
@@ -18,6 +19,7 @@ export function RefreshControl({
   isFetching,
   dataUpdatedAt,
   onRefresh,
+  refreshIntervalSeconds,
   ariaLabel = '刷新',
 }: RefreshControlProps) {
   return (
@@ -37,7 +39,7 @@ export function RefreshControl({
           : dataUpdatedAt > 0
             ? `上次刷新 ${refreshTime(dataUpdatedAt)}`
             : '等待首次刷新'}
-        {' · 每 30 秒自动刷新'}
+        {` · 每 ${refreshIntervalSeconds} 秒自动刷新`}
       </span>
     </div>
   )

@@ -107,8 +107,10 @@ type metricRangeView struct {
 }
 
 type datasourceStatusView struct {
-	Healthy   bool      `json:"healthy"`
-	CheckedAt time.Time `json:"checked_at"`
+	Type                   string    `json:"type"`
+	Healthy                bool      `json:"healthy"`
+	CheckedAt              time.Time `json:"checked_at"`
+	RefreshIntervalSeconds int64     `json:"refresh_interval_seconds"`
 }
 
 func (a *api) overview(w http.ResponseWriter, r *http.Request) {
@@ -261,7 +263,12 @@ func (a *api) datasourceStatus(w http.ResponseWriter, r *http.Request) {
 		a.writeServiceError(w, r, err)
 		return
 	}
-	writeSuccess(w, r, datasourceStatusView{Healthy: value.Healthy, CheckedAt: value.CheckedAt}, meta)
+	writeSuccess(w, r, datasourceStatusView{
+		Type:                   a.config.DataSource,
+		Healthy:                value.Healthy,
+		CheckedAt:              value.CheckedAt,
+		RefreshIntervalSeconds: int64(a.config.RefreshInterval / time.Second),
+	}, meta)
 }
 
 func (a *api) writeServiceError(w http.ResponseWriter, r *http.Request, err error) {

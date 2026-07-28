@@ -5,6 +5,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { APIError, apiRequest } from '../api/client'
 import type { DataSourceStatusResponse } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
+import { refreshIntervalMilliseconds } from './runtime'
 
 export function AppShell() {
   const { logout, username } = useAuth()
@@ -15,7 +16,10 @@ export function AppShell() {
       apiRequest<DataSourceStatusResponse>('/api/v1/datasource/status', {
         signal,
       }),
-    refetchInterval: 30_000,
+    refetchInterval: (query) =>
+      refreshIntervalMilliseconds(
+        query.state.data?.data.refresh_interval_seconds,
+      ),
     refetchIntervalInBackground: false,
   })
 
@@ -40,6 +44,27 @@ export function AppShell() {
           : datasourceState === 'healthy'
             ? '健康'
             : '异常'
+  const datasourceName =
+    datasourceData?.data.type === 'nightingale'
+      ? 'Nightingale'
+      : datasourceData?.data.type === 'mock'
+        ? 'Mock'
+        : '待确认'
+  const connectionSummary =
+    datasourceState === 'loading'
+      ? '正在检查'
+      : datasourceState === 'error'
+        ? '状态获取失败'
+        : datasourceState === 'stale'
+          ? '状态过期'
+          : datasourceState === 'unhealthy'
+            ? '1 个连接异常'
+            : datasourceData?.data.type === 'mock'
+              ? '包含 Mock 数据'
+              : '1/1 正常'
+  const refreshIntervalMs = refreshIntervalMilliseconds(
+    datasourceData?.data.refresh_interval_seconds,
+  )
 
   async function handleLogout() {
     setLogoutError(null)
@@ -78,41 +103,53 @@ export function AppShell() {
           <NavLink to="/hosts">主机</NavLink>
         </nav>
 
-        <div
+        <details
           className="source-status"
-          aria-label="数据源状态"
+          aria-label="数据连接汇总"
           data-state={datasourceState}
+          data-mode={datasourceData?.data.type ?? 'unknown'}
         >
-          <span className="status-label">数据源</span>
-          <strong>Mock</strong>
-          <span className="status-detail">
+          <summary>
             <span className="status-dot" aria-hidden="true" />
-            {datasourceLabel}
-          </span>
-          {datasourceData !== undefined && (
-            <>
-              {datasourceData.meta.stale && (
-                <span className="source-last-result">
-                  上次检查{datasourceData.data.healthy ? '健康' : '异常'}
-                </span>
-              )}
-              <span className="source-checked-at">
-                最近检查
-                <time dateTime={datasourceData.data.checked_at}>
-                  {new Intl.DateTimeFormat('zh-CN', {
-                    dateStyle: 'short',
-                    timeStyle: 'medium',
-                  }).format(new Date(datasourceData.data.checked_at))}
-                </time>
-              </span>
-            </>
-          )}
-          {datasourceData !== undefined && datasource.isError && (
-            <span className="source-request-error" role="alert">
-              状态刷新失败
+            <span className="connection-summary-title">数据连接</span>
+            <span className="connection-summary-state">
+              {connectionSummary}
             </span>
-          )}
-        </div>
+            <span className="connection-toggle" aria-hidden="true">
+              ›
+            </span>
+          </summary>
+          <div className="connection-details">
+            <div className="connection-row">
+              <span className="connection-kind">指标</span>
+              <strong>{datasourceName}</strong>
+              <span className="connection-health">{datasourceLabel}</span>
+            </div>
+            {datasourceData !== undefined && (
+              <>
+                {datasourceData.meta.stale && (
+                  <span className="source-last-result">
+                    上次检查{datasourceData.data.healthy ? '健康' : '异常'}
+                  </span>
+                )}
+                <span className="source-checked-at">
+                  最近检查
+                  <time dateTime={datasourceData.data.checked_at}>
+                    {new Intl.DateTimeFormat('zh-CN', {
+                      dateStyle: 'short',
+                      timeStyle: 'medium',
+                    }).format(new Date(datasourceData.data.checked_at))}
+                  </time>
+                </span>
+              </>
+            )}
+            {datasourceData !== undefined && datasource.isError && (
+              <span className="source-request-error" role="alert">
+                状态刷新失败
+              </span>
+            )}
+          </div>
+        </details>
       </aside>
 
       <div className="workspace" data-density="dense">
@@ -139,7 +176,7 @@ export function AppShell() {
         )}
 
         <main id="main-content" className="content" tabIndex={-1}>
-          <Outlet />
+          <Outlet context={{ refreshIntervalMs }} />
         </main>
       </div>
     </div>
