@@ -221,3 +221,130 @@ git commit -m "feat: 提供 MySQL 只读查询 API"
 - `docker ... gofmt -l ...`：无输出
 - `git diff --check`：无输出
 - MySQL method-qualified 路由扫描：仅两个 `GET`
+
+---
+
+# Fix Round 1
+
+## 正式审查结论处理
+
+- 修正基线：`80f2761bb5416bbdfe411c49818c0a05c7bbc9d1`
+- Important 根因：`url.ParseQuery` 将 `?key` 和 `?key=` 都解析为单个空字符串；共享 `queryParameters` 原先只校验允许键和单值数量。`search`、`status`、`role`、`sort`、`order` 的空值因此被 Service 当作未设置，返回 200 并调用 provider。
+- RED 覆盖：`search`、`status`、`role`、`sort`、`order`、`page`、`page_size` 七个允许参数，各自覆盖 bare key 与显式空值，共 14 个子测试；同时断言非法请求的 provider 调用次数为 0。
+- RED 证据：10 个非分页子测试均得到 `status = 200, provider calls = 1`；分页参数已由既有整数解析返回 400。
+- 最小修复：共享 `queryParameters` 在解析成功、键允许、值数量等于 1 后，再要求唯一值非空。所有 14 个子测试随后返回 400 且 provider 调用保持 0。
+- Minor 契约测试：
+  - 精确检查 overview/instances 的 envelope、meta、data、alerts、instance、replication key 集合；
+  - 检查所有叶子 JSON 类型；
+  - fixture 的 connections、max_connections、connection_usage_percent、threads_running、qps、slow_queries_per_second、buffer_pool_usage_percent、uptime_seconds、replication.lag_seconds 必须保持 JSON `null`；
+  - 空快照必须编码为 `instances: []`，并保持 `total=0`、`page=1`、`page_size=20`、`total_pages=0`。
+- 未改变 API 设计、路由、Service 查询语义或生产装配。
+
+## Fix Round 1 变更文件
+
+- 修改：`internal/httpapi/query_handlers.go`
+- 修改：`internal/httpapi/api_test.go`
+- 追加：本报告
+
+所有受跟踪文件修改均通过 `apply_patch` 完成；`gofmt` 仅对两个 Go 文件做机械格式化。
+
+## Fix Round 1 实际命令（按执行顺序）
+
+1. 核对修正基线与工作树：
+
+```bash
+git rev-parse HEAD
+git status --short
+```
+
+2. 首次空/bare 参数 RED：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm go test ./internal/httpapi -run 'TestMySQLInstancesRejectsEmptyAllowedParametersBeforeProvider' -count=1
+```
+
+3. 合并状态与 provider 调用断言后的精确 RED：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm go test ./internal/httpapi -run 'TestMySQLInstancesRejectsEmptyAllowedParametersBeforeProvider' -count=1
+```
+
+4. 共享 parser 最小修复后的 GREEN：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm go test ./internal/httpapi -run 'TestMySQLInstancesRejectsEmptyAllowedParametersBeforeProvider' -count=1
+```
+
+5. Important 与 Minor 聚焦契约：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm go test ./internal/httpapi -run 'TestMySQL(InstancesRejectsEmptyAllowedParametersBeforeProvider|ViewsExposeCompleteSchemaAndPreserveNullMetrics|InstancesEncodeEmptySnapshotAsArray)' -count=1
+```
+
+6. 格式化：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/src" -w /src golang:1.24-bookworm gofmt -w internal/httpapi/api_test.go internal/httpapi/query_handlers.go
+```
+
+7. 全部 MySQL HTTP 聚焦回归：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm go test ./internal/httpapi -run 'TestMySQL' -count=1
+```
+
+8. 全仓 Go 回归：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm go test ./... -count=1
+```
+
+9. 差异与范围审查：
+
+```bash
+git status --short
+git diff --check
+git diff --stat
+git diff -- internal/httpapi/query_handlers.go internal/httpapi/api_test.go
+rg -n 'parameterValues\[0\]|RejectsEmptyAllowed|provider calls|ExposeCompleteSchema|EncodeEmptySnapshot|jsonPathIsNull|assertJSONObjectKeys' internal/httpapi/query_handlers.go internal/httpapi/api_test.go
+```
+
+10. 最终格式与差异门检：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/src" -w /src golang:1.24-bookworm gofmt -l internal/httpapi/api_test.go internal/httpapi/query_handlers.go
+git diff --check
+git status --short
+```
+
+11. 精确暂存 Fix Round 1 文件；三个文件均进入 index，但 Git 仍对显式 `.superpowers` 路径输出忽略提示并以 1 退出：
+
+```bash
+git add internal/httpapi/query_handlers.go internal/httpapi/api_test.go .superpowers/sdd/2026-07-28-mysql-module/task-8-implementer-report.md
+```
+
+12. 仅强制刷新暂存任务明确要求的原报告：
+
+```bash
+git add -f .superpowers/sdd/2026-07-28-mysql-module/task-8-implementer-report.md
+```
+
+13. 提交前检查：
+
+```bash
+git diff --cached --check
+git diff --cached --stat
+```
+
+14. 单独修正提交：
+
+```bash
+git commit -m "fix: 拒绝 MySQL 空查询参数"
+```
+
+## Fix Round 1 最终验证结果
+
+- `docker ... go test ./internal/httpapi -run 'TestMySQL' -count=1`：PASS
+- `docker ... go test ./... -count=1`：PASS；所有 Go 包 0 failures
+- 14 个 empty/bare 子测试：全部 400，provider 调用为 0
+- 完整 schema、nullable null、空快照数组契约：PASS

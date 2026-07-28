@@ -306,7 +306,7 @@ func queryParameters(r *http.Request, allowed ...string) (url.Values, bool) {
 		allowedSet[name] = struct{}{}
 	}
 	for name, parameterValues := range values {
-		if _, ok := allowedSet[name]; !ok || len(parameterValues) != 1 {
+		if _, ok := allowedSet[name]; !ok || len(parameterValues) != 1 || parameterValues[0] == "" {
 			return nil, false
 		}
 	}

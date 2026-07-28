@@ -86,6 +86,149 @@ func TestMySQLOverviewAndInstancesReturnReadOnlyViews(t *testing.T) {
 	}
 }
 
+func TestMySQLViewsExposeCompleteSchemaAndPreserveNullMetrics(t *testing.T) {
+	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
+
+	overview := request(t, handler, http.MethodGet, "/api/v1/mysql/overview", "", sessionCookie)
+	if overview.Code != http.StatusOK {
+		t.Fatalf("overview status = %d", overview.Code)
+	}
+	overviewBody := overview.Body.Bytes()
+	assertJSONObjectKeys(t, overviewBody, "", "data", "meta")
+	assertJSONObjectKeys(
+		t,
+		overviewBody,
+		"data",
+		"total",
+		"normal",
+		"warning",
+		"critical",
+		"unknown",
+		"affected_instances",
+		"warning_instances",
+		"critical_instances",
+		"alerts",
+	)
+	assertJSONObjectKeys(t, overviewBody, "data.alerts", "availability", "replication_threads", "replication_lag", "replication_data")
+	for _, category := range []string{"availability", "replication_threads", "replication_lag", "replication_data"} {
+		assertJSONObjectKeys(t, overviewBody, "data.alerts."+category, "warning", "critical")
+		for _, level := range []string{"warning", "critical"} {
+			path := "data.alerts." + category + "." + level
+			if !jsonPathIsNumber(t, overviewBody, path) {
+				t.Fatalf("JSON path %q is not a number", path)
+			}
+		}
+	}
+	for _, path := range []string{
+		"data.total",
+		"data.normal",
+		"data.warning",
+		"data.critical",
+		"data.unknown",
+		"data.affected_instances",
+		"data.warning_instances",
+		"data.critical_instances",
+	} {
+		if !jsonPathIsNumber(t, overviewBody, path) {
+			t.Fatalf("JSON path %q is not a number", path)
+		}
+	}
+	assertMySQLResponseMetaSchema(t, overviewBody)
+
+	instances := request(t, handler, http.MethodGet, "/api/v1/mysql/instances?page=1&page_size=20", "", sessionCookie)
+	if instances.Code != http.StatusOK {
+		t.Fatalf("instances status = %d", instances.Code)
+	}
+	instancesBody := instances.Body.Bytes()
+	assertJSONObjectKeys(t, instancesBody, "", "data", "meta")
+	assertJSONObjectKeys(t, instancesBody, "data", "instances", "total", "page", "page_size", "total_pages")
+	for _, path := range []string{"data.total", "data.page", "data.page_size", "data.total_pages"} {
+		if !jsonPathIsNumber(t, instancesBody, path) {
+			t.Fatalf("JSON path %q is not a number", path)
+		}
+	}
+	items, ok := jsonPathValue(t, instancesBody, "data.instances").([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("instances type/length invalid")
+	}
+	assertJSONObjectKeys(
+		t,
+		instancesBody,
+		"data.instances.0",
+		"id",
+		"name",
+		"address",
+		"host",
+		"version",
+		"role",
+		"connections",
+		"max_connections",
+		"connection_usage_percent",
+		"threads_running",
+		"qps",
+		"slow_queries_per_second",
+		"buffer_pool_usage_percent",
+		"uptime_seconds",
+		"replication",
+		"status",
+	)
+	for _, field := range []string{"id", "name", "address", "host", "version", "role", "status"} {
+		path := "data.instances.0." + field
+		if !jsonPathIsString(t, instancesBody, path) {
+			t.Fatalf("JSON path %q is not a string", path)
+		}
+	}
+	for _, field := range []string{
+		"connections",
+		"max_connections",
+		"connection_usage_percent",
+		"threads_running",
+		"qps",
+		"slow_queries_per_second",
+		"buffer_pool_usage_percent",
+		"uptime_seconds",
+	} {
+		path := "data.instances.0." + field
+		if !jsonPathIsNull(t, instancesBody, path) {
+			t.Fatalf("JSON path %q is not null", path)
+		}
+	}
+	assertJSONObjectKeys(t, instancesBody, "data.instances.0.replication", "state", "lag_seconds", "level")
+	for _, field := range []string{"state", "level"} {
+		path := "data.instances.0.replication." + field
+		if !jsonPathIsString(t, instancesBody, path) {
+			t.Fatalf("JSON path %q is not a string", path)
+		}
+	}
+	if !jsonPathIsNull(t, instancesBody, "data.instances.0.replication.lag_seconds") {
+		t.Fatal("replication lag is not null")
+	}
+	assertMySQLResponseMetaSchema(t, instancesBody)
+}
+
+func TestMySQLInstancesEncodeEmptySnapshotAsArray(t *testing.T) {
+	handler, sessionCookie := newMySQLAPITestHandler(t, mysql.Snapshot{})
+	response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances", "", sessionCookie)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d", response.Code)
+	}
+	body := response.Body.Bytes()
+	instances, ok := jsonPathValue(t, body, "data.instances").([]any)
+	if !ok || len(instances) != 0 {
+		t.Fatalf("instances type/length invalid")
+	}
+	for path, want := range map[string]float64{
+		"data.total":       0,
+		"data.page":        1,
+		"data.page_size":   20,
+		"data.total_pages": 0,
+	} {
+		if got, ok := jsonPathValue(t, body, path).(float64); !ok || got != want {
+			t.Fatalf("JSON path %q = %#v, want %v", path, got, want)
+		}
+	}
+}
+
 func TestMySQLRoutesRejectMutationMethods(t *testing.T) {
 	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
 	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
@@ -138,6 +281,34 @@ func TestMySQLInstancesRejectsMalformedOrEmptyPaginationParameters(t *testing.T)
 	response := requestWithRawQuery(t, handler, sessionCookie, "/api/v1/mysql/instances", "unknown=%ZZ")
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("malformed escape status = %d", response.Code)
+	}
+}
+
+func TestMySQLInstancesRejectsEmptyAllowedParametersBeforeProvider(t *testing.T) {
+	for _, parameter := range []string{"search", "status", "role", "sort", "order", "page", "page_size"} {
+		for _, form := range []struct {
+			name   string
+			suffix string
+		}{
+			{name: "bare"},
+			{name: "explicit_empty", suffix: "="},
+		} {
+			t.Run(parameter+"/"+form.name, func(t *testing.T) {
+				provider := &mysqlSnapshotProvider{snapshot: fixtureMySQLSnapshot()}
+				handler, sessionCookie := newMySQLAPIProviderTestHandler(t, provider)
+				response := request(
+					t,
+					handler,
+					http.MethodGet,
+					"/api/v1/mysql/instances?"+parameter+form.suffix,
+					"",
+					sessionCookie,
+				)
+				if response.Code != http.StatusBadRequest || provider.calls != 0 {
+					t.Fatalf("status = %d, provider calls = %d", response.Code, provider.calls)
+				}
+			})
+		}
 	}
 }
 
@@ -735,6 +906,17 @@ func jsonPathIsArray(t *testing.T, body []byte, path string) bool {
 	return ok
 }
 
+func jsonPathIsString(t *testing.T, body []byte, path string) bool {
+	t.Helper()
+	_, ok := jsonPathValue(t, body, path).(string)
+	return ok
+}
+
+func jsonPathIsNull(t *testing.T, body []byte, path string) bool {
+	t.Helper()
+	return jsonPathValue(t, body, path) == nil
+}
+
 func jsonPathAllowsNull(t *testing.T, body []byte, path string) bool {
 	t.Helper()
 	value := jsonPathValue(t, body, path)
@@ -750,6 +932,9 @@ func jsonPathValue(t *testing.T, body []byte, path string) any {
 	var value any
 	if err := json.Unmarshal(body, &value); err != nil {
 		t.Fatalf("response is not valid JSON: %v", err)
+	}
+	if path == "" {
+		return value
 	}
 	for _, segment := range strings.Split(path, ".") {
 		switch current := value.(type) {
@@ -770,6 +955,34 @@ func jsonPathValue(t *testing.T, body []byte, path string) any {
 		}
 	}
 	return value
+}
+
+func assertJSONObjectKeys(t *testing.T, body []byte, path string, want ...string) {
+	t.Helper()
+	object, ok := jsonPathValue(t, body, path).(map[string]any)
+	if !ok {
+		t.Fatalf("JSON path %q is not an object", path)
+	}
+	if len(object) != len(want) {
+		t.Fatalf("JSON path %q has %d keys, want %d", path, len(object), len(want))
+	}
+	for _, key := range want {
+		if _, ok := object[key]; !ok {
+			t.Fatalf("JSON path %q is missing key %q", path, key)
+		}
+	}
+}
+
+func assertMySQLResponseMetaSchema(t *testing.T, body []byte) {
+	t.Helper()
+	assertJSONObjectKeys(t, body, "meta", "request_id", "stale", "collected_at")
+	if !jsonPathIsString(t, body, "meta.request_id") ||
+		!jsonPathIsString(t, body, "meta.collected_at") {
+		t.Fatal("MySQL response meta string fields are invalid")
+	}
+	if _, ok := jsonPathValue(t, body, "meta.stale").(bool); !ok {
+		t.Fatal("MySQL response meta stale is not a boolean")
+	}
 }
 
 func newTestAPIAt(t *testing.T, provider datasource.Provider, clock func() time.Time) http.Handler {
@@ -925,9 +1138,11 @@ type unavailableProvider struct{}
 type mysqlSnapshotProvider struct {
 	snapshot mysql.Snapshot
 	err      error
+	calls    int
 }
 
 func (p *mysqlSnapshotProvider) MySQLSnapshot(context.Context) (mysql.Snapshot, error) {
+	p.calls++
 	return p.snapshot, p.err
 }
 
