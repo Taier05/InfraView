@@ -997,8 +997,13 @@ h1 {
   table-layout: fixed;
 }
 
-.mysql-table {
-  min-width: 104rem;
+.mysql-table-scroll {
+  overflow-x: hidden;
+}
+
+.mysql-table-compact {
+  width: 100%;
+  min-width: 0;
 }
 
 .host-table th,
@@ -1041,17 +1046,33 @@ h1 {
 .host-table th:nth-child(10) { width: 10%; }
 .host-table th:nth-child(11) { width: 7%; }
 
-.mysql-table th:nth-child(1) { width: 14%; }
-.mysql-table th:nth-child(2) { width: 10%; }
-.mysql-table th:nth-child(3) { width: 11%; }
-.mysql-table th:nth-child(4) { width: 12%; }
-.mysql-table th:nth-child(5) { width: 7%; }
-.mysql-table th:nth-child(6) { width: 6%; }
-.mysql-table th:nth-child(7) { width: 9%; }
-.mysql-table th:nth-child(8) { width: 10%; }
-.mysql-table th:nth-child(9) { width: 11%; }
-.mysql-table th:nth-child(10),
-.mysql-table th:nth-child(11) { width: 5%; }
+.mysql-table-compact th,
+.mysql-table-compact td {
+  padding: 0.32rem 0.3rem;
+}
+
+.mysql-table-compact th {
+  font-size: 0.68rem;
+  line-height: 1.1;
+  white-space: normal;
+}
+
+.mysql-table-compact td {
+  font-size: 0.72rem;
+  line-height: 1.15;
+}
+
+.mysql-table-compact th:nth-child(1) { width: 14%; }
+.mysql-table-compact th:nth-child(2) { width: 9%; }
+.mysql-table-compact th:nth-child(3) { width: 9%; }
+.mysql-table-compact th:nth-child(4) { width: 10%; }
+.mysql-table-compact th:nth-child(5) { width: 7%; }
+.mysql-table-compact th:nth-child(6) { width: 6%; }
+.mysql-table-compact th:nth-child(7) { width: 7%; }
+.mysql-table-compact th:nth-child(8) { width: 9%; }
+.mysql-table-compact th:nth-child(9) { width: 12%; }
+.mysql-table-compact th:nth-child(10) { width: 8%; }
+.mysql-table-compact th:nth-child(11) { width: 9%; }
 
 .host-table th:nth-child(1) .host-sort-button,
 .host-table th:nth-child(n + 5):nth-child(-n + 10) .host-sort-button {
@@ -1240,6 +1261,14 @@ h1 {
 }
 
 @media (max-width: 1100px) {
+  .mysql-table-scroll {
+    overflow-x: auto;
+  }
+
+  .mysql-table-compact {
+    min-width: 68rem;
+  }
+
   .overview-compact-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

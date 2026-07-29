@@ -121,12 +121,16 @@ it('renders the eleven compact MySQL columns', async () => {
   )
   expect(cells[1]).toHaveTextContent('fixture-db-host-a')
   expect(cells[2]).toHaveTextContent('8.4.1 · 可写')
-  expect(cells[3]).toHaveTextContent('32 / 200 (16.0%)')
+  expect(cells[3]).toHaveTextContent('32/200 · 16.0%')
   expect(cells[4]).toHaveTextContent('5')
   expect(cells[5]).toHaveTextContent('123.46')
   expect(cells[6]).toHaveTextContent('0.13')
   expect(cells[7]).toHaveTextContent('82.3%')
   expect(cells[8]).toHaveTextContent('正常 · 2s')
+  expect(cells[8].querySelector('.host-metric')).toHaveAttribute(
+    'title',
+    '正常 · 2s',
+  )
   expect(cells[9]).toHaveTextContent('2天 3小时')
   expect(within(cells[10]).getByText('正常')).toHaveAttribute(
     'data-level',
@@ -140,7 +144,13 @@ it('renders the eleven compact MySQL columns', async () => {
       .getByRole('searchbox', { name: '搜索实例名称、地址或所属主机' })
       .closest('.mysql-list-controls'),
   ).not.toBeNull()
-  expect(screen.getByRole('table')).toHaveClass('mysql-table')
+  const table = screen.getByRole('table')
+  expect(table).toHaveClass(
+    'host-table',
+    'mysql-table',
+    'mysql-table-compact',
+  )
+  expect(table.closest('.mysql-table-scroll')).not.toBeNull()
 })
 
 it('renders missing and unknown versions as Chinese unknown with the role', async () => {

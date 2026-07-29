@@ -34,3 +34,36 @@ test('原 8080 在 1440×900 下显示四列紧凑模块位', async ({ page }) =
   expect(hostBox!.width).toBeLessThanOrEqual(gridBox!.width * 0.26)
   expect(Math.abs(hostBox!.y - mysqlBox!.y)).toBeLessThanOrEqual(1)
 })
+
+test('原 8080 的 MySQL 11 列在 1440×900 下无横向滚动', async ({
+  page,
+}) => {
+  test.skip(!username || !password, '需要显式提供测试服务凭据')
+  await login(page)
+  await page.getByRole('link', { name: '查看 MySQL 板块' }).click()
+  await expect(page.getByRole('heading', { name: 'MySQL 实例' })).toBeVisible()
+
+  const headers = page.getByRole('columnheader')
+  await expect(headers).toHaveCount(11)
+  for (const header of await headers.all()) {
+    await expect(header).toBeVisible()
+  }
+
+  const tableViewport = await page.locator('.mysql-table-scroll').evaluate(
+    (element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }),
+  )
+  expect(tableViewport.scrollWidth).toBeLessThanOrEqual(
+    tableViewport.clientWidth,
+  )
+
+  const documentViewport = await page.locator('html').evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }))
+  expect(documentViewport.scrollWidth).toBeLessThanOrEqual(
+    documentViewport.clientWidth,
+  )
+})

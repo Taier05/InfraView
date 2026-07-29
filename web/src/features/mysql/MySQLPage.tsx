@@ -111,7 +111,7 @@ function connectionUsage(instance: MySQLInstance) {
   }
   const values =
     connections !== null && maximum !== null
-      ? `${decimal(connections)} / ${decimal(maximum)}`
+      ? `${decimal(connections)}/${decimal(maximum)}`
       : connections !== null
         ? decimal(connections)
         : maximum !== null
@@ -119,7 +119,7 @@ function connectionUsage(instance: MySQLInstance) {
           : '暂无数据'
   return connection_usage_percent === null
     ? values
-    : `${values} (${connection_usage_percent.toFixed(1)}%)`
+    : `${values} · ${connection_usage_percent.toFixed(1)}%`
 }
 
 function versionRole(instance: MySQLInstance) {
@@ -154,7 +154,7 @@ function ReplicationText({
         ? `${replicationLabels[state]} · 暂无数据`
         : replicationLabels[state]
   return (
-    <span className="host-metric" data-level={level}>
+    <span className="host-metric" data-level={level} title={text}>
       {text}
     </span>
   )
@@ -502,8 +502,8 @@ export function MySQLPage() {
       )}
 
       <div className="host-table-panel">
-        <div className="host-table-scroll">
-          <table className="host-table mysql-table">
+        <div className="host-table-scroll mysql-table-scroll">
+          <table className="host-table mysql-table mysql-table-compact">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
