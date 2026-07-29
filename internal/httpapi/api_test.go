@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -141,7 +142,10 @@ func TestMySQLViewsExposeCompleteSchemaAndPreserveNullMetrics(t *testing.T) {
 	}
 	instancesBody := instances.Body.Bytes()
 	assertJSONObjectKeys(t, instancesBody, "", "data", "meta")
-	assertJSONObjectKeys(t, instancesBody, "data", "instances", "total", "page", "page_size", "total_pages")
+	assertJSONObjectKeys(t, instancesBody, "data", "instances", "available_labels", "total", "page", "page_size", "total_pages")
+	if !jsonPathIsArray(t, instancesBody, "data.available_labels") {
+		t.Fatal("available_labels is not an array")
+	}
 	for _, path := range []string{"data.total", "data.page", "data.page_size", "data.total_pages"} {
 		if !jsonPathIsNumber(t, instancesBody, path) {
 			t.Fatalf("JSON path %q is not a number", path)
@@ -223,6 +227,45 @@ func TestMySQLInstanceViewExposesBufferPoolSizeBytes(t *testing.T) {
 	}
 }
 
+func TestMySQLInstancesAcceptsLabelAndReturnsAvailableLabelsForEmptyResult(t *testing.T) {
+	snapshot := fixtureMySQLSnapshot()
+	duplicate := snapshot.Instances[0]
+	duplicate.ID = mysql.StableInstanceID("fixture-host-b", "fixture-mysql-b", "192.0.2.13:3306")
+	duplicate.Name = "fixture-mysql-b"
+	duplicate.Address = "192.0.2.13:3306"
+	duplicate.Host = "fixture-host-b"
+	duplicate.Role = mysql.RoleReadOnly
+	running := true
+	lag := float64(8)
+	duplicate.ReplicationChannels = []mysql.ReplicationChannel{{
+		IORunning: &running, SQLRunning: &running, LagSeconds: &lag,
+	}}
+	snapshot.Instances = append(snapshot.Instances, duplicate)
+	handler, sessionCookie := newMySQLAPITestHandler(t, snapshot)
+
+	response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances?label=fixture-mysql-b&status=warning&role=read_only&search=fixture-host-b&sort=status&order=desc&page=1&page_size=20", "", sessionCookie)
+	if response.Code != http.StatusOK {
+		t.Fatalf("labelled response status = %d", response.Code)
+	}
+	if got := jsonPathValue(t, response.Body.Bytes(), "data.total"); got != float64(1) {
+		t.Fatalf("labelled total = %#v, want 1", got)
+	}
+	if got := jsonPathValue(t, response.Body.Bytes(), "data.instances.0.name"); got != "fixture-mysql-b" {
+		t.Fatalf("labelled instance = %#v, want fixture-mysql-b", got)
+	}
+
+	empty := request(t, handler, http.MethodGet, "/api/v1/mysql/instances?label=fixture-mysql-a&status=critical", "", sessionCookie)
+	if empty.Code != http.StatusOK {
+		t.Fatalf("empty response status = %d", empty.Code)
+	}
+	if got := jsonPathValue(t, empty.Body.Bytes(), "data.total"); got != float64(0) {
+		t.Fatalf("empty total = %#v, want 0", got)
+	}
+	if got := jsonPathValue(t, empty.Body.Bytes(), "data.available_labels"); !reflect.DeepEqual(got, []any{"fixture-mysql-a", "fixture-mysql-b"}) {
+		t.Fatalf("available_labels = %#v", got)
+	}
+}
+
 func TestMySQLInstancesEncodeEmptySnapshotAsArray(t *testing.T) {
 	handler, sessionCookie := newMySQLAPITestHandler(t, mysql.Snapshot{})
 	response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances", "", sessionCookie)
@@ -271,6 +314,7 @@ func TestMySQLInstancesRejectsUnknownOrRepeatedQueryParameters(t *testing.T) {
 	for _, query := range []string{
 		"?unknown=value",
 		"?status=normal&status=warning",
+		"?label=fixture-mysql-a&label=fixture-mysql-b",
 		"?role=primary",
 		"?sort=raw_promql",
 		"?page_size=10",
@@ -302,7 +346,7 @@ func TestMySQLInstancesRejectsMalformedOrEmptyPaginationParameters(t *testing.T)
 }
 
 func TestMySQLInstancesRejectsEmptyAllowedParametersBeforeProvider(t *testing.T) {
-	for _, parameter := range []string{"search", "status", "role", "sort", "order", "page", "page_size"} {
+	for _, parameter := range []string{"search", "label", "status", "role", "sort", "order", "page", "page_size"} {
 		for _, form := range []struct {
 			name   string
 			suffix string

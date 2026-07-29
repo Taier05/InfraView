@@ -54,11 +54,12 @@ type mysqlInstanceView struct {
 }
 
 type mysqlInstancePageView struct {
-	Instances  []mysqlInstanceView `json:"instances"`
-	Total      int                 `json:"total"`
-	Page       int                 `json:"page"`
-	PageSize   int                 `json:"page_size"`
-	TotalPages int                 `json:"total_pages"`
+	Instances       []mysqlInstanceView `json:"instances"`
+	AvailableLabels []string            `json:"available_labels"`
+	Total           int                 `json:"total"`
+	Page            int                 `json:"page"`
+	PageSize        int                 `json:"page_size"`
+	TotalPages      int                 `json:"total_pages"`
 }
 
 func (a *api) mysqlOverview(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +94,7 @@ func (a *api) mysqlOverview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *api) mysqlInstances(w http.ResponseWriter, r *http.Request) {
-	query, ok := queryParameters(r, "search", "status", "role", "sort", "order", "page", "page_size")
+	query, ok := queryParameters(r, "search", "label", "status", "role", "sort", "order", "page", "page_size")
 	if !ok || hasEmptyMySQLQueryParameter(query) {
 		writeError(w, r, http.StatusBadRequest, "invalid_query", "查询参数无效", false)
 		return
@@ -113,6 +114,7 @@ func (a *api) mysqlInstances(w http.ResponseWriter, r *http.Request) {
 	}
 	value, meta, err := a.mysqlService.Instances(r.Context(), service.MySQLQuery{
 		Search:   query.Get("search"),
+		Label:    query.Get("label"),
 		Status:   service.Level(query.Get("status")),
 		Role:     mysql.Role(query.Get("role")),
 		Sort:     query.Get("sort"),
@@ -132,12 +134,15 @@ func (a *api) mysqlInstances(w http.ResponseWriter, r *http.Request) {
 	if value.Total > 0 {
 		totalPages = (value.Total + value.PageSize - 1) / value.PageSize
 	}
+	availableLabels := make([]string, len(value.AvailableLabels))
+	copy(availableLabels, value.AvailableLabels)
 	writeSuccess(w, r, mysqlInstancePageView{
-		Instances:  instances,
-		Total:      value.Total,
-		Page:       value.Page,
-		PageSize:   value.PageSize,
-		TotalPages: totalPages,
+		Instances:       instances,
+		AvailableLabels: availableLabels,
+		Total:           value.Total,
+		Page:            value.Page,
+		PageSize:        value.PageSize,
+		TotalPages:      totalPages,
 	}, meta)
 }
 

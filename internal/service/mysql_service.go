@@ -132,10 +132,25 @@ func (s *MySQLService) Instances(ctx context.Context, query MySQLQuery) (MySQLPa
 	if err != nil {
 		return MySQLPage{}, Meta{}, err
 	}
+	labels := make(map[string]struct{}, len(snapshot.Instances))
+	for _, instance := range snapshot.Instances {
+		if strings.TrimSpace(instance.Name) != "" {
+			labels[instance.Name] = struct{}{}
+		}
+	}
+	availableLabels := make([]string, 0, len(labels))
+	for label := range labels {
+		availableLabels = append(availableLabels, label)
+	}
+	sort.Strings(availableLabels)
+
 	search := strings.ToLower(strings.TrimSpace(query.Search))
 	items := make([]MySQLInstanceSummary, 0, len(snapshot.Instances))
 	for _, instance := range snapshot.Instances {
 		summary := summarizeMySQLInstance(instance)
+		if query.Label != "" && summary.Name != query.Label {
+			continue
+		}
 		if query.Status != "" && summary.Status != query.Status {
 			continue
 		}
@@ -143,7 +158,6 @@ func (s *MySQLService) Instances(ctx context.Context, query MySQLQuery) (MySQLPa
 			continue
 		}
 		if search != "" &&
-			!strings.Contains(strings.ToLower(summary.Name), search) &&
 			!strings.Contains(strings.ToLower(summary.Address), search) &&
 			!strings.Contains(strings.ToLower(summary.Host), search) {
 			continue
@@ -162,14 +176,16 @@ func (s *MySQLService) Instances(ctx context.Context, query MySQLQuery) (MySQLPa
 	}
 	end := min(start+query.PageSize, total)
 	return MySQLPage{
-		Instances: append([]MySQLInstanceSummary(nil), items[start:end]...),
-		Total:     total,
-		Page:      query.Page,
-		PageSize:  query.PageSize,
+		Instances:       append([]MySQLInstanceSummary(nil), items[start:end]...),
+		AvailableLabels: availableLabels,
+		Total:           total,
+		Page:            query.Page,
+		PageSize:        query.PageSize,
 	}, meta, nil
 }
 
 func normalizeMySQLQuery(query MySQLQuery) (MySQLQuery, error) {
+	query.Label = strings.TrimSpace(query.Label)
 	if query.Page < 1 {
 		return MySQLQuery{}, fmt.Errorf("%w: page must be positive", ErrInvalidQuery)
 	}

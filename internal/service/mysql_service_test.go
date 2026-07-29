@@ -345,12 +345,11 @@ func TestMySQLOverviewClassifiesZeroReplicationChannelsByRole(t *testing.T) {
 	}
 }
 
-func TestMySQLInstancesSearchesNameAddressAndHost(t *testing.T) {
+func TestMySQLInstancesSearchesOnlyAddressAndHost(t *testing.T) {
 	tests := []struct {
 		search string
 		want   string
 	}{
-		{search: "  FIXTURE-MYSQL-A ", want: "fixture-mysql-a"},
 		{search: "192.0.2.11", want: "fixture-mysql-b"},
 		{search: "fixture-host-c", want: "fixture-mysql-c"},
 	}
@@ -366,6 +365,74 @@ func TestMySQLInstancesSearchesNameAddressAndHost(t *testing.T) {
 				t.Fatalf("search %q returned %#v", tt.search, page)
 			}
 		})
+	}
+}
+
+func TestMySQLInstancesDoesNotSearchInstanceName(t *testing.T) {
+	page, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{
+		Search: "fixture-mysql-a", Page: 1, PageSize: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 0 || len(page.Instances) != 0 {
+		t.Fatalf("page = %#v, want no results", page)
+	}
+}
+
+func TestMySQLInstancesReturnsStableAvailableLabelsFromCompleteSnapshot(t *testing.T) {
+	snapshot := fixtureMySQLSnapshot()
+	duplicate := snapshot.Instances[1]
+	duplicate.ID = mysql.StableInstanceID("fixture-host-d", duplicate.Name, "192.0.2.13:3306")
+	duplicate.Address = "192.0.2.13:3306"
+	duplicate.Host = "fixture-host-d"
+	blank := snapshot.Instances[2]
+	blank.ID = mysql.StableInstanceID("fixture-host-e", " ", "192.0.2.14:3306")
+	blank.Name = " "
+	blank.Address = "192.0.2.14:3306"
+	blank.Host = "fixture-host-e"
+	snapshot.Instances = append(snapshot.Instances, duplicate, blank)
+
+	page, _, err := newMySQLServiceWithSnapshot(snapshot).Instances(context.Background(), MySQLQuery{
+		Status:   LevelWarning,
+		Role:     mysql.RoleReadOnly,
+		Search:   "fixture-host-b",
+		Label:    "fixture-mysql-b",
+		Sort:     "status",
+		Order:    "desc",
+		Page:     2,
+		PageSize: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"fixture-mysql-a", "fixture-mysql-b", "fixture-mysql-c"}
+	if !reflect.DeepEqual(page.AvailableLabels, want) {
+		t.Fatalf("available labels = %#v, want %#v", page.AvailableLabels, want)
+	}
+}
+
+func TestMySQLInstancesFiltersExactLabelAndKeepsSameNamedAddresses(t *testing.T) {
+	snapshot := fixtureMySQLSnapshot()
+	duplicate := snapshot.Instances[1]
+	duplicate.ID = mysql.StableInstanceID("fixture-host-d", duplicate.Name, "192.0.2.13:3306")
+	duplicate.Address = "192.0.2.13:3306"
+	duplicate.Host = "fixture-host-d"
+	snapshot.Instances = append(snapshot.Instances, duplicate)
+
+	page, _, err := newMySQLServiceWithSnapshot(snapshot).Instances(context.Background(), MySQLQuery{
+		Label: " fixture-mysql-b ", Search: "192.0.2", Sort: "instance", Order: "asc", Page: 1, PageSize: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 2 || len(page.Instances) != 2 {
+		t.Fatalf("page = %#v", page)
+	}
+	for _, item := range page.Instances {
+		if item.Name != "fixture-mysql-b" {
+			t.Fatalf("instance = %#v, want exact label match", item)
+		}
 	}
 }
 

@@ -14,6 +14,7 @@ type MySQLOptions struct {
 
 type MySQLQuery struct {
 	Search   string
+	Label    string
 	Status   Level
 	Role     mysql.Role
 	Sort     string
@@ -47,10 +48,11 @@ type MySQLOverview struct {
 }
 
 type MySQLPage struct {
-	Instances []MySQLInstanceSummary
-	Total     int
-	Page      int
-	PageSize  int
+	Instances       []MySQLInstanceSummary
+	AvailableLabels []string
+	Total           int
+	Page            int
+	PageSize        int
 }
 
 type MySQLReplicationState string
