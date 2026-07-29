@@ -69,7 +69,7 @@ v8.4.1 上游只读契约预检已经通过；Target 在当前环境提供 `upda
 
 - 固定账号登录、内存会话、并发安全登录限速。
 - 稳定数据源领域契约、确定性 Mock、以 v8.4.1 为主要真实验证版本并保留 v9.x 协议兼容的只读 Nightingale Provider。
-- 独立 MySQL 领域与 Service、MySQL Mock、固定 13 查询单 batch 的 Nightingale MySQL Provider、MySQL 总览/实例 GET API、总览卡与 11 列实例页。
+- 独立 MySQL 领域与 Service、MySQL Mock、固定 14 查询单 batch 的 Nightingale MySQL Provider、MySQL 总览/实例 GET API、总览卡与 11 列实例页。
 - TTL 缓存、相同请求合并、最多 5 分钟旧值降级。
 - 总览、主机列表、单机详情和数据源状态只读 API。
 - 深色中文 React UI、板块告警摘要卡、统一刷新控件、搜索、筛选、排序、URL 状态和分页。

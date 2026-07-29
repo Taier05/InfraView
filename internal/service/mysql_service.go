@@ -346,7 +346,9 @@ func summarizeMySQLInstance(source mysql.Instance) MySQLInstanceSummary {
 	var connectionUsagePercent *float64
 	if source.Connections != nil && source.MaxConnections != nil && *source.MaxConnections > 0 {
 		usage := *source.Connections / *source.MaxConnections * 100
-		connectionUsagePercent = &usage
+		if !math.IsNaN(usage) && !math.IsInf(usage, 0) {
+			connectionUsagePercent = &usage
+		}
 	}
 	return MySQLInstanceSummary{
 		ID:                     source.ID,

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -224,6 +225,26 @@ func TestMySQLInstanceViewExposesBufferPoolSizeBytes(t *testing.T) {
 	}
 	if got := jsonPathValue(t, response.Body.Bytes(), "data.instances.0.buffer_pool_size_bytes"); got != float64(1_073_741_824) {
 		t.Fatalf("buffer_pool_size_bytes = %#v, want %d", got, 1_073_741_824)
+	}
+}
+
+func TestMySQLInstancesEncodeNonFiniteDerivedConnectionUsageAsNull(t *testing.T) {
+	snapshot := fixtureMySQLSnapshot()
+	connections := math.MaxFloat64
+	maxConnections := float64(1)
+	snapshot.Instances[0].Connections = &connections
+	snapshot.Instances[0].MaxConnections = &maxConnections
+	handler, sessionCookie := newMySQLAPITestHandler(t, snapshot)
+
+	response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances?page=1&page_size=20", "", sessionCookie)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+	if !json.Valid(response.Body.Bytes()) {
+		t.Fatal("instances response is not valid JSON")
+	}
+	if !jsonPathIsNull(t, response.Body.Bytes(), "data.instances.0.connection_usage_percent") {
+		t.Fatal("connection_usage_percent is not null")
 	}
 }
 

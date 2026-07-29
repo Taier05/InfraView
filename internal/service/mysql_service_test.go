@@ -102,6 +102,19 @@ func TestMySQLSummaryCalculatesOnlyValidConnectionUsageAndMaximumLag(t *testing.
 	}
 }
 
+func TestMySQLSummaryRejectsNonFiniteDerivedConnectionUsage(t *testing.T) {
+	instance := mysql.Instance{
+		Availability:   mysql.AvailabilityUp,
+		Role:           mysql.RoleWritable,
+		Connections:    floatPointer(math.MaxFloat64),
+		MaxConnections: floatPointer(1),
+	}
+
+	if got := summarizeMySQLInstance(instance).ConnectionUsagePercent; got != nil {
+		t.Fatalf("non-finite derived connection usage = %#v", got)
+	}
+}
+
 func TestMySQLSummaryMakesIncompleteCriticalReplicationDataUnknown(t *testing.T) {
 	instance := instanceWithChannels(mysql.ReplicationChannel{
 		SQLRunning: boolPointer(true),
