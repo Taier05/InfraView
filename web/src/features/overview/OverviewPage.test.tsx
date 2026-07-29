@@ -244,6 +244,63 @@ it('把未知实例作为 warning 风险但保留未知文案', async () => {
   expect(within(card).getByText('未知 1')).toBeVisible()
 })
 
+it('Linux 无主机时显示中性空状态且不影响 MySQL 正常卡', async () => {
+  mockOverviewRequests({
+    host: overviewFixture({
+      data: {
+        total: 0,
+        online: 0,
+        offline: 0,
+        unknown: 0,
+        alerts: {
+          affected_hosts: 0,
+          warning_hosts: 0,
+          critical_hosts: 0,
+          cpu: { warning: 0, critical: 0 },
+          memory: { warning: 0, critical: 0 },
+          io: { warning: 0, critical: 0 },
+          network: { warning: 0, critical: 0 },
+        },
+      },
+    }),
+    mysql: mysqlOverviewFixture({
+      data: {
+        total: 2,
+        normal: 2,
+        warning: 0,
+        critical: 0,
+        unknown: 0,
+        affected_instances: 0,
+        warning_instances: 0,
+        critical_instances: 0,
+        alerts: {
+          availability: { warning: 0, critical: 0 },
+          replication_threads: { warning: 0, critical: 0 },
+          replication_lag: { warning: 0, critical: 0 },
+          replication_data: { warning: 0, critical: 0 },
+        },
+      },
+    }),
+  })
+  renderOverview()
+
+  const hostCard = await screen.findByRole('link', {
+    name: '查看 Linux 主机板块',
+  })
+  expect(hostCard).toHaveAttribute('data-level', 'empty')
+  expect(within(hostCard).getByText('暂无 Linux 主机')).toBeVisible()
+  expect(within(hostCard).queryByText('全部正常')).not.toBeInTheDocument()
+  expect(within(hostCard).queryByText('/ 0')).not.toBeInTheDocument()
+  expect(within(hostCard).queryByText('无严重')).not.toBeInTheDocument()
+  expect(within(hostCard).queryByText('无警告')).not.toBeInTheDocument()
+  expect(within(hostCard).queryByText('无异常')).not.toBeInTheDocument()
+  expect(within(hostCard).queryByText('在线 0')).not.toBeInTheDocument()
+
+  const mysqlCard = screen.getByRole('link', { name: '查看 MySQL 板块' })
+  expect(mysqlCard).toHaveAttribute('data-level', 'normal')
+  expect(within(mysqlCard).getByText('全部正常')).toBeVisible()
+})
+
 it('MySQL 无实例时显示空状态而不是异常', async () => {
   mockOverviewRequests({
     mysql: mysqlOverviewFixture({

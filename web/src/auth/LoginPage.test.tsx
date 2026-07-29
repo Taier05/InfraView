@@ -136,6 +136,23 @@ it('登录后进入基础设施总览', async () => {
   ).toBeInTheDocument()
 })
 
+it('已认证用户可通过导航进入 MySQL 实例页', async () => {
+  const user = userEvent.setup()
+  render(<App />)
+
+  await user.type(await screen.findByLabelText('用户名'), 'admin')
+  await user.type(screen.getByLabelText('密码'), 'secret-value')
+  await user.click(screen.getByRole('button', { name: '登录' }))
+  await screen.findByRole('heading', { name: '基础设施总览' })
+
+  await user.click(screen.getByRole('link', { name: 'MySQL' }))
+
+  expect(
+    await screen.findByRole('heading', { name: 'MySQL 实例' }),
+  ).toBeInTheDocument()
+  expect(window.location.pathname).toBe('/mysql')
+})
+
 it('凭据无效时显示后端返回的中文错误', async () => {
   const clear = vi.spyOn(QueryClient.prototype, 'clear')
   const user = userEvent.setup()

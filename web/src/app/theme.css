@@ -747,7 +747,7 @@ h1 {
   letter-spacing: -0.03em;
 }
 
-.mysql-overview-empty-state {
+.module-overview-empty-state {
   display: grid;
   min-height: 7.1rem;
   margin-top: 0.55rem;
@@ -759,7 +759,7 @@ h1 {
   text-align: center;
 }
 
-.mysql-overview-empty-state strong {
+.module-overview-empty-state strong {
   color: var(--text);
   font-size: 0.82rem;
 }

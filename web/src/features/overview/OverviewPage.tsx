@@ -146,6 +146,36 @@ function ModuleStaleBanner({
 }
 
 function HostStatusCard({ data }: { data: OverviewData }) {
+  if (data.total === 0) {
+    return (
+      <Link
+        className="module-status-card"
+        data-level="empty"
+        to="/hosts"
+        aria-label="查看 Linux 主机板块"
+      >
+        <div className="module-status-heading">
+          <div>
+            <span>主机板块</span>
+            <h2>Linux 主机</h2>
+          </div>
+          <span className="module-status-level" data-level="empty">
+            暂无主机
+          </span>
+        </div>
+        <div className="module-overview-empty-state">
+          <strong>暂无 Linux 主机</strong>
+          <span>尚无可展示的主机健康数据</span>
+        </div>
+        <div className="module-status-footer">
+          <span className="module-status-action">
+            查看主机 <span aria-hidden="true">→</span>
+          </span>
+        </div>
+      </Link>
+    )
+  }
+
   const { alerts } = data
   const level: MetricLevel =
     alerts.critical_hosts > 0
@@ -250,7 +280,7 @@ function MySQLStatusCard({ data }: { data: MySQLOverviewData }) {
             暂无实例
           </span>
         </div>
-        <div className="mysql-overview-empty-state">
+        <div className="module-overview-empty-state">
           <strong>暂无 MySQL 实例</strong>
           <span>尚无可展示的实例健康数据</span>
         </div>
