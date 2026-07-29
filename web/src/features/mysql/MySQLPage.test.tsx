@@ -85,47 +85,48 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('renders the eleven compact MySQL columns', async () => {
+it('renders the eleven compact MySQL columns with complete titles', async () => {
   renderMySQLPage('/mysql')
   expect(
     await screen.findByRole('heading', { name: 'MySQL 实例' }),
   ).toBeVisible()
-  for (const heading of [
-    '实例',
-    '所属主机',
-    '版本 / 角色',
-    '连接使用',
-    '活跃线程',
-    'QPS',
-    '慢查询速率',
-    'Buffer Pool 使用率',
-    '复制状态 / 延迟',
-    '运行时间',
-    '状态',
+  for (const [heading, title] of [
+    ['实例地址', 'MySQL 实例地址'],
+    ['所属主机', '所属主机'],
+    ['版本 / 角色', 'MySQL 版本 / 角色'],
+    ['连接', '连接使用'],
+    ['线程', '活跃线程'],
+    ['QPS', '每秒查询数'],
+    ['慢查询', '慢查询速率'],
+    ['Buffer Pool', 'Buffer Pool 容量 / 使用率'],
+    ['复制 / 延迟', '复制状态 / 延迟'],
+    ['运行时间', '运行时间'],
+    ['状态', '实例状态'],
   ]) {
-    expect(
-      screen.getByRole('columnheader', {
-        name: new RegExp(`^${heading}(排序|$)`),
-      }),
-    ).toBeVisible()
+    const header = screen.getByRole('columnheader', {
+      name: new RegExp(`^${heading}(排序|$)`),
+    })
+    expect(header).toBeVisible()
+    expect(within(header).getByTitle(title)).toBeVisible()
   }
 
-  const instance = (await screen.findByText('fixture-mysql-a')).closest('tr')
+  const instance = (await screen.findByText('192.0.2.101:3306')).closest('tr')
   expect(instance).not.toBeNull()
   const cells = within(instance!).getAllByRole('cell')
   expect(cells).toHaveLength(11)
-  expect(cells[0]).toHaveTextContent('fixture-mysql-a · 192.0.2.101:3306')
-  expect(cells[0].querySelector('.host-name-text')).toHaveAttribute(
+  expect(cells[0]).toHaveTextContent('192.0.2.101:3306')
+  expect(cells[0]).not.toHaveTextContent('fixture-mysql-a')
+  expect(cells[0].querySelector('.host-cell-text')).toHaveAttribute(
     'title',
-    'fixture-mysql-a · 192.0.2.101:3306',
+    '192.0.2.101:3306',
   )
   expect(cells[1]).toHaveTextContent('fixture-db-host-a')
-  expect(cells[2]).toHaveTextContent('8.4.1 · 可写')
+  expect(cells[2]).toHaveTextContent('8.4.1 · 读写')
   expect(cells[3]).toHaveTextContent('32/200 · 16.0%')
   expect(cells[4]).toHaveTextContent('5')
   expect(cells[5]).toHaveTextContent('123.46')
   expect(cells[6]).toHaveTextContent('0.13')
-  expect(cells[7]).toHaveTextContent('82.3%')
+  expect(cells[7]).toHaveTextContent('8 GiB / 82.3%')
   expect(cells[8]).toHaveTextContent('正常 · 2s')
   expect(cells[8].querySelector('.host-metric')).toHaveAttribute(
     'title',
@@ -145,9 +146,11 @@ it('renders the eleven compact MySQL columns', async () => {
   ).not.toBeInTheDocument()
   expect(
     screen
-      .getByRole('searchbox', { name: '搜索实例名称、地址或所属主机' })
+      .getByRole('searchbox', { name: '搜索实例地址或所属主机' })
       .closest('.mysql-list-controls'),
   ).not.toBeNull()
+  expect(screen.getByRole('option', { name: '读写' })).toHaveValue('writable')
+  expect(screen.queryByRole('option', { name: '可写' })).not.toBeInTheDocument()
   const table = screen.getByRole('table')
   expect(table).toHaveClass(
     'host-table',
@@ -161,14 +164,14 @@ it('renders missing and unknown versions as Chinese unknown with the role', asyn
   renderMySQLPage()
 
   const missingVersionRow = (
-    await screen.findByText('fixture-mysql-d')
+    await screen.findByText('192.0.2.104:3306')
   ).closest('tr')
   expect(missingVersionRow).not.toBeNull()
   const missingVersionCell = within(missingVersionRow!).getAllByRole('cell')[2]
   expect(missingVersionCell).toHaveTextContent('未知 · 只读')
   expect(missingVersionCell).not.toHaveTextContent(/^\s*·/)
 
-  const unknownVersionRow = screen.getByText('fixture-mysql-e').closest('tr')
+  const unknownVersionRow = screen.getByText('192.0.2.105:3306').closest('tr')
   expect(unknownVersionRow).not.toBeNull()
   expect(within(unknownVersionRow!).getAllByRole('cell')[2]).toHaveTextContent(
     '未知 · 只读',
@@ -211,7 +214,7 @@ it('uses only service-valid fixture replication combinations', () => {
 it('writes filters sort and pagination to the URL', async () => {
   const user = userEvent.setup()
   renderMySQLPage('/mysql?page=3')
-  await screen.findByText('fixture-mysql-a')
+  await screen.findByText('192.0.2.101:3306')
   await user.selectOptions(
     screen.getByRole('combobox', { name: '实例状态' }),
     'warning',
@@ -221,12 +224,17 @@ it('writes filters sort and pagination to the URL', async () => {
     'read_only',
   )
   await user.selectOptions(
+    screen.getByRole('combobox', { name: '实例标签' }),
+    'tier-fixture',
+  )
+  await user.selectOptions(
     screen.getByRole('combobox', { name: '每页数量' }),
     '50',
   )
-  await user.click(screen.getByRole('button', { name: /^QPS排序/ }))
+  await user.click(screen.getByRole('button', { name: /^每秒查询数排序/ }))
   expect(window.location.search).toContain('status=warning')
   expect(window.location.search).toContain('role=read_only')
+  expect(window.location.search).toContain('label=tier-fixture')
   expect(window.location.search).toContain('page_size=50')
   expect(window.location.search).toContain('sort=qps')
   expect(window.location.search).toContain('page=1')
@@ -236,6 +244,7 @@ it('writes filters sort and pagination to the URL', async () => {
     expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
       status: 'warning',
       role: 'read_only',
+      label: 'tier-fixture',
       sort: 'qps',
       order: 'asc',
       page: '1',
@@ -244,9 +253,67 @@ it('writes filters sort and pagination to the URL', async () => {
   })
 })
 
+it('places instance labels before status and restores labels from the URL', async () => {
+  renderMySQLPage('/mysql?label=%20legacy-fixture%20')
+  await screen.findByText('192.0.2.101:3306')
+
+  const label = screen.getByRole('combobox', { name: '实例标签' })
+  const status = screen.getByRole('combobox', { name: '实例状态' })
+  expect(label.compareDocumentPosition(status)).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING,
+  )
+  expect(label).toHaveValue('legacy-fixture')
+  expect(within(label).getByRole('option', { name: '全部标签' })).toHaveValue('')
+  expect(
+    within(label).getByRole('option', { name: 'tier-fixture' }),
+  ).toHaveValue('tier-fixture')
+  expect(
+    within(label).getByRole('option', { name: 'team-fixture' }),
+  ).toHaveValue('team-fixture')
+  expect(lastRequest().searchParams.get('label')).toBe('legacy-fixture')
+  await waitFor(() =>
+    expect(window.location.search).toContain('label=legacy-fixture'),
+  )
+  expect(requestedURLs).toHaveLength(1)
+  expect(requestedURLs.every((url) => url.pathname === '/api/v1/mysql/instances')).toBe(
+    true,
+  )
+})
+
+it('selecting an instance label preserves filters and resets to page one', async () => {
+  const user = userEvent.setup()
+  renderMySQLPage(
+    '/mysql?status=warning&role=read_only&sort=qps&order=desc&page=2&page_size=50',
+  )
+  await screen.findByText('192.0.2.101:3306')
+  expect(requestedURLs).toHaveLength(1)
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: '实例标签' }),
+    'tier-fixture',
+  )
+
+  await waitFor(() => {
+    expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+      label: 'tier-fixture',
+      status: 'warning',
+      role: 'read_only',
+      sort: 'qps',
+      order: 'desc',
+      page: '1',
+      page_size: '50',
+    })
+  })
+  expect(requestedURLs).toHaveLength(2)
+  expect(requestedURLs.every((url) => url.pathname === '/api/v1/mysql/instances')).toBe(
+    true,
+  )
+  expect(window.location.search).toContain('label=tier-fixture')
+  expect(window.location.search).toContain('page=1')
+})
+
 it('requests the fixed endpoint with GET and an AbortSignal', async () => {
   renderMySQLPage()
-  await screen.findByText('fixture-mysql-a')
+  await screen.findByText('192.0.2.101:3306')
 
   const [input, init] = vi.mocked(globalThis.fetch).mock.calls[0]
   expect(requestURL(input).pathname).toBe('/api/v1/mysql/instances')
@@ -274,7 +341,7 @@ it('debounces search and sends only fixed GET parameters', async () => {
   await act(async () => vi.advanceTimersByTimeAsync(0))
   fireEvent.change(
     screen.getByRole('searchbox', {
-      name: '搜索实例名称、地址或所属主机',
+      name: '搜索实例地址或所属主机',
     }),
     { target: { value: 'fixture' } },
   )
@@ -299,14 +366,79 @@ it('renders missing metrics as 暂无数据', async () => {
     threads_running: null,
     qps: null,
     slow_queries_per_second: null,
+    buffer_pool_size_bytes: null,
     buffer_pool_usage_percent: null,
     uptime_seconds: null,
   }
   vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse(fixture))
   renderMySQLPage()
-  const row = (await screen.findByText('fixture-mysql-a')).closest('tr')
+  const row = (await screen.findByText('192.0.2.101:3306')).closest('tr')
   expect(row).not.toBeNull()
-  expect(within(row!).getAllByText('暂无数据')).toHaveLength(6)
+  expect(within(row!).getAllByText('暂无数据')).toHaveLength(5)
+  expect(within(row!).getAllByRole('cell')[7]).toHaveTextContent('—')
+})
+
+it('renders all Buffer Pool capacity and usage availability combinations', async () => {
+  const fixture = mysqlInstancePageFixture()
+  fixture.data.instances[0] = {
+    ...fixture.data.instances[0],
+    buffer_pool_size_bytes: 1024 ** 3,
+    buffer_pool_usage_percent: 50,
+  }
+  fixture.data.instances[1] = {
+    ...fixture.data.instances[1],
+    buffer_pool_size_bytes: 1,
+    buffer_pool_usage_percent: null,
+  }
+  fixture.data.instances[2] = {
+    ...fixture.data.instances[2],
+    buffer_pool_size_bytes: null,
+    buffer_pool_usage_percent: 25,
+  }
+  fixture.data.instances[3] = {
+    ...fixture.data.instances[3],
+    buffer_pool_size_bytes: null,
+    buffer_pool_usage_percent: null,
+  }
+  fixture.data.instances[4] = {
+    ...fixture.data.instances[4],
+    buffer_pool_size_bytes: 1024,
+    buffer_pool_usage_percent: 75,
+  }
+  fixture.data.instances.push(
+    {
+      ...fixture.data.instances[4],
+      id: 'mysql-fixture-006',
+      name: 'fixture-mysql-f',
+      address: '192.0.2.106:3306',
+      buffer_pool_size_bytes: 1024 ** 2,
+      buffer_pool_usage_percent: 80,
+    },
+    {
+      ...fixture.data.instances[4],
+      id: 'mysql-fixture-007',
+      name: 'fixture-mysql-g',
+      address: '192.0.2.107:3306',
+      buffer_pool_size_bytes: 1024 ** 4,
+      buffer_pool_usage_percent: 90,
+    },
+  )
+  vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse(fixture))
+  renderMySQLPage()
+
+  for (const [address, value] of [
+    ['192.0.2.101:3306', '1 GiB / 50.0%'],
+    ['192.0.2.102:3306', '1 B / —'],
+    ['192.0.2.103:3306', '— / 25.0%'],
+    ['192.0.2.104:3306', '—'],
+    ['192.0.2.105:3306', '1 KiB / 75.0%'],
+    ['192.0.2.106:3306', '1 MiB / 80.0%'],
+    ['192.0.2.107:3306', '1 TiB / 90.0%'],
+  ]) {
+    const row = (await screen.findByText(address)).closest('tr')
+    expect(row).not.toBeNull()
+    expect(within(row!).getAllByRole('cell')[7]).toHaveTextContent(value)
+  }
 })
 
 it('preserves available connection values without inventing zeroes', async () => {
@@ -319,7 +451,7 @@ it('preserves available connection values without inventing zeroes', async () =>
   }
   vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse(fixture))
   renderMySQLPage()
-  const row = (await screen.findByText('fixture-mysql-a')).closest('tr')
+  const row = (await screen.findByText('192.0.2.101:3306')).closest('tr')
   expect(row).not.toBeNull()
   const connectionCell = within(row!).getAllByRole('cell')[3]
   expect(connectionCell).toHaveTextContent('7')
@@ -344,12 +476,12 @@ it('renders every replication and instance state with text and level', async () 
   }
   vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse(fixture))
   renderMySQLPage()
-  await screen.findByText('fixture-mysql-a')
+  await screen.findByText('192.0.2.101:3306')
   for (const label of ['正常', '线程异常', '未配置复制', '状态未知']) {
     expect(screen.getAllByText(new RegExp(`^${label}`)).length).toBeGreaterThan(0)
   }
-  const stoppedRow = screen.getByText('fixture-mysql-b').closest('tr')
-  const unknownRow = screen.getByText('fixture-mysql-d').closest('tr')
+  const stoppedRow = screen.getByText('192.0.2.102:3306').closest('tr')
+  const unknownRow = screen.getByText('192.0.2.104:3306').closest('tr')
   expect(stoppedRow).not.toBeNull()
   expect(unknownRow).not.toBeNull()
   expect(within(stoppedRow!).getAllByRole('cell')[8]).toHaveTextContent(
@@ -430,7 +562,7 @@ it('normalizes invalid URL state and out-of-range response pages', async () => {
   })
   const historyLength = window.history.length
   renderMySQLPage(
-    '/mysql?status=broken&role=admin&sort=sql&order=sideways&page=999&page_size=9',
+    '/mysql?label=%20%20&status=broken&role=admin&sort=sql&order=sideways&page=999&page_size=9',
   )
   expect(await screen.findByText('第 4 / 4 页，共 64 个实例')).toBeVisible()
   expect(requestedURLs.map((url) => url.searchParams.get('page'))).toEqual([
@@ -441,6 +573,7 @@ it('normalizes invalid URL state and out-of-range response pages', async () => {
     '?status=&role=&sort=instance&order=asc&page=4&page_size=20',
   )
   expect(window.history.length).toBe(historyLength)
+  expect(requestedURLs.every((url) => url.searchParams.has('label'))).toBe(false)
 })
 
 it('keeps stale data visible and reports background errors', async () => {
@@ -459,7 +592,7 @@ it('keeps stale data visible and reports background errors', async () => {
       ),
     )
   renderMySQLPage()
-  expect(await screen.findByText('fixture-mysql-a')).toBeVisible()
+  expect(await screen.findByText('192.0.2.101:3306')).toBeVisible()
   expect(screen.getByText('数据已过期')).toBeVisible()
   await userEvent
     .setup()
@@ -467,5 +600,5 @@ it('keeps stale data visible and reports background errors', async () => {
   expect(await screen.findByText('MySQL 实例列表刷新失败')).toBeVisible()
   expect(screen.getByText('数据已过期')).toBeVisible()
   expect(screen.getAllByRole('alert')).toHaveLength(2)
-  expect(screen.getByText('fixture-mysql-a')).toBeVisible()
+  expect(screen.getByText('192.0.2.101:3306')).toBeVisible()
 })

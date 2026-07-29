@@ -144,6 +144,7 @@ export interface MySQLInstancePageFixture {
       threads_running: number | null
       qps: number | null
       slow_queries_per_second: number | null
+      buffer_pool_size_bytes: number | null
       buffer_pool_usage_percent: number | null
       uptime_seconds: number | null
       replication: {
@@ -157,6 +158,7 @@ export interface MySQLInstancePageFixture {
       }
       status: MetricLevelFixture
     }>
+    available_labels: string[]
     total: number
     page: number
     page_size: number
@@ -368,6 +370,7 @@ export function mysqlInstancePageFixture(
           threads_running: 5,
           qps: 123.456,
           slow_queries_per_second: 0.125,
+          buffer_pool_size_bytes: 8 * 1024 ** 3,
           buffer_pool_usage_percent: 82.34,
           uptime_seconds: 183_600,
           replication: {
@@ -390,6 +393,7 @@ export function mysqlInstancePageFixture(
           threads_running: 18,
           qps: 87,
           slow_queries_per_second: 1.2,
+          buffer_pool_size_bytes: 16 * 1024 ** 3,
           buffer_pool_usage_percent: 91.25,
           uptime_seconds: 43_200,
           replication: {
@@ -412,6 +416,7 @@ export function mysqlInstancePageFixture(
           threads_running: 43,
           qps: 212.5,
           slow_queries_per_second: 4.75,
+          buffer_pool_size_bytes: 4 * 1024 ** 3,
           buffer_pool_usage_percent: 98.6,
           uptime_seconds: 900,
           replication: {
@@ -434,6 +439,7 @@ export function mysqlInstancePageFixture(
           threads_running: null,
           qps: null,
           slow_queries_per_second: null,
+          buffer_pool_size_bytes: null,
           buffer_pool_usage_percent: null,
           uptime_seconds: null,
           replication: {
@@ -456,6 +462,7 @@ export function mysqlInstancePageFixture(
           threads_running: 11,
           qps: 64.75,
           slow_queries_per_second: 0.25,
+          buffer_pool_size_bytes: 2 * 1024 ** 3,
           buffer_pool_usage_percent: 73.5,
           uptime_seconds: 266_400,
           replication: {
@@ -466,6 +473,7 @@ export function mysqlInstancePageFixture(
           status: 'warning',
         },
       ],
+      available_labels: ['tier-fixture', 'team-fixture'],
       total: 64,
       page: 1,
       page_size: 20,

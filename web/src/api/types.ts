@@ -147,6 +147,7 @@ export interface MySQLInstance {
   threads_running: number | null
   qps: number | null
   slow_queries_per_second: number | null
+  buffer_pool_size_bytes: number | null
   buffer_pool_usage_percent: number | null
   uptime_seconds: number | null
   replication: {
@@ -159,6 +160,7 @@ export interface MySQLInstance {
 
 export interface MySQLInstancePageData {
   instances: MySQLInstance[]
+  available_labels: string[]
   total: number
   page: number
   page_size: number

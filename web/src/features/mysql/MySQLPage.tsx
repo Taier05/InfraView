@@ -38,7 +38,7 @@ type MySQLSort = (typeof sortFields)[number]
 type SortOrder = 'asc' | 'desc'
 
 const roleLabels: Record<MySQLRole, string> = {
-  writable: '可写',
+  writable: '读写',
   read_only: '只读',
   unknown: '未知',
 }
@@ -97,6 +97,30 @@ function decimal(value: number | null, digits = 2) {
 
 function percentage(value: number | null) {
   return value === null ? '暂无数据' : `${value.toFixed(1)}%`
+}
+
+function byteSize(value: number | null) {
+  if (value === null) return null
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
+  let unitIndex = 0
+  let size = value
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex += 1
+  }
+  return `${size.toFixed(1).replace(/\.0$/, '')} ${units[unitIndex]}`
+}
+
+function bufferPool(instance: MySQLInstance) {
+  const size = byteSize(instance.buffer_pool_size_bytes)
+  const usage =
+    instance.buffer_pool_usage_percent === null
+      ? null
+      : percentage(instance.buffer_pool_usage_percent)
+  if (size !== null && usage !== null) return `${size} / ${usage}`
+  if (size !== null) return `${size} / —`
+  if (usage !== null) return `— / ${usage}`
+  return '—'
 }
 
 function connectionUsage(instance: MySQLInstance) {
@@ -173,6 +197,7 @@ export function MySQLPage() {
   const refreshIntervalMs = useRefreshIntervalMs()
   const [searchParams, setSearchParams] = useSearchParams()
   const querySearch = searchParams.get('search') ?? ''
+  const label = (searchParams.get('label') ?? '').trim()
   const status = mysqlStatus(searchParams.get('status'))
   const role = mysqlRole(searchParams.get('role'))
   const requestedSort = searchParams.get('sort')
@@ -188,6 +213,8 @@ export function MySQLPage() {
     const canonical = new URLSearchParams(searchParams)
     if (querySearch === '') canonical.delete('search')
     else canonical.set('search', querySearch)
+    if (label === '') canonical.delete('label')
+    else canonical.set('label', label)
     canonical.set('status', status)
     canonical.set('role', role)
     canonical.set('sort', sort)
@@ -202,6 +229,7 @@ export function MySQLPage() {
     page,
     pageSize,
     querySearch,
+    label,
     role,
     searchParams,
     setSearchParams,
@@ -232,6 +260,7 @@ export function MySQLPage() {
     page_size: String(pageSize),
   })
   if (querySearch !== '') requestParameters.set('search', querySearch)
+  if (label !== '') requestParameters.set('label', label)
   if (status !== '') requestParameters.set('status', status)
   if (role !== '') requestParameters.set('role', role)
 
@@ -239,6 +268,7 @@ export function MySQLPage() {
     queryKey: [
       'mysql-instances',
       querySearch,
+      label,
       status,
       role,
       sort,
@@ -257,6 +287,11 @@ export function MySQLPage() {
 
   const responsePage = instances.data?.data.page
   const responseTotalPages = instances.data?.data.total_pages
+  const availableLabels = instances.data?.data.available_labels ?? []
+  const labelOptions =
+    label === '' || availableLabels.includes(label)
+      ? availableLabels
+      : [label, ...availableLabels]
   const canonicalResponsePage =
     responsePage === undefined || responseTotalPages === undefined
       ? page
@@ -297,15 +332,15 @@ export function MySQLPage() {
     })
   }
 
-  function sortButton(field: MySQLSort, label: string) {
+  function sortButton(field: MySQLSort, label: string, title: string) {
     const state = sort === field ? (order === 'asc' ? '升序' : '降序') : '未排序'
     return (
       <button
         className="host-sort-button"
         type="button"
         data-active={sort === field}
-        aria-label={`${label}排序，当前${state}`}
-        title={`点击按${label}排序`}
+        aria-label={`${title}排序，当前${state}`}
+        title={title}
         onClick={() => changeSort(field)}
       >
         <span>{label}</span>
@@ -319,20 +354,19 @@ export function MySQLPage() {
   const columns: ColumnDef<MySQLInstance>[] = [
     {
       id: 'instance',
-      header: () => sortButton('instance', '实例'),
+      header: () => sortButton('instance', '实例地址', 'MySQL 实例地址'),
       cell: ({ row }) => {
-        const value = `${row.original.name} · ${row.original.address}`
+        const value = row.original.address
         return (
-          <span className="host-name-text" title={value}>
-            <span>{row.original.name}</span>
-            <span>{` · ${row.original.address}`}</span>
+          <span className="host-cell-text" title={value}>
+            {value}
           </span>
         )
       },
     },
     {
       id: 'host',
-      header: '所属主机',
+      header: () => <span title="所属主机">所属主机</span>,
       cell: ({ row }) => (
         <span className="host-cell-text" title={row.original.host}>
           {row.original.host}
@@ -341,7 +375,7 @@ export function MySQLPage() {
     },
     {
       id: 'version-role',
-      header: '版本 / 角色',
+      header: () => <span title="MySQL 版本 / 角色">版本 / 角色</span>,
       cell: ({ row }) => {
         const value = versionRole(row.original)
         return (
@@ -353,7 +387,7 @@ export function MySQLPage() {
     },
     {
       id: 'connections',
-      header: () => sortButton('connections', '连接使用'),
+      header: () => sortButton('connections', '连接', '连接使用'),
       cell: ({ row }) => {
         const value = connectionUsage(row.original)
         return (
@@ -365,27 +399,35 @@ export function MySQLPage() {
     },
     {
       id: 'threads-running',
-      header: () => sortButton('threads_running', '活跃线程'),
+      header: () => sortButton('threads_running', '线程', '活跃线程'),
       cell: ({ row }) => decimal(row.original.threads_running),
     },
     {
       id: 'qps',
-      header: () => sortButton('qps', 'QPS'),
+      header: () => sortButton('qps', 'QPS', '每秒查询数'),
       cell: ({ row }) => decimal(row.original.qps),
     },
     {
       id: 'slow-queries',
-      header: () => sortButton('slow_queries', '慢查询速率'),
+      header: () => sortButton('slow_queries', '慢查询', '慢查询速率'),
       cell: ({ row }) => decimal(row.original.slow_queries_per_second),
     },
     {
       id: 'buffer-pool',
-      header: () => sortButton('buffer_pool', 'Buffer Pool 使用率'),
-      cell: ({ row }) => percentage(row.original.buffer_pool_usage_percent),
+      header: () =>
+        sortButton('buffer_pool', 'Buffer Pool', 'Buffer Pool 容量 / 使用率'),
+      cell: ({ row }) => {
+        const value = bufferPool(row.original)
+        return (
+          <span className="host-metric" title={value}>
+            {value}
+          </span>
+        )
+      },
     },
     {
       id: 'replication',
-      header: () => sortButton('replication_lag', '复制状态 / 延迟'),
+      header: () => sortButton('replication_lag', '复制 / 延迟', '复制状态 / 延迟'),
       cell: ({ row }) => (
         <ReplicationText
           state={row.original.replication.state}
@@ -396,7 +438,7 @@ export function MySQLPage() {
     },
     {
       id: 'uptime',
-      header: () => sortButton('uptime', '运行时间'),
+      header: () => sortButton('uptime', '运行时间', '运行时间'),
       cell: ({ row }) => {
         const value = uptime(row.original.uptime_seconds)
         return (
@@ -408,7 +450,7 @@ export function MySQLPage() {
     },
     {
       id: 'status',
-      header: () => sortButton('status', '状态'),
+      header: () => sortButton('status', '状态', '实例状态'),
       cell: ({ row }) => <StatusText level={row.original.status} />,
     },
   ]
@@ -431,12 +473,26 @@ export function MySQLPage() {
 
       <div className="host-list-controls mysql-list-controls">
         <label className="host-search">
-          <span>搜索实例名称、地址或所属主机</span>
+          <span>搜索实例地址或所属主机</span>
           <input
             type="search"
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />
+        </label>
+        <label className="host-status-filter">
+          <span>实例标签</span>
+          <select
+            value={label}
+            onChange={(event) => updateParameters({ label: event.target.value })}
+          >
+            <option value="">全部标签</option>
+            {labelOptions.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="host-status-filter">
           <span>实例状态</span>
@@ -462,7 +518,7 @@ export function MySQLPage() {
             }
           >
             <option value="">全部属性</option>
-            <option value="writable">可写</option>
+            <option value="writable">读写</option>
             <option value="read_only">只读</option>
             <option value="unknown">未知</option>
           </select>
