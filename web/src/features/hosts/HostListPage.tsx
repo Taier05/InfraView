@@ -353,7 +353,9 @@ export function HostListPage() {
     },
     {
       id: 'status',
-      header: '状态',
+      header: () => (
+        <span className="status-align-header host-status-align-header">状态</span>
+      ),
       cell: ({ row }) => <StatusText status={row.original.status} />,
     },
   ]

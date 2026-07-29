@@ -127,6 +127,10 @@ it('renders the eleven compact MySQL columns with complete single-line titles an
   ]) {
     expect(screen.getByTitle(title)).toHaveClass('host-sort-button')
   }
+  expect(screen.getByTitle('实例状态')).toHaveClass(
+    'status-align-header',
+    'mysql-status-align-header',
+  )
 
   const instance = (await screen.findByText('192.0.2.101:3306')).closest('tr')
   expect(instance).not.toBeNull()

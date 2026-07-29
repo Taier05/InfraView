@@ -135,6 +135,9 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
       screen.getByRole('columnheader', { name: label }),
     ).toBeInTheDocument()
   }
+  expect(
+    within(screen.getByRole('columnheader', { name: '状态' })).getByText('状态'),
+  ).toHaveClass('status-align-header', 'host-status-align-header')
 
   expect(
     screen.queryByRole('link', { name: 'linux-app-01' }),

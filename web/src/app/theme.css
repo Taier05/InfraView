@@ -1146,6 +1146,14 @@ h1 {
   background: #31504d;
 }
 
+.host-status-align-header {
+  padding-inline-start: 0.88rem;
+}
+
+.mysql-status-align-header {
+  padding-inline-start: 1.15rem;
+}
+
 .host-name-text {
   display: block;
   width: 100%;

@@ -332,11 +332,20 @@ export function MySQLPage() {
     })
   }
 
-  function sortButton(field: MySQLSort, label: string, title: string) {
+  function sortButton(
+    field: MySQLSort,
+    label: string,
+    title: string,
+    className?: string,
+  ) {
     const state = sort === field ? (order === 'asc' ? '升序' : '降序') : '未排序'
     return (
       <button
-        className="host-sort-button"
+        className={
+          className === undefined
+            ? 'host-sort-button'
+            : `host-sort-button ${className}`
+        }
         type="button"
         data-active={sort === field}
         aria-label={`${title}排序，当前${state}`}
@@ -450,7 +459,13 @@ export function MySQLPage() {
     },
     {
       id: 'status',
-      header: () => sortButton('status', '状态', '实例状态'),
+      header: () =>
+        sortButton(
+          'status',
+          '状态',
+          '实例状态',
+          'status-align-header mysql-status-align-header',
+        ),
       cell: ({ row }) => <StatusText level={row.original.status} />,
     },
   ]
