@@ -460,7 +460,11 @@ export function OverviewPage() {
         />
       )}
 
-      <div className="overview-status-grid">
+      <div
+        className="overview-status-grid overview-compact-grid"
+        role="group"
+        aria-label="基础设施模块"
+      >
         {hostOverview.data === undefined ? (
           hostOverview.isPending ? (
             <ModuleLoading label="Linux 主机" />

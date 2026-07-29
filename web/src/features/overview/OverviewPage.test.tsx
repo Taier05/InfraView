@@ -104,6 +104,17 @@ it('总览展示可进入 Linux 主机和 MySQL 板块的告警摘要卡', async
   const mysqlCard = screen.getByRole('link', {
     name: '查看 MySQL 板块',
   })
+  const moduleGrid = screen.getByRole('group', { name: '基础设施模块' })
+  expect(moduleGrid).toHaveClass(
+    'overview-status-grid',
+    'overview-compact-grid',
+  )
+  expect(
+    within(moduleGrid).getByRole('link', { name: '查看 Linux 主机板块' }),
+  ).toBeVisible()
+  expect(
+    within(moduleGrid).getByRole('link', { name: '查看 MySQL 板块' }),
+  ).toBeVisible()
   expect(screen.queryAllByRole('article')).toHaveLength(0)
   expect(hostCard).toHaveAttribute('href', '/hosts')
   expect(hostCard).toHaveAttribute('data-level', 'critical')
