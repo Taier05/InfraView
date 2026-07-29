@@ -17,12 +17,12 @@ async function login(page: Page) {
 async function expectNoDestructiveControls(page: Page) {
   await expect(
     page.getByRole('button', {
-      name: /重启|删除|执行|远程命令|修改|发布|配置下发/,
+      name: /重启|删除|执行|远程命令|切换|修改|发布|配置/,
     }),
   ).toHaveCount(0)
   await expect(
     page.getByRole('link', {
-      name: /重启|删除|执行|远程命令|修改|发布|配置下发/,
+      name: /重启|删除|执行|远程命令|切换|修改|发布|配置/,
     }),
   ).toHaveCount(0)
 }
@@ -40,8 +40,11 @@ test('未登录会重定向，登录后可完成总览和主机列表关键路�
   await expect(
     page.getByRole('heading', { name: '基础设施总览' }),
   ).toBeVisible()
-  await expect(page.getByText('异常主机')).toBeVisible()
-  await expect(page.getByText(/存在严重异常|存在警告|全部正常/)).toBeVisible()
+  const linuxCard = page.getByRole('link', { name: '查看 Linux 主机板块' })
+  await expect(linuxCard.getByText('异常主机')).toBeVisible()
+  await expect(
+    linuxCard.getByText(/存在严重异常|存在警告|全部正常/),
+  ).toBeVisible()
   await expect(page.getByText('CPU', { exact: true })).toBeVisible()
   await expect(page.getByText('内存', { exact: true })).toBeVisible()
   await expect(page.getByText('IO', { exact: true })).toBeVisible()
@@ -69,7 +72,7 @@ test('未登录会重定向，登录后可完成总览和主机列表关键路�
   await page.getByRole('button', { name: '刷新' }).click()
   await refreshResponse
 
-  await page.getByRole('link', { name: '查看 Linux 主机板块' }).click()
+  await linuxCard.click()
   await expect(
     page.getByRole('heading', { name: '主机', exact: true }),
   ).toBeVisible()
@@ -199,4 +202,88 @@ test('可控错误响应会显示只读重试入口', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText('测试数据源暂时不可用')
   await expect(page.getByRole('button', { name: '重试' })).toBeVisible()
   await expectNoDestructiveControls(page)
+})
+
+test('shows the read-only MySQL overview and compact instance list', async ({
+  page,
+}) => {
+  await login(page)
+  const mysqlCard = page.getByRole('link', { name: '查看 MySQL 板块' })
+  await expect(mysqlCard).toBeVisible()
+  await expect(mysqlCard.getByText('复制线程')).toBeVisible()
+  await mysqlCard.click()
+
+  await expect(page.getByRole('heading', { name: 'MySQL 实例' })).toBeVisible()
+  const headers = page.getByRole('columnheader')
+  await expect(headers).toHaveCount(11)
+  for (const name of [
+    /^实例/,
+    /^所属主机$/,
+    /^版本 \/ 角色$/,
+    /^连接使用/,
+    /^活跃线程/,
+    /^QPS/,
+    /^慢查询速率/,
+    /^Buffer Pool 使用率/,
+    /^复制状态 \/ 延迟/,
+    /^运行时间/,
+    /^状态/,
+  ]) {
+    await expect(page.getByRole('columnheader', { name })).toBeVisible()
+  }
+
+  const stoppedReplication = page
+    .getByRole('row')
+    .filter({ hasText: 'fixture-mysql-stopped-replication' })
+  await expect(stoppedReplication.getByText('线程异常')).toBeVisible()
+  await expect(
+    stoppedReplication.getByText('严重', { exact: true }),
+  ).toBeVisible()
+  await expectNoDestructiveControls(page)
+  await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll')
+  const viewport = await page.locator('html').evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }))
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth)
+})
+
+test('刷新后从 URL 恢复 MySQL 筛选、排序和每页数量', async ({ page }) => {
+  await login(page)
+  await page.getByRole('link', { name: '查看 MySQL 板块' }).click()
+  await expect(page.getByRole('heading', { name: 'MySQL 实例' })).toBeVisible()
+
+  await page
+    .getByRole('combobox', { name: '读写属性' })
+    .selectOption('read_only')
+  await expect(page).toHaveURL(/role=read_only/)
+  await page.getByRole('combobox', { name: '实例状态' }).selectOption('critical')
+  await expect(page).toHaveURL(/status=critical/)
+  await page
+    .getByRole('button', { name: /^复制状态 \/ 延迟排序/ })
+    .click()
+  await expect(page).toHaveURL(/sort=replication_lag/)
+  await expect(page).toHaveURL(/order=asc/)
+  await page.getByRole('combobox', { name: '每页数量' }).selectOption('50')
+  await expect(page).toHaveURL(/page_size=50/)
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'MySQL 实例' })).toBeVisible()
+  await expect(page).toHaveURL(/role=read_only/)
+  await expect(page).toHaveURL(/status=critical/)
+  await expect(page).toHaveURL(/sort=replication_lag/)
+  await expect(page).toHaveURL(/order=asc/)
+  await expect(page).toHaveURL(/page_size=50/)
+  await expect(
+    page.getByRole('combobox', { name: '读写属性' }),
+  ).toHaveValue('read_only')
+  await expect(
+    page.getByRole('combobox', { name: '实例状态' }),
+  ).toHaveValue('critical')
+  await expect(
+    page.getByRole('combobox', { name: '每页数量' }),
+  ).toHaveValue('50')
+  await expect(
+    page.getByRole('button', { name: /^复制状态 \/ 延迟排序，当前升序$/ }),
+  ).toBeVisible()
 })

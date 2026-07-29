@@ -37,10 +37,16 @@ chmod +x "$test_dir/bin/docker"
 printf '%s\n' \
 	'#!/bin/sh' \
 	'case "$*" in' \
+	'  *"--request "*"api/v1/mysql/overview"*) printf "%s" 405 ;;' \
+	'  *"--request "*"api/v1/mysql/instances"*) printf "%s" 405 ;;' \
 	'  *"--request "*) printf "%s" 404 ;;' \
 	'  *"--write-out %{http_code}"*"api/v1/session"*) printf "%s" 204 ;;' \
+	'  *"--write-out %{http_code}"*"api/v1/mysql/overview"*) printf "%s" 401 ;;' \
+	'  *"--write-out %{http_code}"*"api/v1/mysql/instances"*) printf "%s" 401 ;;' \
 	'  *"/healthz"*) printf "%s" '\''{"status":"ok"}'\'' ;;' \
 	'  *"api/v1/session"*) printf "%s" '\''{"authenticated":true}'\'' ;;' \
+	'  *"api/v1/mysql/overview"*) printf "%s" '\''{"data":{"total":0,"alerts":{"availability":{}}},"meta":{"stale":false}}'\'' ;;' \
+	'  *"api/v1/mysql/instances"*) printf "%s" '\''{"data":{"instances":[],"page_size":20},"meta":{"stale":false}}'\'' ;;' \
 	'  *"api/v1/overview"*) printf "%s" '\''{"total":1}'\'' ;;' \
 	'  *"api/v1/hosts?page"*) printf "%s" '\''{"hosts":[]}'\'' ;;' \
 	'  *"mock-host-001/metrics"*) printf "%s" '\''{"series":[]}'\'' ;;' \
