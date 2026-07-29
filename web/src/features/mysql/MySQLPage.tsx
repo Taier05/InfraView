@@ -397,7 +397,14 @@ export function MySQLPage() {
     {
       id: 'uptime',
       header: () => sortButton('uptime', '运行时间'),
-      cell: ({ row }) => uptime(row.original.uptime_seconds),
+      cell: ({ row }) => {
+        const value = uptime(row.original.uptime_seconds)
+        return (
+          <span className="mysql-uptime" title={value}>
+            {value}
+          </span>
+        )
+      },
     },
     {
       id: 'status',

@@ -132,6 +132,10 @@ it('renders the eleven compact MySQL columns', async () => {
     '正常 · 2s',
   )
   expect(cells[9]).toHaveTextContent('2天 3小时')
+  expect(cells[9].querySelector('.mysql-uptime')).toHaveAttribute(
+    'title',
+    '2天 3小时',
+  )
   expect(within(cells[10]).getByText('正常')).toHaveAttribute(
     'data-level',
     'normal',
