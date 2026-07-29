@@ -199,7 +199,10 @@ AvailableLabels []string `json:"available_labels"`
 - [ ] **Step 5: 运行后端回归并提交**
 
 ```bash
-docker build --target backend-test --progress=plain .
+docker run --rm --user "$(id -u):$(id -g)" \
+  -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod \
+  -v "$PWD:/src" -w /src golang:1.24-bookworm \
+  go test ./internal/adapters/nightingale ./internal/mysql ./internal/service ./internal/httpapi -count=1
 git diff --check
 git status --short
 git add internal/service/mysql_types.go internal/service/mysql_service.go internal/service/mysql_service_test.go internal/httpapi/mysql_handlers.go internal/httpapi/api_test.go
