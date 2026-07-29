@@ -2,7 +2,7 @@
 
 状态：真实只读适配器已实现。当前主要开发与真实验证版本为 Nightingale v8.4.1，v9.x 保留协议兼容；当前 8080 服务已使用更新后的私密环境文件重建并通过最终只读验收。`INFRAVIEW_DATA_SOURCE` 接受 `mock` 或 `nightingale`。
 
-最后采集：2026-07-28
+最后采集：2026-07-29
 
 ## 脱敏验证契约
 
@@ -54,10 +54,12 @@ CPU 核数、内存总量和网络接口映射已通过脱敏夹具验证。公�
 ## MySQL 只读映射
 
 - MySQL 是独立领域；Nightingale 共享的同一个 `*Provider` 同时实现 Linux 主机 `datasource.Provider` 与 `mysql.Provider`，复用受限 HTTP 客户端和数据源发现缓存，不会增加任意代理、任意 PromQL 或数据库连接能力。
-- 快照仅发送一次 `POST /api/n9e/query-instant-batch`，请求内固定包含 13 条代码内置查询：可用性、版本、运行时间、只读角色、连接数、最大连接数、运行线程、QPS、慢查询速率、Buffer Pool 使用率、复制延迟、复制 IO 线程、复制 SQL 线程。
+- 快照仅发送一次 `POST /api/n9e/query-instant-batch`，请求内固定包含 14 条代码内置查询：可用性、版本、运行时间、只读角色、连接数、最大连接数、运行线程、QPS、慢查询速率、Buffer Pool 使用率、Buffer Pool 容量、复制延迟、复制 IO 线程、复制 SQL 线程。容量固定使用 `mysql_global_variables_innodb_buffer_pool_size`，原始单位为字节。
+- `BufferPoolSizeBytes` / `buffer_pool_size_bytes` 为可空字段：只接受非负最新有效样本；缺失、负数、NaN、Inf 或最新同时间戳冲突均保持 `null`，不得伪造成零。新增容量不增加第二次 batch，也不改变复制查询索引的身份规则。
 - Provider 按完整实例身份与复制通道归并批量结果；没有按实例发起的 N+1 查询。批量基数、身份标签、数值范围和上游错误均由脱敏契约测试验证，错误映射为安全的 MySQL 数据源不可用状态。
-- 不提供 MySQL 历史、实例详情、数据库写入或运维操作。真实 v8.4.1 MySQL API 与浏览器验收仍须获得单独授权；本地 Mock 和脱敏自动化覆盖不等同于生产验收。
-- 本轮已通过无缓存生产镜像、独立全仓 race、E2E 隔离安全测试和一次性 Mock Chromium 验收；该证据只证明本地实现与脱敏夹具，不能替代真实 Nightingale v8.4.1 MySQL 读取契约或生产页面验收。
+- 实例列表的 `available_labels` 从完整 snapshot 的非空实例名去重并排序，独立于标签、状态、角色、搜索、排序和分页；`label` 仅按去除首尾空白后的实例名精确匹配。服务端 `search` 只匹配实例地址或所属主机。
+- 不提供 MySQL 历史、实例详情、数据库写入或运维操作。2026-07-29 已获授权在仅连接测试 Nightingale 的原 8080 完成脱敏 MySQL API 与浏览器验收；该证据不等同于生产验收。
+- 本轮已通过无缓存生产镜像、Go 普通/race、E2E 隔离安全测试、固定 14 查询定向测试和原 8080 Chromium 4/4。没有连接生产、创建额外端口或增加运行时查询能力。
 
 Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能只依赖 HTTP 状态，还必须检查 `err`。错误路径会被 SPA 接管并返回 HTML，因此适配器必须同时校验 Content-Type 和 JSON 结构。
 

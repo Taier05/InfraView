@@ -19,16 +19,16 @@
 2. docs/PROJECT_STATUS.md
 3. docs/TODO.md
 4. docs/datasources/NIGHTINGALE.md
-5. docs/superpowers/specs/2026-07-29-mysql-compact-layout-design.md
-6. docs/superpowers/plans/2026-07-29-mysql-compact-layout.md
-7. docs/superpowers/reports/2026-07-29-mysql-compact-layout-verification.md
+5. docs/superpowers/specs/2026-07-28-mysql-module-design.md
+6. docs/superpowers/plans/2026-07-29-mysql-table-refinement.md
+7. docs/superpowers/reports/2026-07-29-mysql-table-refinement-verification.md
 
 先只读执行：
 git status --short --branch
 git log -3 --oneline
 git diff --check
 
-InfraView 始终只读。最终审查修复波、范围化复审、完整构建和原 8080 测试 Nightingale Chromium 验收均已通过；当前下一步是等待用户决定是否合并，不得声明已合并或已推送。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/指标值或上游正文。不要自行 push、合并、部署或重启。
+InfraView 始终只读。MySQL 表格细化、范围化复审、完整无缓存构建和原 8080 测试 Nightingale Chromium 4/4 验收均已通过；当前下一步是等待用户决定是否集成，不得声明已合并或已推送。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/指标值或上游正文。不要自行 push、合并、部署或重启。
 ```
 
 ## 历史 main 恢复提示（不适用于当前 MySQL 暂停点）
@@ -63,15 +63,19 @@ Nightingale v8.4.1 兼容功能交付基线为 18d26a6，已合并并推送到 o
 
 ## 当前暂停点
 
-### 2026-07-29 MySQL 模块 Task 12
+### 2026-07-29 MySQL 表格细化收口
 
-当前授权工作树为 `<仓库根目录>/.worktrees/mysql-module`，分支 `feature/mysql-module`。MySQL 模块已完成独立领域/Service、Mock、Nightingale 受限适配、`GET /api/v1/mysql/overview`、`GET /api/v1/mysql/instances`、总览卡及 11 列实例页；复用 Nightingale 安全客户端，以固定 13 条查询构成一次即时 batch，禁止按实例 N+1。没有 MySQL 历史、详情、写入、数据库连接、任意 PromQL 或代理能力。
+当前授权工作树为 `<仓库根目录>/.worktrees/mysql-module`，分支 `feature/mysql-module`。MySQL 模块已完成独立领域/Service、Mock、Nightingale 受限适配、`GET /api/v1/mysql/overview`、`GET /api/v1/mysql/instances`、总览卡及 11 列实例页；复用 Nightingale 安全客户端，以固定 14 条查询构成一次即时 batch，禁止按实例 N+1。新增的第 14 条固定查询是 `mysql_global_variables_innodb_buffer_pool_size`，通过可空 `BufferPoolSizeBytes` / `buffer_pool_size_bytes` 契约只读下发。没有 MySQL 历史、详情、写入、数据库连接、任意 PromQL 或代理能力。
 
 复制线程任一明确停止为严重；最大有效复制延迟 5 秒为警告、30 秒为严重。缺失值不伪造成零：仅可写且零复制通道为“未配置复制/正常”，只读或角色未知且零通道时复制线程与实例状态均为未知并纳入警告风险。任意复制状态只要存在有效延迟都显示秒数；总览警告徽标使用 `warning_instances` 并明确显示“警告风险”。
 
 继续前读取上方 Git 跟踪文档；本地验证证据和恢复命令统一见 `docs/superpowers/reports/2026-07-29-mysql-module-verification.md`，不再依赖被 Git 忽略的 Task 12 brief/report。本地无缓存生产镜像、独立 race、E2E 安全测试、一次性 Mock smoke/资源检查与 Chromium 已通过，专用 E2E 项目资源已确认删除。真实 Nightingale v8.4.1 MySQL API smoke 和真实 Chromium 验收必须再次取得用户单独授权，绝不能读取或输出私密环境文件、Token、Cookie、认证头、真实地址、标识、数量、指标或上游正文。
 
 2026-07-29 已完成 MySQL 紧凑布局的追加验收：桌面总览固定为四列紧凑模块位，Linux 与 MySQL 模块等宽；MySQL 保留全部 11 列，并在 1440×900 下确认页面和表格均无横向滚动。无缓存生产镜像验证、E2E 清理边界测试、原有 `infraview` 8080 的健康与无正文 HTTP 检查，以及原 8080 Chromium live 验收均已执行；Chromium 两项布局用例通过。此次只强制重建既有 `infraview` Compose 项目的 8080，未创建其他测试端口、Compose 项目或预览服务。开发 8080 永远连接测试 Nightingale，未连接生产；产品和运行时仍严格只读。受 Git 跟踪的完整脱敏证据见 `docs/superpowers/reports/2026-07-29-mysql-compact-layout-verification.md`。
+
+同日完成 MySQL 表格细化收口：容量指标只接受非负最新有效值，缺失、非法或同一最新时间戳冲突均保持 `null`；`available_labels` 从完整 snapshot 的非空实例名去重排序，不受标签、状态、角色、搜索、排序和分页影响。`label` 去除首尾空白后按实例名精确匹配，并可与其他条件组合；服务端与页面 `search` 均只匹配实例地址或所属主机，不把实例名混入自由搜索。页面角色文案使用“读写/只读/未知”，Buffer Pool 按“容量 / 使用率”“容量 / —”“— / 使用率”“—”显示。
+
+MySQL 表格最终列为“实例地址、所属主机、版本 / 角色、连接、线程、QPS、慢查询、Buffer Pool、复制 / 延迟、运行时间、状态”，桌面列宽依次为 `13/9/9/9/6/5/7/13/12/8/9%`。状态列表头为状态圆点预留等宽起始偏移；原 8080 Chromium 4/4 已确认 Host/MySQL 共享列文本起点差值 `<= 1px`、11 个表头单行、1440×900 无页面或表格横向溢出、900px 控制区两行三列。认证后的业务页标签/搜索/地址/角色/Buffer Pool 匿名断言通过，且没有 console error、page error 或 request failure。恢复前曾在基线发现状态列 live 几何失败，修复提交 `aa54eae` 已通过范围复审并由本轮重新无缓存构建、部署和 live 验收确认。完整脱敏证据见 `docs/superpowers/reports/2026-07-29-mysql-table-refinement-verification.md`。
 
 Nightingale v8.4.1 兼容功能已经快进合并并推送到 `origin/main`，功能交付基线为 `18d26a6`；原 `feature/nightingale-v8-compat` 分支和对应 worktree 已删除。该功能完成 v8.4.1 Target 时间字段的 RED→GREEN：`StatusTime` 优先采用有效 `beat_time`，缺失或无效时回退有效 `update_at`，两者都无效时保持零值。v8.4.1 的 profile、Target、数据源 brief、即时批量和区间批量只读契约预检通过；运行时不增加版本探测请求，v9.x 既有协议测试继续保留。
 

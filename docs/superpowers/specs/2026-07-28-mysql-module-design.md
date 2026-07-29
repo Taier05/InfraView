@@ -68,11 +68,12 @@ MySQL 模块继续遵守 InfraView 的只读产品边界：只展示监控数据
 | QPS | `rate(mysql_global_status_questions[5m])` | 每秒 |
 | 慢查询速率 | `rate(mysql_global_status_slow_queries[5m])` | 每秒 |
 | Buffer Pool 使用率 | `mysql_global_status_buffer_pool_pages_utilization` | 百分比 |
+| Buffer Pool 容量 | `mysql_global_variables_innodb_buffer_pool_size` | 字节，非负 |
 | 复制延迟 | `mysql_slave_status_seconds_behind_master` | 秒 |
 | 复制 IO 线程 | `mysql_slave_status_slave_io_running` | 0/1 |
 | 复制 SQL 线程 | `mysql_slave_status_slave_sql_running` | 0/1 |
 
-二值指标已验证符合 0/1 语义；Buffer Pool 使用率已验证符合百分比范围。所有查询必须在代码内固定，不允许从 HTTP 请求、前端或配置传入 PromQL。
+二值指标已验证符合 0/1 语义；Buffer Pool 使用率已验证符合百分比范围，容量只接受非负值。MySQL snapshot 固定发送上述 14 条查询，仍只有一次 `query-instant-batch`。所有查询必须在代码内固定，不允许从 HTTP 请求、前端或配置传入 PromQL。
 
 ## 架构
 
@@ -159,13 +160,13 @@ API `id` 使用该组合键生成稳定的 URL 安全摘要，不直接嵌入原
 
 辅助指标按相同组合键合并。缺失或非法的非关键指标返回 `null`，不得转换为零。
 
-同一实例出现多条非复制辅助指标序列时，选择时间戳最新的有效样本；负数、NaN、Inf、超出 0..100 的 Buffer Pool 使用率等非法候选必须先忽略，不能更新已选时间。最新有效时间戳相同但值或版本标签冲突时，该字段返回 `null`。复制指标保留通道维度后再按本规格聚合；每个通道的复制延迟也选择最新有效样本，非法候选不得推进时间。
+同一实例出现多条非复制辅助指标序列时，选择时间戳最新的有效样本；负数、NaN、Inf、超出 0..100 的 Buffer Pool 使用率等非法候选必须先忽略，不能更新已选时间，Buffer Pool 容量同样拒绝负数、NaN 和 Inf。最新有效时间戳相同但值或版本标签冲突时，该字段返回 `null`。容量在领域、Service 和 HTTP 层依次使用可空 `BufferPoolSizeBytes`、`BufferPoolSizeBytes` 和 `buffer_pool_size_bytes`。复制指标保留通道维度后再按本规格聚合；每个通道的复制延迟也选择最新有效样本，非法候选不得推进时间。
 
 ## 角色语义
 
 `mysql_global_variables_read_only` 只用于显示：
 
-- `0`：可写。
+- `0`：领域角色为 `writable`，页面文案显示“读写”。
 - `1`：只读。
 - 缺失或非法：未知。
 
@@ -270,7 +271,8 @@ GET /api/v1/mysql/instances
 
 查询参数：
 
-- `search`：匹配实例名、地址或所属主机。
+- `search`：只匹配实例地址或所属主机，不匹配实例名。
+- `label`：去除首尾空白后按实例名精确匹配，可与其他筛选、排序和分页组合。
 - `status`：`normal`、`warning`、`critical`、`unknown`。
 - `role`：`writable`、`read_only`、`unknown`。
 - `sort`
@@ -291,6 +293,8 @@ GET /api/v1/mysql/instances
 - 状态。
 
 分页只允许 20、50、100，默认 20。缺失值始终置后；相同值使用实例稳定 ID 保持确定顺序。
+
+响应中的每个实例新增可空 `buffer_pool_size_bytes`；页面级 `available_labels` 为完整 snapshot 中非空实例名的去重排序结果，不受当前 `label`、`status`、`role`、`search`、排序或分页影响，空结果页仍返回完整选项。
 
 MySQL API 只注册 GET。POST、PUT、PATCH、DELETE 返回 405。不存在 SQL、restart、failover、promote、configure、proxy 或 query 路由。
 
@@ -319,23 +323,25 @@ MySQL API 只注册 GET。POST、PUT、PATCH、DELETE 返回 405。不存在 SQL
 
 页面采用紧凑 11 列：
 
-1. 实例：单行组合显示实例名和地址，超长省略并提供完整提示。
+1. 实例地址：单行显示完整地址语义，超长省略并提供完整 `title`。
 2. 所属主机。
 3. 版本 / 角色。
-4. 连接使用。
-5. 活跃线程。
+4. 连接。
+5. 线程。
 6. QPS。
-7. 慢查询速率。
-8. Buffer Pool 使用率。
-9. 复制状态 / 延迟。
+7. 慢查询。
+8. Buffer Pool。
+9. 复制 / 延迟。
 10. 运行时间。
 11. 状态。
 
-连接使用显示当前连接、最大连接和可计算的百分比。复制列显示“正常”“线程异常”“未配置复制”或“状态未知”，有有效延迟时附带秒数。
+连接显示当前连接、最大连接和可计算的百分比。Buffer Pool 以 IEC 容量与一位小数使用率组合显示，四种缺失组合依次为“容量 / 使用率”“容量 / —”“— / 使用率”“—”。复制列显示“正常”“线程异常”“未配置复制”或“状态未知”，有有效延迟时附带秒数。
 
 只有可用性和复制指标使用警告或严重色。信息指标不设置经验阈值，不擅自着色。
 
-搜索、筛选、排序、页码和每页数量写入 URL。页面复用统一刷新控件，显示上次成功刷新时间、运行时刷新周期和“正在刷新…”。stale、空态、首次加载、后台刷新失败和无缓存错误沿用现有统一交互。
+搜索、标签/状态/角色筛选、排序、页码和每页数量写入 URL。标签选项只消费响应中的 `available_labels`，不发起额外 API；页面搜索框明确为“搜索实例地址或所属主机”。页面复用统一刷新控件，显示上次成功刷新时间、运行时刷新周期和“正在刷新…”。stale、空态、首次加载、后台刷新失败和无缓存错误沿用现有统一交互。
+
+桌面 11 列宽依次为 `13/9/9/9/6/5/7/13/12/8/9%`，表头强制单行。Host 与 MySQL 的共享可排序列以及状态列文本起点差值必须 `<= 1px`；状态列表头为单元格中的状态圆点和间距预留等宽偏移。1440×900 下页面与表格均不得水平溢出；761–1100px 的六个控制项采用两行三列，窄屏再降为两列。
 
 首期不提供实例详情链接、操作列或历史图表。
 
@@ -397,7 +403,8 @@ MySQL API 只注册 GET。POST、PUT、PATCH、DELETE 返回 405。不存在 SQL
 
 - 总览 MySQL 卡及四类告警摘要。
 - 11 列实例列表。
-- 搜索、筛选、排序、分页和 URL 恢复。
+- 搜索、标签/状态/角色筛选、排序、分页和 URL 恢复。
+- 地址 `title`、“读写”文案及 Buffer Pool 四种容量/使用率缺失组合。
 - 空态、stale、后台刷新错误和首次错误。
 - 无实例详情、SQL、重启、主从切换或配置修改控件。
 
@@ -407,6 +414,7 @@ MySQL API 只注册 GET。POST、PUT、PATCH、DELETE 返回 405。不存在 SQL
 - Docker 中运行 Go 普通测试、race 测试和构建。
 - 隔离 Mock Compose smoke 与 Chromium E2E。
 - Chromium 验证总览进入 MySQL、列表字段、刷新、无溢出和无破坏性控件。
+- 原 8080 在 1440×900 验证四列总览、11 个表头单行、Host/MySQL 文本起点差值 `<= 1px` 和页面/表格无水平溢出；900px 验证六个控制项两行三列。认证后业务页不得出现 console error、page error 或 request failure。
 
 ## 真实环境验收
 

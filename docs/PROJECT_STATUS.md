@@ -6,13 +6,17 @@
 
 ### 2026-07-29 MySQL 模块文档与本地验收
 
-当前工作树 `feature/mysql-module` 已实现只读 MySQL 领域、Service、Mock、Nightingale 适配、两个 GET API、总览告警卡与 11 列实例页。MySQL 快照固定为 13 条代码内置即时查询，必须在一次 batch 内归并；不提供实例 N+1、历史、详情、写入、数据库连接或任意查询能力。
+当前工作树 `feature/mysql-module` 已实现只读 MySQL 领域、Service、Mock、Nightingale 适配、两个 GET API、总览告警卡与 11 列实例页。MySQL 快照固定为 14 条代码内置即时查询，必须在一次 batch 内归并；新增 `mysql_global_variables_innodb_buffer_pool_size`，以可空 `buffer_pool_size_bytes` 下发容量。不提供实例 N+1、历史、详情、写入、数据库连接或任意查询能力。
 
-复制线程任一明确停止为严重；复制延迟最大有效值 5 秒起警告、30 秒起严重。缺失复制通道、线程或延迟不转换为零：仅可写且零复制通道为正常，只读或角色未知且零通道时复制线程与实例状态均为未知并计入警告风险。Nightingale 适配器先忽略非法候选再选择最新有效样本，复制通道身份按标签键存在性判定并允许合法空值。2026-07-29 已在本地完成无缓存生产镜像构建（前端 Vitest 67/67、typecheck、production build、Go 普通/race 测试与编译）、独立全仓 race、E2E 隔离安全测试，以及一次性 Mock smoke、资源检查和 Chromium 6/6；专用 E2E 项目资源已确认清理。真实 Nightingale v8.4.1 MySQL API smoke 和真实浏览器验收均待用户单独授权。
+复制线程任一明确停止为严重；复制延迟最大有效值 5 秒起警告、30 秒起严重。缺失复制通道、线程或延迟不转换为零：仅可写且零复制通道为正常，只读或角色未知且零通道时复制线程与实例状态均为未知并计入警告风险。Nightingale 适配器先忽略非法候选再选择最新有效样本，复制通道身份按标签键存在性判定并允许合法空值。2026-07-29 已在本地完成无缓存生产镜像构建（前端 Vitest 71/71、typecheck、production build、Go 普通/race 测试与编译）、E2E 隔离安全测试，以及既有 Mock 验收。用户随后授权仅连接测试 Nightingale 的原 8080 Chromium 验收并已完成；该证据不等同于生产 MySQL 验收。
 
 同日的 MySQL 紧凑布局验收已完成：总览桌面四列紧凑模块位已锁定，Linux/MySQL 模块等宽；MySQL 11 列和所有表头在 1440×900 下可见，页面与表格均无横向滚动。完整无缓存镜像验证和 E2E 清理边界测试已运行；只重建既有 `infraview` Compose 项目的原 8080，健康与无正文 HTTP 检查通过，原 8080 Chromium live 两项布局用例通过。该开发服务只连接测试 Nightingale，未连接生产，也没有创建其他测试端口或 Compose 项目。受跟踪的脱敏验证记录见 `docs/superpowers/reports/2026-07-29-mysql-compact-layout-verification.md`。
 
 最终全分支审查发现的 MySQL batch `null` 语义和总览四类互斥状态已按 TDD 修复，范围化复审通过；最终提交重新完成无缓存镜像、原 8080 健康与无正文 HTTP、E2E safety 和 Chromium live 验收。当前未合并、未推送，等待用户决定。
+
+MySQL 表格细化也已完成：`available_labels` 来自完整 snapshot 的稳定非空实例名集合，`label` 为去空白后的实例名精确筛选并可与状态、角色、搜索、排序和分页组合；服务端与页面 `search` 均只匹配实例地址或所属主机。页面使用“读写”而非“可写”，Buffer Pool 同列展示容量与使用率，缺失组合不伪造成零。桌面 11 列宽为 `13/9/9/9/6/5/7/13/12/8/9%`。
+
+修复提交 `aa54eae` 解决状态圆点导致的状态列表头文本起点偏移后，本轮在新 HEAD 上重新完成无缓存镜像、E2E safety、固定 14 查询定向测试及原 8080 重建。无正文检查为健康端点 200 JSON、未认证受保护 API 401 JSON；Chromium 4/4 确认 Host/MySQL 共享列 `<= 1px`、11 个表头单行、1440×900 无页面/表格横向溢出和 900px 控制区两行三列。认证后业务页匿名语义与 console/page/request 安全检查通过。原 8080 仍仅连接测试 Nightingale，未连接生产；本分支仍未推送、未合并。
 
 Mock MVP、紧凑布局、Nightingale 只读接入、15 秒当前页面刷新、“数据连接”汇总和 Nightingale v8.4.1 兼容均已完成并进入 `main`。v8.4.1 功能交付基线为 `18d26a6`，已推送到 `origin/main`；原 `feature/nightingale-v8-compat` 分支和 worktree 已清理。当前以 Nightingale v8.4.1 为主要开发与真实验证版本，同时保留 v9.x 已覆盖的协议兼容。
 

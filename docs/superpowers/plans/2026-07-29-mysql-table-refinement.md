@@ -12,7 +12,7 @@
 
 - 全程只读访问 Nightingale；不得增加写接口、运维动作、任意 PromQL 或逐实例查询。
 - MySQL 固定批量查询由 13 条增加到 14 条，但仍只发起一次 `query-instant-batch`，禁止 N+1。
-- 只使用现有 `infraview` Compose 项目和 `http://192.168.8.200:8080/`；不得创建额外端口或预览服务。
+- 只使用现有 `infraview` Compose 项目的原 8080；公开计划不记录真实访问地址，不得创建额外端口或预览服务。
 - 开发与验证只连接测试 Nightingale，永不连接生产环境。
 - 不输出 `.env`、Token、Cookie、认证头、上游响应正文、真实主机或实例标识、IP、资源数量和指标值。
 - 所有实现先写失败测试，再写最小实现；每个任务完成后独立提交，不推送、不合并。
@@ -34,7 +34,7 @@
 - Modify: `internal/httpapi/mysql_handlers.go`
 - Modify: `internal/httpapi/api_test.go`
 
-- [ ] **Step 1: 为适配器写容量指标失败测试**
+- [x] **Step 1: 为适配器写容量指标失败测试**
 
 在 `provider_test.go` 的 MySQL 快照测试中补第 14 组批量结果，覆盖：
 
@@ -55,7 +55,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 预期：因查询和字段尚未实现而失败。
 
-- [ ] **Step 2: 最小实现 Nightingale 容量采集**
+- [x] **Step 2: 最小实现 Nightingale 容量采集**
 
 在 `mysqlPromQL()` 的 Buffer Pool 使用率之后加入：
 
@@ -71,7 +71,7 @@ BufferPoolSizeBytes *float64
 
 同时更新快照克隆，确保缓存返回值不共享指针。
 
-- [ ] **Step 3: 为服务和 HTTP 契约写失败测试**
+- [x] **Step 3: 为服务和 HTTP 契约写失败测试**
 
 测试 `BufferPoolSizeBytes`：
 
@@ -91,7 +91,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 预期：因服务/API 字段尚未实现而失败。
 
-- [ ] **Step 4: 扩展服务与 API 响应**
+- [x] **Step 4: 扩展服务与 API 响应**
 
 在服务摘要与 HTTP view 中增加：
 
@@ -101,7 +101,7 @@ BufferPoolSizeBytes *float64 `json:"buffer_pool_size_bytes"`
 
 只做透传，不加入排序、健康状态或告警逻辑。
 
-- [ ] **Step 5: 运行后端回归并提交**
+- [x] **Step 5: 运行后端回归并提交**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -129,7 +129,7 @@ git commit -m "feat: expose MySQL Buffer Pool capacity"
 - Modify: `internal/httpapi/mysql_handlers.go`
 - Modify: `internal/httpapi/api_test.go`
 
-- [ ] **Step 1: 写服务层筛选失败测试**
+- [x] **Step 1: 写服务层筛选失败测试**
 
 覆盖：
 
@@ -151,7 +151,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 预期：因查询字段与标签列表尚未实现而失败。
 
-- [ ] **Step 2: 实现服务层标签契约**
+- [x] **Step 2: 实现服务层标签契约**
 
 扩展类型：
 
@@ -177,7 +177,7 @@ if query.Label != "" && summary.Name != query.Label {
 
 自由搜索只检查 `Address` 与 `Host`。对 `Label` 使用 `strings.TrimSpace` 规范化。
 
-- [ ] **Step 3: 写 HTTP 参数与响应失败测试**
+- [x] **Step 3: 写 HTTP 参数与响应失败测试**
 
 覆盖：
 
@@ -186,7 +186,7 @@ if query.Label != "" && summary.Name != query.Label {
 - 响应包含稳定的 `available_labels`；
 - 空结果页仍返回完整标签选项。
 
-- [ ] **Step 4: 实现 HTTP 映射**
+- [x] **Step 4: 实现 HTTP 映射**
 
 将 `label` 加入参数白名单和 `service.MySQLQuery`，并在页面 view 增加：
 
@@ -196,7 +196,7 @@ AvailableLabels []string `json:"available_labels"`
 
 返回时复制列表，避免响应层意外共享底层切片。
 
-- [ ] **Step 5: 运行后端回归并提交**
+- [x] **Step 5: 运行后端回归并提交**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -221,7 +221,7 @@ git commit -m "feat: add MySQL instance label filter"
 - Modify: `web/src/features/mysql/MySQLPage.tsx`
 - Modify: `web/src/features/mysql/MySQLPage.test.tsx`
 
-- [ ] **Step 1: 更新类型和匿名测试夹具**
+- [x] **Step 1: 更新类型和匿名测试夹具**
 
 向 `MySQLInstance` 增加：
 
@@ -237,7 +237,7 @@ available_labels: string[]
 
 所有夹具使用匿名值，不引入真实实例信息。
 
-- [ ] **Step 2: 写前端失败测试**
+- [x] **Step 2: 写前端失败测试**
 
 覆盖：
 
@@ -261,7 +261,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 预期：新增断言失败。
 
-- [ ] **Step 3: 实现 URL、请求与筛选控件**
+- [x] **Step 3: 实现 URL、请求与筛选控件**
 
 增加 `label` 的 URL 读取、规范化、Query Key 和请求参数；以响应 `available_labels` 渲染下拉框：
 
@@ -284,7 +284,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 标签值仅来自后端或当前 URL，控件不得发起额外 API 请求。
 
-- [ ] **Step 4: 实现精简表头和单元格**
+- [x] **Step 4: 实现精简表头和单元格**
 
 采用以下桌面表头：
 
@@ -305,7 +305,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 容量使用 IEC 单位（B、KiB、MiB、GiB、TiB），不得把缺失值显示为 0。
 
-- [ ] **Step 5: 运行前端回归并提交**
+- [x] **Step 5: 运行前端回归并提交**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -330,7 +330,7 @@ git commit -m "fix: refine MySQL table semantics"
 - Modify: `web/src/features/hosts/HostListPage.test.tsx`
 - Modify: `web/src/features/mysql/MySQLPage.test.tsx`
 
-- [ ] **Step 1: 为结构约束写失败测试**
+- [x] **Step 1: 为结构约束写失败测试**
 
 单元测试确认主机和 MySQL 可排序表头仍使用统一 `.host-sort-button`，MySQL 11 列均有单行标题语义和完整 `title`。
 
@@ -350,7 +350,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
   sh -c 'npm ci && npm run test:run -- src/features/mysql/MySQLPage.test.tsx src/features/hosts/HostListPage.test.tsx'
 ```
 
-- [ ] **Step 2: 实现统一起始边界与列宽**
+- [x] **Step 2: 实现统一起始边界与列宽**
 
 移除可排序按钮的水平内边距，保留垂直点击区域：
 
@@ -368,7 +368,7 @@ MySQL 表头强制单行，并使用总和为 100% 的列宽：
 
 桌面保持无横向滚动；`<= 1100px` 保持表格内部滚动。调整 `.mysql-list-controls` 以容纳搜索、标签、状态、角色、每页数量与刷新六个控件，并保持窄屏换行。
 
-- [ ] **Step 3: 运行前端回归并提交**
+- [x] **Step 3: 运行前端回归并提交**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -396,7 +396,7 @@ git commit -m "fix: align infrastructure table columns"
 - Modify: `docs/superpowers/plans/2026-07-29-mysql-table-refinement.md`
 - Create: `docs/superpowers/reports/2026-07-29-mysql-table-refinement-verification.md`
 
-- [ ] **Step 1: 运行完整无缓存构建与安全回归**
+- [x] **Step 1: 运行完整无缓存构建与安全回归**
 
 ```bash
 docker build --no-cache --progress=plain .
@@ -406,7 +406,7 @@ git diff --check
 
 只记录通过/失败与匿名结论，不输出测试数据正文。
 
-- [ ] **Step 2: 在原 8080 上先执行浏览器 RED**
+- [x] **Step 2: 在原 8080 上先执行浏览器 RED**
 
 使用已有测试凭据运行 `web/e2e/mysql-compact-live.spec.ts`，确认旧部署尚未满足至少一项新断言。不得显示凭据或页面业务数据，不得启动额外端口。
 
@@ -429,7 +429,7 @@ git diff --check
 )
 ```
 
-- [ ] **Step 3: 仅重建现有 8080 服务**
+- [x] **Step 3: 仅重建现有 8080 服务**
 
 ```bash
 INFRAVIEW_ENV_FILE=/root/github/InfraView/.env INFRAVIEW_PORT=8080 docker compose -p infraview up -d --build --force-recreate
@@ -437,7 +437,7 @@ INFRAVIEW_ENV_FILE=/root/github/InfraView/.env INFRAVIEW_PORT=8080 docker compos
 
 该命令只重建既有测试服务；执行前再次确认 Compose 项目名为 `infraview`、端口为 8080。
 
-- [ ] **Step 4: 进行无正文健康检查与 Chromium 验收**
+- [x] **Step 4: 进行无正文健康检查与 Chromium 验收**
 
 验证：
 
@@ -470,7 +470,7 @@ INFRAVIEW_ENV_FILE=/root/github/InfraView/.env INFRAVIEW_PORT=8080 docker compos
 )
 ```
 
-- [ ] **Step 5: 更新文档和计划勾选**
+- [x] **Step 5: 更新文档和计划勾选**
 
 记录：
 
@@ -482,7 +482,7 @@ INFRAVIEW_ENV_FILE=/root/github/InfraView/.env INFRAVIEW_PORT=8080 docker compos
 
 验证报告不得包含真实环境标识、资源数量和指标值。
 
-- [ ] **Step 6: 文档检查并提交**
+- [x] **Step 6: 文档检查并提交**
 
 ```bash
 git diff --check
@@ -494,6 +494,6 @@ git show --check --stat --oneline HEAD
 git status --short --branch
 ```
 
-- [ ] **Step 7: 停止并等待集成授权**
+- [x] **Step 7: 停止并等待集成授权**
 
 汇报本地提交、验证结果和原 8080 状态。不得自行推送、合并到 `main` 或改动生产部署。
