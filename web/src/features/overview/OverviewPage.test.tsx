@@ -212,7 +212,7 @@ it('全正常时用绿色无异常文案展示所有零值状态', async () => {
   expect(mysqlCard).toHaveAttribute('data-level', 'normal')
   expect(within(mysqlCard).getAllByText('无异常')).toHaveLength(4)
   expect(within(mysqlCard).getByText('无严重')).toBeVisible()
-  expect(within(mysqlCard).getByText('无警告')).toBeVisible()
+  expect(within(mysqlCard).getByText('无警告风险')).toBeVisible()
 })
 
 it('把未知实例作为 warning 风险但保留未知文案', async () => {
@@ -241,6 +241,8 @@ it('把未知实例作为 warning 风险但保留未知文案', async () => {
   const card = await screen.findByRole('link', { name: '查看 MySQL 板块' })
   expect(card).toHaveAttribute('data-level', 'warning')
   expect(within(card).getByText('存在警告或未知')).toBeVisible()
+  expect(within(card).getByText('警告风险 1')).toBeVisible()
+  expect(within(card).queryByText('无警告')).not.toBeInTheDocument()
   expect(within(card).getByText('未知 1')).toBeVisible()
 })
 

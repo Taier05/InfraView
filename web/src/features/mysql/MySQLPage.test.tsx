@@ -313,11 +313,37 @@ it('preserves available connection values without inventing zeroes', async () =>
 })
 
 it('renders every replication and instance state with text and level', async () => {
+  const fixture = mysqlInstancePageFixture()
+  fixture.data.instances[1] = {
+    ...fixture.data.instances[1],
+    replication: {
+      ...fixture.data.instances[1].replication,
+      lag_seconds: 35,
+    },
+  }
+  fixture.data.instances[3] = {
+    ...fixture.data.instances[3],
+    replication: {
+      ...fixture.data.instances[3].replication,
+      lag_seconds: 7,
+    },
+  }
+  vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse(fixture))
   renderMySQLPage()
   await screen.findByText('fixture-mysql-a')
   for (const label of ['正常', '线程异常', '未配置复制', '状态未知']) {
-    expect(screen.getAllByText(label).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(new RegExp(`^${label}`)).length).toBeGreaterThan(0)
   }
+  const stoppedRow = screen.getByText('fixture-mysql-b').closest('tr')
+  const unknownRow = screen.getByText('fixture-mysql-d').closest('tr')
+  expect(stoppedRow).not.toBeNull()
+  expect(unknownRow).not.toBeNull()
+  expect(within(stoppedRow!).getAllByRole('cell')[8]).toHaveTextContent(
+    '线程异常 · 35s',
+  )
+  expect(within(unknownRow!).getAllByRole('cell')[8]).toHaveTextContent(
+    '状态未知 · 7s',
+  )
   for (const [label, level] of [
     ['正常', 'normal'],
     ['警告', 'warning'],

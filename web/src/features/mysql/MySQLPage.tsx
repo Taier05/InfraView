@@ -148,11 +148,11 @@ function ReplicationText({
   level: MetricLevel
 }) {
   const text =
-    state === 'normal'
-      ? `${replicationLabels[state]} · ${
-          lagSeconds === null ? '暂无数据' : `${decimal(lagSeconds)}s`
-        }`
-      : replicationLabels[state]
+    lagSeconds !== null
+      ? `${replicationLabels[state]} · ${decimal(lagSeconds)}s`
+      : state === 'normal'
+        ? `${replicationLabels[state]} · 暂无数据`
+        : replicationLabels[state]
   return (
     <span className="host-metric" data-level={level}>
       {text}

@@ -113,7 +113,7 @@ func (s *MySQLService) Overview(ctx context.Context) (MySQLOverview, Meta, error
 		}
 
 		addMySQLAlert(&overview.Alerts.Availability, mysqlAvailabilityLevel(instance.Availability))
-		addMySQLAlert(&overview.Alerts.ReplicationThreads, mysqlReplicationThreadsLevel(instance.ReplicationChannels))
+		addMySQLAlert(&overview.Alerts.ReplicationThreads, mysqlReplicationThreadsLevel(instance.Role, instance.ReplicationChannels))
 		if level, available := mysqlReplicationLagLevel(instance.ReplicationChannels); available {
 			addMySQLAlert(&overview.Alerts.ReplicationLag, level)
 		}
@@ -268,7 +268,13 @@ func addMySQLAlert(count *MySQLAlertCount, level Level) {
 	}
 }
 
-func mysqlReplicationThreadsLevel(channels []mysql.ReplicationChannel) Level {
+func mysqlReplicationThreadsLevel(role mysql.Role, channels []mysql.ReplicationChannel) Level {
+	if len(channels) == 0 {
+		if role == mysql.RoleWritable {
+			return LevelNormal
+		}
+		return LevelUnknown
+	}
 	level := LevelNormal
 	for _, channel := range channels {
 		if channel.IORunning != nil && !*channel.IORunning ||

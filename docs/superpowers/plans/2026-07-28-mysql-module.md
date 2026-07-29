@@ -40,7 +40,7 @@
 - Consumes: `context.Context` 和 `errors` 标准库。
 - Produces: `mysql.Provider.MySQLSnapshot(context.Context) (mysql.Snapshot, error)`、`mysql.StableInstanceID(string, string, string) string`、`mysql.Instance`、`mysql.ReplicationChannel`、`mysql.ErrUnavailable`。
 
-- [ ] **Step 1: 写稳定身份和 Provider 契约失败测试**
+- [x] **Step 1: 写稳定身份和 Provider 契约失败测试**
 
 ```go
 func TestStableInstanceIDUsesAllIdentityLabels(t *testing.T) {
@@ -83,7 +83,7 @@ func RunContract(t testing.TB, provider mysql.Provider) {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认 RED**
+- [x] **Step 2: 运行测试确认 RED**
 
 Run:
 
@@ -96,7 +96,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: FAIL，提示 `internal/mysql` 或 `StableInstanceID` 尚不存在。
 
-- [ ] **Step 3: 实现最小领域类型和稳定 ID**
+- [x] **Step 3: 实现最小领域类型和稳定 ID**
 
 `internal/mysql/provider.go`：
 
@@ -171,7 +171,7 @@ func StableInstanceID(host, name, address string) string {
 }
 ```
 
-- [ ] **Step 4: 容器化格式化并确认 GREEN**
+- [x] **Step 4: 容器化格式化并确认 GREEN**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -185,7 +185,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交领域契约**
+- [x] **Step 5: 提交领域契约**
 
 ```bash
 git add internal/mysql
@@ -206,7 +206,7 @@ git commit -m "feat: 定义 MySQL 只读领域契约"
 - Consumes: `mysql.Provider`、`mysql.Snapshot`、`mysql.Instance` 和 `mysqltest.RunContract`。
 - Produces: `mock.NewMySQL() mysql.Provider`，供 Service、主程序和 E2E 使用。
 
-- [ ] **Step 1: 写 Mock 契约和场景失败测试**
+- [x] **Step 1: 写 Mock 契约和场景失败测试**
 
 ```go
 func TestMySQLProviderContract(t *testing.T) {
@@ -231,7 +231,7 @@ func TestMySQLProviderContainsDeterministicHealthScenarios(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认 RED**
+- [x] **Step 2: 运行测试确认 RED**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -242,7 +242,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: FAIL，提示 `NewMySQL` 未定义。
 
-- [ ] **Step 3: 实现完全虚构的固定 snapshot**
+- [x] **Step 3: 实现完全虚构的固定 snapshot**
 
 在 `mysql_provider.go` 中实现 `mysqlProvider`，固定返回：
 
@@ -271,7 +271,7 @@ func NewMySQL() mysql.Provider {
 }
 ```
 
-- [ ] **Step 4: 格式化并确认 Mock GREEN**
+- [x] **Step 4: 格式化并确认 Mock GREEN**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -285,7 +285,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交 Mock Provider**
+- [x] **Step 5: 提交 Mock Provider**
 
 ```bash
 git add internal/adapters/mock/mysql_provider.go internal/adapters/mock/mysql_provider_test.go
@@ -307,7 +307,7 @@ git commit -m "feat: 增加确定性 MySQL Mock 数据"
 - Consumes: `mysql.Instance`、`mysql.Provider`、现有 `service.Level` 和 `service.Meta`。
 - Produces: `service.NewMySQL(mysql.Provider, *cache.Store, service.MySQLOptions) *service.MySQLService`、`service.MySQLInstanceSummary`、`service.MySQLReplicationSummary`。
 
-- [ ] **Step 1: 写复制边界和最终等级失败测试**
+- [x] **Step 1: 写复制边界和最终等级失败测试**
 
 ```go
 func TestMySQLSummaryAggregatesReplicationChannelsAndBoundaries(t *testing.T) {
@@ -379,7 +379,7 @@ func (p *recordingMySQLProvider) MySQLSnapshot(context.Context) (mysql.Snapshot,
 }
 ```
 
-- [ ] **Step 2: 运行聚焦测试确认 RED**
+- [x] **Step 2: 运行聚焦测试确认 RED**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -392,7 +392,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: FAIL，提示 `summarizeMySQLInstance` 或复制输出类型未定义。
 
-- [ ] **Step 3: 定义 Service 输出类型**
+- [x] **Step 3: 定义 Service 输出类型**
 
 `mysql_types.go` 定义：
 
@@ -448,7 +448,7 @@ type MySQLInstanceSummary struct {
 }
 ```
 
-- [ ] **Step 4: 实现可用性、角色和复制聚合**
+- [x] **Step 4: 实现可用性、角色和复制聚合**
 
 在 `mysql_service.go` 中实现：
 
@@ -469,7 +469,7 @@ func mysqlHigherLevel(left, right Level) Level
 
 `mysqlHigherLevel` 使用 `critical > warning > unknown > normal`。线程停止先返回严重；其余通道取最大有效延迟。可写且无通道返回 `not_configured/normal`；只读或角色未知且数据不足返回 `unknown/unknown`。
 
-- [ ] **Step 5: 补充缺失语义和连接使用率测试**
+- [x] **Step 5: 补充缺失语义和连接使用率测试**
 
 增加明确用例：
 
@@ -512,7 +512,7 @@ func TestMySQLSummaryCalculatesOnlyValidConnectionUsageAndMaximumLag(t *testing.
 }
 ```
 
-- [ ] **Step 6: 格式化并确认告警计算 GREEN**
+- [x] **Step 6: 格式化并确认告警计算 GREEN**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -526,7 +526,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: PASS。
 
-- [ ] **Step 7: 提交规范化和告警计算**
+- [x] **Step 7: 提交规范化和告警计算**
 
 ```bash
 git add internal/service/mysql_types.go internal/service/mysql_service.go internal/service/mysql_service_test.go
@@ -548,7 +548,7 @@ git commit -m "feat: 计算 MySQL 实例健康状态"
 - Consumes: Task 3 的 `MySQLService` 和 `MySQLInstanceSummary`。
 - Produces: `MySQLService.Overview(context.Context) (MySQLOverview, Meta, error)`、`MySQLService.Instances(context.Context, MySQLQuery) (MySQLPage, Meta, error)`。
 
-- [ ] **Step 1: 写缓存、singleflight 和 stale 失败测试**
+- [x] **Step 1: 写缓存、singleflight 和 stale 失败测试**
 
 ```go
 func TestMySQLServiceSharesOneSnapshotAcrossOverviewAndList(t *testing.T) {
@@ -603,7 +603,7 @@ func TestMySQLServiceReturnsIndependentSnapshotCopies(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认 RED**
+- [x] **Step 2: 运行测试确认 RED**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -614,7 +614,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: FAIL，缓存读取或总览接口尚未实现。
 
-- [ ] **Step 3: 实现 snapshot 加载和深复制**
+- [x] **Step 3: 实现 snapshot 加载和深复制**
 
 ```go
 func (s *MySQLService) snapshot(ctx context.Context) (mysql.Snapshot, Meta, error) {
@@ -640,7 +640,7 @@ func (s *MySQLService) snapshot(ctx context.Context) (mysql.Snapshot, Meta, erro
 
 `cloneMySQLSnapshot` 必须复制所有数值指针和 `ReplicationChannels`。
 
-- [ ] **Step 4: 写总览计数失败测试**
+- [x] **Step 4: 写总览计数失败测试**
 
 ```go
 func TestMySQLOverviewCountsUnknownAsWarningRisk(t *testing.T) {
@@ -670,7 +670,7 @@ func TestMySQLOverviewCountsAlertCategoriesIndependently(t *testing.T) {
 }
 ```
 
-- [ ] **Step 5: 定义并实现总览类型**
+- [x] **Step 5: 定义并实现总览类型**
 
 ```go
 type MySQLAlertCount struct {
@@ -700,7 +700,7 @@ type MySQLOverview struct {
 
 `Overview` 从同一 snapshot 映射 summaries；四个状态互斥，未知同时计入 `WarningInstances` 和 `AffectedInstances`。
 
-- [ ] **Step 6: 写列表规范化、筛选、排序和分页失败测试**
+- [x] **Step 6: 写列表规范化、筛选、排序和分页失败测试**
 
 ```go
 func TestMySQLInstancesSearchesNameAddressAndHost(t *testing.T) {
@@ -804,7 +804,7 @@ func assertAvailableValuesBeforeMissing(
 
 `fixtureMySQLSnapshot` 和 `alertCategoryFixtureSnapshot` 使用 Task 3 的 `instanceWithChannels` 构造固定实例；`assertStableIDTieBreak` 对相同排序值的相邻实例断言 ID 升序。
 
-- [ ] **Step 7: 实现列表查询白名单**
+- [x] **Step 7: 实现列表查询白名单**
 
 ```go
 type MySQLPage struct {
@@ -820,7 +820,7 @@ func sortMySQLInstances(items []MySQLInstanceSummary, field, order string)
 
 默认 `sort=instance`、`order=asc`；允许 `instance`、`connections`、`threads_running`、`qps`、`slow_queries`、`buffer_pool`、`replication_lag`、`uptime`、`status`。搜索匹配 `Name`、`Address`、`Host`。
 
-- [ ] **Step 8: 格式化并运行完整 Service 测试**
+- [x] **Step 8: 格式化并运行完整 Service 测试**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -834,7 +834,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: PASS。
 
-- [ ] **Step 9: 提交 MySQL Service**
+- [x] **Step 9: 提交 MySQL Service**
 
 ```bash
 git add internal/service/mysql_types.go internal/service/mysql_service.go internal/service/mysql_service_test.go
@@ -858,7 +858,7 @@ git commit -m "feat: 增加 MySQL 总览和实例查询服务"
 - Consumes: 现有 `Provider.queryInstant(context.Context, []string)` 和 `instantSeries`。
 - Produces: `(*nightingale.Provider).MySQLSnapshot(context.Context) (mysql.Snapshot, error)`，使 `*nightingale.Provider` 同时满足 `datasource.Provider` 和 `mysql.Provider`。
 
-- [ ] **Step 1: 写固定查询顺序失败测试**
+- [x] **Step 1: 写固定查询顺序失败测试**
 
 ```go
 func TestMySQLPromQLIsFixed(t *testing.T) {
@@ -883,7 +883,7 @@ func TestMySQLPromQLIsFixed(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: 运行测试确认 RED**
+- [x] **Step 2: 运行测试确认 RED**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -894,11 +894,11 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: FAIL，提示 `mysqlPromQL` 未定义。
 
-- [ ] **Step 3: 实现固定查询列表**
+- [x] **Step 3: 实现固定查询列表**
 
 `mysql_promql.go` 仅返回 Step 1 的 13 个常量查询，不接收参数，不拼接用户输入。
 
-- [ ] **Step 4: 添加完全脱敏的批量夹具和 happy-path 失败测试**
+- [x] **Step 4: 添加完全脱敏的批量夹具和 happy-path 失败测试**
 
 夹具外层 `dat` 必须严格包含 13 个查询结果。实例标签仅使用：
 
@@ -940,7 +940,7 @@ func TestMySQLSnapshotUsesOneBatchAndMergesInstances(t *testing.T) {
 }
 ```
 
-- [ ] **Step 5: 让 Nightingale 构造器返回可共享的具体 Provider**
+- [x] **Step 5: 让 Nightingale 构造器返回可共享的具体 Provider**
 
 将：
 
@@ -963,7 +963,7 @@ var _ mysql.Provider = (*Provider)(nil)
 
 现有调用方仍可把返回值赋给 `datasource.Provider`。
 
-- [ ] **Step 6: 实现实例身份和辅助指标合并**
+- [x] **Step 6: 实现实例身份和辅助指标合并**
 
 `mysql_provider.go` 实现：
 
@@ -983,7 +983,7 @@ func mergeMySQLScalar(target **float64, targetTime *time.Time, candidate instant
 5. 复制通道用 `channel_name + NUL + master_host + NUL + master_uuid` 在实例内分组，但不把这些标签写入领域输出。
 6. 无法匹配已有实例的辅助序列忽略，不创建幽灵实例。
 
-- [ ] **Step 7: 格式化并确认 Nightingale happy path GREEN**
+- [x] **Step 7: 格式化并确认 Nightingale happy path GREEN**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -1000,7 +1000,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: PASS。
 
-- [ ] **Step 8: 提交 Nightingale happy path**
+- [x] **Step 8: 提交 Nightingale happy path**
 
 ```bash
 git add internal/adapters/nightingale internal/mysql
@@ -1021,7 +1021,7 @@ git commit -m "feat: 接入 Nightingale MySQL 当前指标"
 - Consumes: Task 5 的 `MySQLSnapshot`。
 - Produces: 对缺失、重复、非法值、批量错误和敏感信息泄露的完整防御。
 
-- [ ] **Step 1: 写关键身份和批量形状失败测试**
+- [x] **Step 1: 写关键身份和批量形状失败测试**
 
 ```go
 func TestMySQLSnapshotEnforcesIdentityAndBatchShape(t *testing.T) {
@@ -1063,7 +1063,7 @@ func TestMySQLSnapshotEnforcesIdentityAndBatchShape(t *testing.T) {
 
 每个测试使用 `httptest.Server` 返回完全虚构 envelope，并断言 `errors.Is(err, mysql.ErrUnavailable)`；空 `mysql_up` 断言 `len(snapshot.Instances)==0` 且无错误。
 
-- [ ] **Step 2: 写数值和冲突选择失败测试**
+- [x] **Step 2: 写数值和冲突选择失败测试**
 
 ```go
 func TestMySQLSnapshotNormalizesValuesAndConflicts(t *testing.T) {
@@ -1109,7 +1109,7 @@ func TestMySQLSnapshotKeepsReplicationChannelsSeparateAndSelectsNewestValue(t *t
 }
 ```
 
-- [ ] **Step 3: 实现最小严格校验**
+- [x] **Step 3: 实现最小严格校验**
 
 新增局部 helper：
 
@@ -1121,7 +1121,7 @@ func newestMySQLValue(current **float64, currentAt *time.Time, candidate float64
 
 所有非法辅助值只使字段缺失；关键身份错误和批量结构错误使整个 snapshot 不可用。
 
-- [ ] **Step 4: 写错误脱敏和一次批量调用测试**
+- [x] **Step 4: 写错误脱敏和一次批量调用测试**
 
 ```go
 func TestMySQLSnapshotErrorDoesNotExposeTokenBodyLabelsOrQueries(t *testing.T) {
@@ -1159,7 +1159,7 @@ func TestMySQLSnapshotUsesOnlyDiscoveryAndOneInstantBatch(t *testing.T) {
 
 错误字符串不得包含夹具 Token、HTML 正文、`fixture-mysql-*`、文档地址或固定查询文本。请求路径集合必须只有数据源 brief 和一次 instant batch。
 
-- [ ] **Step 5: 运行 Nightingale 普通和 race 测试**
+- [x] **Step 5: 运行 Nightingale 普通和 race 测试**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -1174,7 +1174,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: 两次 PASS。
 
-- [ ] **Step 6: 提交契约加固**
+- [x] **Step 6: 提交契约加固**
 
 ```bash
 git add internal/adapters/nightingale/mysql_provider.go internal/adapters/nightingale/provider_test.go
@@ -1195,7 +1195,7 @@ git commit -m "test: 加固 MySQL 指标契约边界"
 - Consumes: `mock.NewMySQL()`、`mysqltest.RunContract` 和同时实现两个 Provider 接口的 `*nightingale.Provider`。
 - Produces: `providerSet{Hosts datasource.Provider, MySQL mysql.Provider}` 和 `withMySQLUpstreamTimeout`，供 Task 8 创建 MySQL Service。
 
-- [ ] **Step 1: 写装配失败测试**
+- [x] **Step 1: 写装配失败测试**
 
 ```go
 func TestProviderSetUsesMockForHostsAndMySQL(t *testing.T) {
@@ -1240,7 +1240,7 @@ func (blockingMySQLProvider) MySQLSnapshot(ctx context.Context) (mysql.Snapshot,
 
 共享测试断言 Nightingale 模式下 `Hosts` 和 `MySQL` 的底层具体指针相同；超时测试使用阻塞 Provider 并断言返回 `context.DeadlineExceeded` 或安全不可用错误。
 
-- [ ] **Step 2: 运行测试确认 RED**
+- [x] **Step 2: 运行测试确认 RED**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -1251,7 +1251,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: FAIL，`providerSet` 和 MySQL 依赖尚未定义。
 
-- [ ] **Step 3: 实现 provider set 和独立超时包装**
+- [x] **Step 3: 实现 provider set 和独立超时包装**
 
 ```go
 type providerSet struct {
@@ -1275,7 +1275,7 @@ func (p *mysqlTimeoutProvider) MySQLSnapshot(ctx context.Context) (mysql.Snapsho
 
 Mock 模式分别构造主机和 MySQL Provider；Nightingale 模式只调用一次 `nightingale.New` 并把同一指针赋给两个接口。
 
-- [ ] **Step 4: 让现有主机装配使用 provider set**
+- [x] **Step 4: 让现有主机装配使用 provider set**
 
 ```go
 providers := dataSourceProviders(cfg, clock)
@@ -1285,7 +1285,7 @@ store := cache.New(clock)
 
 Task 7 只替换原 `dataSourceProvider` 调用并保持现有主机 Service 参数原样；`providers.MySQL` 在 `providerSet` 中保留，由 Task 8 完成 Service 和 HTTP 装配。
 
-- [ ] **Step 5: 格式化并确认装配 GREEN**
+- [x] **Step 5: 格式化并确认装配 GREEN**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -1299,7 +1299,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交依赖装配**
+- [x] **Step 6: 提交依赖装配**
 
 ```bash
 git add cmd/infraview
@@ -1323,7 +1323,7 @@ git commit -m "feat: 装配 MySQL 数据源能力"
 - Consumes: `service.NewMySQL`、`service.MySQLService.Overview`、`service.MySQLService.Instances` 和 Task 7 的 `providerSet`。
 - Produces: `GET /api/v1/mysql/overview`、`GET /api/v1/mysql/instances` 和稳定 JSON view。
 
-- [ ] **Step 1: 写路由、认证和只读方法失败测试**
+- [x] **Step 1: 写路由、认证和只读方法失败测试**
 
 ```go
 func TestMySQLRoutesRequireAuthentication(t *testing.T) {
@@ -1370,7 +1370,7 @@ func TestMySQLRoutesRejectMutationMethods(t *testing.T) {
 
 测试 helper 使用现有认证 Manager 创建会话并把 `service.NewMySQL` 注入 `Dependencies.MySQLService`；JSON path helper 只检查类型，不打印响应正文。
 
-- [ ] **Step 2: 运行测试确认 RED**
+- [x] **Step 2: 运行测试确认 RED**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -1381,7 +1381,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: FAIL，新路由返回 404。
 
-- [ ] **Step 3: 定义 JSON view 和 handlers**
+- [x] **Step 3: 定义 JSON view 和 handlers**
 
 `mysql_handlers.go` 定义：
 
@@ -1422,7 +1422,7 @@ type mysqlInstancePageView struct {
 
 总览 view 使用 `availability`、`replication_threads`、`replication_lag`、`replication_data` 四个 `alertCountView`。
 
-- [ ] **Step 4: 注册 GET 路由和 405 fallback**
+- [x] **Step 4: 注册 GET 路由和 405 fallback**
 
 在 `api.go` 的依赖和 server 增加：
 
@@ -1465,11 +1465,11 @@ mux.HandleFunc("/api/v1/mysql/overview", server.methodNotAllowed)
 mux.HandleFunc("/api/v1/mysql/instances", server.methodNotAllowed)
 ```
 
-- [ ] **Step 5: 实现严格参数白名单**
+- [x] **Step 5: 实现严格参数白名单**
 
 实例 handler 只允许 `search`、`status`、`role`、`sort`、`order`、`page`、`page_size`，并构造 `service.MySQLQuery`。总览不允许任何查询参数。
 
-- [ ] **Step 6: 增加非法查询和错误脱敏测试**
+- [x] **Step 6: 增加非法查询和错误脱敏测试**
 
 ```go
 func TestMySQLInstancesRejectsUnknownOrRepeatedQueryParameters(t *testing.T) {
@@ -1505,7 +1505,7 @@ func TestMySQLInstancesMapsUnavailableToSafe503(t *testing.T) {
 
 `writeServiceError` 将 `errors.Is(err, mysql.ErrUnavailable)` 映射为与现有数据源一致的安全 503，不把底层错误写入响应或日志。
 
-- [ ] **Step 7: 格式化并运行 HTTP 全包测试**
+- [x] **Step 7: 格式化并运行 HTTP 全包测试**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -1519,7 +1519,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: PASS。
 
-- [ ] **Step 8: 提交 HTTP API**
+- [x] **Step 8: 提交 HTTP API**
 
 ```bash
 git add internal/httpapi cmd/infraview/main.go cmd/infraview/main_test.go
@@ -1543,7 +1543,7 @@ git commit -m "feat: 提供 MySQL 只读查询 API"
 - Consumes: `GET /api/v1/mysql/instances`。
 - Produces: `MySQLPage`、`MySQLInstancePageResponse` 和 `/mysql` 页面主体。
 
-- [ ] **Step 1: 定义前端 API 类型**
+- [x] **Step 1: 定义前端 API 类型**
 
 在 `types.ts` 增加：
 
@@ -1589,7 +1589,7 @@ export interface MySQLInstancePageData {
 export type MySQLInstancePageResponse = ApiResponse<MySQLInstancePageData>
 ```
 
-- [ ] **Step 2: 添加 MSW fixture 和页面失败测试**
+- [x] **Step 2: 添加 MSW fixture 和页面失败测试**
 
 fixture 必须包含完全虚构的正常、警告、严重、未知实例。测试：
 
@@ -1668,7 +1668,7 @@ it('keeps stale data visible and reports background errors', async () => {
 })
 ```
 
-- [ ] **Step 3: 运行 Vitest 确认 RED**
+- [x] **Step 3: 运行 Vitest 确认 RED**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -1679,7 +1679,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: FAIL，`MySQLPage` 尚不存在。
 
-- [ ] **Step 4: 实现 URL 规范化和查询**
+- [x] **Step 4: 实现 URL 规范化和查询**
 
 复用主机页的 300ms 搜索防抖、20/50/100 页大小、响应页码规范化和运行时刷新周期。MySQL sort 白名单：
 
@@ -1699,7 +1699,7 @@ const sortFields = [
 
 请求只调用 `/api/v1/mysql/instances`，参数来自规范化 URL。
 
-- [ ] **Step 5: 实现 11 列表格和格式化**
+- [x] **Step 5: 实现 11 列表格和格式化**
 
 具体格式：
 
@@ -1712,7 +1712,7 @@ const sortFields = [
 - 运行时间：天/小时；缺失显示“暂无数据”。
 - 状态：正常、警告、严重、未知，颜色和文字同时表达。
 
-- [ ] **Step 6: 运行页面测试和 typecheck**
+- [x] **Step 6: 运行页面测试和 typecheck**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -1723,7 +1723,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: PASS。
 
-- [ ] **Step 7: 提交 MySQL 页面**
+- [x] **Step 7: 提交 MySQL 页面**
 
 ```bash
 git add web/src/features/mysql web/src/api/types.ts web/src/test/fixtures.ts web/src/test/server.ts
@@ -1752,7 +1752,7 @@ git commit -m "feat: 增加 MySQL 实例列表"
 - Consumes: `MySQLPage` 和 `GET /api/v1/mysql/overview`。
 - Produces: `/mysql` 路由、侧边栏“MySQL”入口和总览 MySQL 健康卡。
 
-- [ ] **Step 1: 定义 MySQL 总览类型和 fixture**
+- [x] **Step 1: 定义 MySQL 总览类型和 fixture**
 
 ```ts
 export interface MySQLOverviewData {
@@ -1775,7 +1775,7 @@ export interface MySQLOverviewData {
 export type MySQLOverviewResponse = ApiResponse<MySQLOverviewData>
 ```
 
-- [ ] **Step 2: 写总览和导航失败测试**
+- [x] **Step 2: 写总览和导航失败测试**
 
 ```tsx
 it('renders a MySQL health card linking to /mysql', async () => {
@@ -1838,7 +1838,7 @@ it('keeps Linux and MySQL card failures independent', async () => {
 })
 ```
 
-- [ ] **Step 3: 运行前端测试确认 RED**
+- [x] **Step 3: 运行前端测试确认 RED**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -1849,7 +1849,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: FAIL，MySQL 卡、路由和导航尚不存在。
 
-- [ ] **Step 4: 注册路由和导航**
+- [x] **Step 4: 注册路由和导航**
 
 `App.tsx`：
 
@@ -1865,7 +1865,7 @@ Expected: FAIL，MySQL 卡、路由和导航尚不存在。
 
 数据连接汇总仍只有指标来源 `Nightingale` 或 `Mock`，不增加第二个连接计数。
 
-- [ ] **Step 5: 实现独立 MySQL overview query 和卡片**
+- [x] **Step 5: 实现独立 MySQL overview query 和卡片**
 
 `OverviewPage` 同时使用：
 
@@ -1883,7 +1883,7 @@ MySQL 卡使用现有 `module-status-card` 和四个 `MetricAlert` 等价结构�
 
 统一刷新控件以 `hostOverview.isFetching || mysqlOverview.isFetching` 表示刷新中，手动刷新同时调用两个 query 的 `refetch()`；“上次刷新”只在两个板块都至少成功一次后显示二者较早的 `dataUpdatedAt`，避免把部分刷新误报为整体成功。
 
-- [ ] **Step 6: 增加紧凑列表和双卡布局样式**
+- [x] **Step 6: 增加紧凑列表和双卡布局样式**
 
 在 `theme.css` 增加 `mysql-*` 类，要求：
 
@@ -1893,7 +1893,7 @@ MySQL 卡使用现有 `module-status-card` 和四个 `MetricAlert` 等价结构�
 - 1440x900 无横向页面溢出；表格容器必要时内部滚动。
 - 不添加操作列或按钮。
 
-- [ ] **Step 7: 运行完整前端验证**
+- [x] **Step 7: 运行完整前端验证**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -1904,7 +1904,7 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 Expected: Vitest、typecheck、production build 全部 PASS。
 
-- [ ] **Step 8: 提交总览和导航**
+- [x] **Step 8: 提交总览和导航**
 
 ```bash
 git add web/src
@@ -1926,7 +1926,7 @@ git commit -m "feat: 集成 MySQL 总览与导航"
 - Consumes: Mock MySQL API、总览卡和 `/mysql` 页面。
 - Produces: 容器级 API smoke 和真实 Chromium MySQL 关键路径。
 
-- [ ] **Step 1: 先写 MySQL API smoke 断言**
+- [x] **Step 1: 先写 MySQL API smoke 断言**
 
 在 `scripts/smoke.sh` 登录后的受保护请求中增加：
 
@@ -1946,7 +1946,7 @@ printf '%s' "$mysql_instances_body" |
 
 脚本不能 echo 响应正文、数量或值。
 
-- [ ] **Step 2: 写 Chromium MySQL 用例**
+- [x] **Step 2: 写 Chromium MySQL 用例**
 
 在 `infraview.spec.ts` 增加独立测试：
 
@@ -1966,7 +1966,7 @@ test('shows the read-only MySQL overview and compact instance list', async ({ pa
 
 再增加 URL 恢复测试：设置角色筛选、状态筛选、排序和每页 50，刷新后断言控件与 URL 保持。
 
-- [ ] **Step 3: 构建隔离 Mock E2E 并确认 GREEN**
+- [x] **Step 3: 构建隔离 Mock E2E 并确认 GREEN**
 
 ```bash
 INFRAVIEW_E2E_PROJECT=infraview-mysql-0728 \
@@ -1976,11 +1976,11 @@ INFRAVIEW_E2E_PORT=18085 \
 
 Expected: Compose smoke 和全部 Chromium 用例 PASS；脚本只清理 `infraview-mysql-0728` 自己创建的资源。
 
-- [ ] **Step 4: 更新测试文档**
+- [x] **Step 4: 更新测试文档**
 
 在 `docs/TESTING.md` 记录 MySQL 领域、Nightingale 契约、HTTP、Vitest、Mock smoke 和 Chromium 覆盖；不得记录真实实例或指标结果。
 
-- [ ] **Step 5: 提交 E2E**
+- [x] **Step 5: 提交 E2E**
 
 ```bash
 git add scripts/smoke.sh web/e2e/infraview.spec.ts docs/TESTING.md

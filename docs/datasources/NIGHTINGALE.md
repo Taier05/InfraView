@@ -53,7 +53,7 @@ CPU 核数、内存总量和网络接口映射已通过脱敏夹具验证。公�
 
 ## MySQL 只读映射
 
-- MySQL 是独立领域，复用同一个受限 Nightingale HTTP 客户端和数据源发现缓存；不会增加任意代理、任意 PromQL 或数据库连接能力。
+- MySQL 是独立领域；Nightingale 共享的同一个 `*Provider` 同时实现 Linux 主机 `datasource.Provider` 与 `mysql.Provider`，复用受限 HTTP 客户端和数据源发现缓存，不会增加任意代理、任意 PromQL 或数据库连接能力。
 - 快照仅发送一次 `POST /api/n9e/query-instant-batch`，请求内固定包含 13 条代码内置查询：可用性、版本、运行时间、只读角色、连接数、最大连接数、运行线程、QPS、慢查询速率、Buffer Pool 使用率、复制延迟、复制 IO 线程、复制 SQL 线程。
 - Provider 按完整实例身份与复制通道归并批量结果；没有按实例发起的 N+1 查询。批量基数、身份标签、数值范围和上游错误均由脱敏契约测试验证，错误映射为安全的 MySQL 数据源不可用状态。
 - 不提供 MySQL 历史、实例详情、数据库写入或运维操作。真实 v8.4.1 MySQL API 与浏览器验收仍须获得单独授权；本地 Mock 和脱敏自动化覆盖不等同于生产验收。
@@ -105,7 +105,7 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 
 ## 目标映射
 
-适配器只实现 `internal/datasource.Provider`：`Health`、`ListHosts`、`GetHost`、`GetCurrentMetrics`、`QueryRange`、`QueryAggregateRange`。前端和服务层不接收 Nightingale 原始请求体、任意 URL 或任意查询表达式。
+共享的 `*Provider` 同时实现 Linux 主机 `internal/datasource.Provider`（`Health`、`ListHosts`、`GetHost`、`GetCurrentMetrics`、`QueryRange`、`QueryAggregateRange`）与 MySQL `internal/mysql.Provider`（`MySQLSnapshot`）。前端和服务层不接收 Nightingale 原始请求体、任意 URL 或任意查询表达式。
 
 ## 实施顺序
 

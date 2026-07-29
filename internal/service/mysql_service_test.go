@@ -297,12 +297,46 @@ func TestMySQLOverviewCountsAlertCategoriesIndependently(t *testing.T) {
 	}
 	want := MySQLOverviewAlerts{
 		Availability:       MySQLAlertCount{Warning: 1, Critical: 1},
-		ReplicationThreads: MySQLAlertCount{Warning: 1, Critical: 1},
+		ReplicationThreads: MySQLAlertCount{Warning: 2, Critical: 1},
 		ReplicationLag:     MySQLAlertCount{Warning: 1, Critical: 1},
 		ReplicationData:    MySQLAlertCount{Warning: 3},
 	}
 	if overview.Alerts != want {
 		t.Fatalf("alerts = %#v, want %#v", overview.Alerts, want)
+	}
+}
+
+func TestMySQLOverviewClassifiesZeroReplicationChannelsByRole(t *testing.T) {
+	base := mysql.Instance{Availability: mysql.AvailabilityUp}
+	writable := base
+	writable.ID = "fixture-writable"
+	writable.Role = mysql.RoleWritable
+	readOnly := base
+	readOnly.ID = "fixture-read-only"
+	readOnly.Role = mysql.RoleReadOnly
+	unknown := base
+	unknown.ID = "fixture-unknown"
+	unknown.Role = mysql.RoleUnknown
+
+	overview, _, err := newMySQLServiceWithSnapshot(mysql.Snapshot{
+		Instances: []mysql.Instance{writable, readOnly, unknown},
+	}).Overview(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := MySQLOverview{
+		Total:             3,
+		Normal:            1,
+		Unknown:           2,
+		AffectedInstances: 2,
+		WarningInstances:  2,
+		Alerts: MySQLOverviewAlerts{
+			ReplicationThreads: MySQLAlertCount{Warning: 2},
+			ReplicationData:    MySQLAlertCount{Warning: 2},
+		},
+	}
+	if overview != want {
+		t.Fatalf("overview = %#v, want %#v", overview, want)
 	}
 }
 

@@ -343,8 +343,12 @@ function MySQLStatusCard({ data }: { data: MySQLOverviewData }) {
             }
           />
           <StatusBadge
-            level={data.warning > 0 ? 'warning' : 'normal'}
-            label={data.warning > 0 ? `警告 ${data.warning}` : '无警告'}
+            level={data.warning_instances > 0 ? 'warning' : 'normal'}
+            label={
+              data.warning_instances > 0
+                ? `警告风险 ${data.warning_instances}`
+                : '无警告风险'
+            }
           />
         </div>
       </div>

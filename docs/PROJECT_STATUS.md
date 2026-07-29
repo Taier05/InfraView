@@ -8,7 +8,7 @@
 
 当前工作树 `feature/mysql-module` 已实现只读 MySQL 领域、Service、Mock、Nightingale 适配、两个 GET API、总览告警卡与 11 列实例页。MySQL 快照固定为 13 条代码内置即时查询，必须在一次 batch 内归并；不提供实例 N+1、历史、详情、写入、数据库连接或任意查询能力。
 
-复制线程任一明确停止为严重；复制延迟最大有效值 5 秒起警告、30 秒起严重。缺失复制通道、线程或延迟不转换为零：可写且未配置复制为正常，其余不完整数据为未知；未知实例单独统计并计入总览警告侧。2026-07-29 已在本地完成无缓存生产镜像构建（前端 Vitest 67/67、typecheck、production build、Go 普通/race 测试与编译）、独立全仓 race、E2E 隔离安全测试，以及一次性 Mock smoke、资源检查和 Chromium 6/6；专用 E2E 项目资源已确认清理。真实 Nightingale v8.4.1 MySQL API smoke 和真实浏览器验收均待用户单独授权。
+复制线程任一明确停止为严重；复制延迟最大有效值 5 秒起警告、30 秒起严重。缺失复制通道、线程或延迟不转换为零：仅可写且零复制通道为正常，只读或角色未知且零通道时复制线程与实例状态均为未知并计入警告风险。Nightingale 适配器先忽略非法候选再选择最新有效样本，复制通道身份按标签键存在性判定并允许合法空值。2026-07-29 已在本地完成无缓存生产镜像构建（前端 Vitest 67/67、typecheck、production build、Go 普通/race 测试与编译）、独立全仓 race、E2E 隔离安全测试，以及一次性 Mock smoke、资源检查和 Chromium 6/6；专用 E2E 项目资源已确认清理。真实 Nightingale v8.4.1 MySQL API smoke 和真实浏览器验收均待用户单独授权。
 
 Mock MVP、紧凑布局、Nightingale 只读接入、15 秒当前页面刷新、“数据连接”汇总和 Nightingale v8.4.1 兼容均已完成并进入 `main`。v8.4.1 功能交付基线为 `18d26a6`，已推送到 `origin/main`；原 `feature/nightingale-v8-compat` 分支和 worktree 已清理。当前以 Nightingale v8.4.1 为主要开发与真实验证版本，同时保留 v9.x 已覆盖的协议兼容。
 

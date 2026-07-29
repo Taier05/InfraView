@@ -1,6 +1,7 @@
 package nightingale
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -296,6 +297,80 @@ func TestMySQLSnapshotNormalizesValuesAndConflicts(t *testing.T) {
 		instance.BufferPoolUsagePercent != nil ||
 		instance.Connections != nil {
 		t.Fatalf("instance = %#v", instance)
+	}
+}
+
+func TestMySQLSnapshotSelectsLatestValidScalarAndReplicationSamples(t *testing.T) {
+	result := mysqlBatchResultsFixture()
+	result[2] = append(result[2],
+		instantSeries{Metric: cloneLabels(result[2][0].Metric), Value: rawInstantValue(1785200200, "-1")},
+		instantSeries{Metric: cloneLabels(result[2][0].Metric), Value: rawInstantValue(1785200100, "7200")},
+	)
+	result[4] = append(result[4],
+		instantSeries{Metric: cloneLabels(result[4][0].Metric), Value: rawInstantValue(1785200200, "NaN")},
+		instantSeries{Metric: cloneLabels(result[4][0].Metric), Value: rawInstantValue(1785200100, "24")},
+	)
+	result[7] = append(result[7],
+		instantSeries{Metric: cloneLabels(result[7][0].Metric), Value: rawInstantValue(1785200200, "+Inf")},
+		instantSeries{Metric: cloneLabels(result[7][0].Metric), Value: rawInstantValue(1785200100, "19")},
+	)
+	result[9] = append(result[9],
+		instantSeries{Metric: cloneLabels(result[9][0].Metric), Value: rawInstantValue(1785200200, "101")},
+		instantSeries{Metric: cloneLabels(result[9][0].Metric), Value: rawInstantValue(1785200100, "55")},
+	)
+	result[10] = append(result[10],
+		instantSeries{Metric: cloneLabels(result[10][0].Metric), Value: rawInstantValue(1785200200, "-1")},
+		instantSeries{Metric: cloneLabels(result[10][0].Metric), Value: rawInstantValue(1785200100, "3")},
+	)
+
+	snapshot, err := runMySQLBatch(t, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance := snapshot.Instances[0]
+	assertFloat(t, instance.UptimeSeconds, 7200)
+	assertFloat(t, instance.Connections, 24)
+	assertFloat(t, instance.QPS, 19)
+	assertFloat(t, instance.BufferPoolUsagePercent, 55)
+	if len(instance.ReplicationChannels) != 1 {
+		t.Fatalf("replication channels = %#v", instance.ReplicationChannels)
+	}
+	assertFloat(t, instance.ReplicationChannels[0].LagSeconds, 3)
+}
+
+func TestMySQLSnapshotAcceptsEmptyDefaultChannelAndIgnoresMissingIdentityKeys(t *testing.T) {
+	result := mysqlBatchResultsFixture()
+	for queryIndex := 10; queryIndex <= 12; queryIndex++ {
+		result[queryIndex][0].Metric["channel_name"] = ""
+		missingKey := instantSeries{
+			Metric: cloneLabels(result[queryIndex][0].Metric),
+			Value:  rawInstantValue(1785200100, "0"),
+		}
+		delete(missingKey.Metric, "master_uuid")
+		result[queryIndex] = append(result[queryIndex], missingKey)
+	}
+
+	snapshot, err := runMySQLBatch(t, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Instances) != 1 || len(snapshot.Instances[0].ReplicationChannels) != 1 {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+	channel := snapshot.Instances[0].ReplicationChannels[0]
+	if channel.IORunning == nil || !*channel.IORunning ||
+		channel.SQLRunning == nil || !*channel.SQLRunning ||
+		channel.LagSeconds == nil || *channel.LagSeconds != 2 {
+		t.Fatalf("default replication channel = %#v", channel)
+	}
+	body, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, label := range []string{"channel_name", "master_host", "master_uuid", "fixture-source-a"} {
+		if bytes.Contains(body, []byte(label)) {
+			t.Fatalf("snapshot leaked replication identity label %q", label)
+		}
 	}
 }
 

@@ -139,13 +139,20 @@ func mysqlBinary(series instantSeries) (*bool, time.Time, bool) {
 }
 
 func mergeMySQLScalar(target **float64, targetTime *time.Time, candidate instantSeries) {
+	mergeValidMySQLScalar(target, targetTime, candidate, nonNegative)
+}
+
+func mergeValidMySQLScalar(
+	target **float64,
+	targetTime *time.Time,
+	candidate instantSeries,
+	valid func(float64) bool,
+) {
 	value, timestamp, ok := parseInstantValue(candidate.Value)
-	if !ok {
+	if !ok || !valid(value) {
 		return
 	}
-	if newestMySQLValue(target, targetTime, value, timestamp) && !nonNegative(value) {
-		*target = nil
-	}
+	newestMySQLValue(target, targetTime, value, timestamp)
 }
 
 func nonNegative(value float64) bool {
@@ -191,10 +198,11 @@ func mergeMySQLScalars(states map[string]*mysqlInstanceState, results [][]instan
 				continue
 			}
 			scalar := &state.scalars[scalarIndex]
-			mergeMySQLScalar(&scalar.value, &scalar.timestamp, series)
-			if scalarIndex == mysqlBufferPoolUsage && scalar.value != nil && !percentage(*scalar.value) {
-				scalar.value = nil
+			validator := nonNegative
+			if scalarIndex == mysqlBufferPoolUsage {
+				validator = percentage
 			}
+			mergeValidMySQLScalar(&scalar.value, &scalar.timestamp, series, validator)
 		}
 	}
 }
@@ -258,10 +266,10 @@ func mysqlStateForSeries(states map[string]*mysqlInstanceState, series instantSe
 }
 
 func mysqlReplicationIdentity(labels map[string]string) (string, bool) {
-	channel := labels["channel_name"]
-	source := labels["master_host"]
-	uuid := labels["master_uuid"]
-	if strings.TrimSpace(channel) == "" || strings.TrimSpace(source) == "" || strings.TrimSpace(uuid) == "" {
+	channel, hasChannel := labels["channel_name"]
+	source, hasSource := labels["master_host"]
+	uuid, hasUUID := labels["master_uuid"]
+	if !hasChannel || !hasSource || !hasUUID {
 		return "", false
 	}
 	return channel + "\x00" + source + "\x00" + uuid, true
