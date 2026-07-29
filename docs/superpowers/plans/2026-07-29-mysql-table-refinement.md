@@ -47,7 +47,10 @@
 运行：
 
 ```bash
-docker build --target backend-test --progress=plain .
+docker run --rm --user "$(id -u):$(id -g)" \
+  -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod \
+  -v "$PWD:/src" -w /src golang:1.24-bookworm \
+  go test ./internal/adapters/nightingale ./internal/mysql ./internal/service ./internal/httpapi -count=1
 ```
 
 预期：因查询和字段尚未实现而失败。
@@ -80,7 +83,10 @@ BufferPoolSizeBytes *float64
 运行：
 
 ```bash
-docker build --target backend-test --progress=plain .
+docker run --rm --user "$(id -u):$(id -g)" \
+  -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod \
+  -v "$PWD:/src" -w /src golang:1.24-bookworm \
+  go test ./internal/adapters/nightingale ./internal/mysql ./internal/service ./internal/httpapi -count=1
 ```
 
 预期：因服务/API 字段尚未实现而失败。
@@ -98,7 +104,10 @@ BufferPoolSizeBytes *float64 `json:"buffer_pool_size_bytes"`
 - [ ] **Step 5: 运行后端回归并提交**
 
 ```bash
-docker build --target backend-test --progress=plain .
+docker run --rm --user "$(id -u):$(id -g)" \
+  -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod \
+  -v "$PWD:/src" -w /src golang:1.24-bookworm \
+  go test ./internal/adapters/nightingale ./internal/mysql ./internal/service ./internal/httpapi -count=1
 git diff --check
 git status --short
 git add internal/adapters/nightingale/mysql_promql.go internal/adapters/nightingale/mysql_provider.go internal/adapters/nightingale/provider_test.go internal/mysql/types.go internal/service/mysql_service.go internal/service/mysql_types.go internal/service/mysql_service_test.go internal/httpapi/mysql_handlers.go internal/httpapi/api_test.go
@@ -134,7 +143,10 @@ git commit -m "feat: expose MySQL Buffer Pool capacity"
 运行：
 
 ```bash
-docker build --target backend-test --progress=plain .
+docker run --rm --user "$(id -u):$(id -g)" \
+  -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod \
+  -v "$PWD:/src" -w /src golang:1.24-bookworm \
+  go test ./internal/adapters/nightingale ./internal/mysql ./internal/service ./internal/httpapi -count=1
 ```
 
 预期：因查询字段与标签列表尚未实现而失败。
@@ -238,7 +250,10 @@ available_labels: string[]
 运行：
 
 ```bash
-docker build --target frontend-test --progress=plain .
+docker run --rm --user "$(id -u):$(id -g)" \
+  -e npm_config_cache=/tmp/npm-cache \
+  -v "$PWD:/src" -w /src/web node:22-alpine \
+  sh -c 'npm ci && npm run test:run -- src/features/mysql/MySQLPage.test.tsx'
 ```
 
 预期：新增断言失败。
@@ -290,7 +305,10 @@ docker build --target frontend-test --progress=plain .
 - [ ] **Step 5: 运行前端回归并提交**
 
 ```bash
-docker build --target frontend-test --progress=plain .
+docker run --rm --user "$(id -u):$(id -g)" \
+  -e npm_config_cache=/tmp/npm-cache \
+  -v "$PWD:/src" -w /src/web node:22-alpine \
+  sh -c 'npm ci && npm run test:run -- src/features/mysql/MySQLPage.test.tsx'
 git diff --check
 git status --short
 git add web/src/api/types.ts web/src/test/fixtures.ts web/src/features/mysql/MySQLPage.tsx web/src/features/mysql/MySQLPage.test.tsx
@@ -323,7 +341,10 @@ Playwright 增加匿名几何断言：
 运行前端单元测试；浏览器 RED 留到原 8080 部署前执行，禁止启动额外服务。
 
 ```bash
-docker build --target frontend-test --progress=plain .
+docker run --rm --user "$(id -u):$(id -g)" \
+  -e npm_config_cache=/tmp/npm-cache \
+  -v "$PWD:/src" -w /src/web node:22-alpine \
+  sh -c 'npm ci && npm run test:run -- src/features/mysql/MySQLPage.test.tsx src/features/hosts/HostListPage.test.tsx'
 ```
 
 - [ ] **Step 2: 实现统一起始边界与列宽**
@@ -347,7 +368,10 @@ MySQL 表头强制单行，并使用总和为 100% 的列宽：
 - [ ] **Step 3: 运行前端回归并提交**
 
 ```bash
-docker build --target frontend-test --progress=plain .
+docker run --rm --user "$(id -u):$(id -g)" \
+  -e npm_config_cache=/tmp/npm-cache \
+  -v "$PWD:/src" -w /src/web node:22-alpine \
+  sh -c 'npm ci && npm run test:run -- src/features/mysql/MySQLPage.test.tsx src/features/hosts/HostListPage.test.tsx'
 git diff --check
 git status --short
 git add web/src/app/theme.css web/e2e/mysql-compact-live.spec.ts web/src/features/hosts/HostListPage.test.tsx web/src/features/mysql/MySQLPage.test.tsx
