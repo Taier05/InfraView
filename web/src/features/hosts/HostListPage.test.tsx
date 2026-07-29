@@ -124,9 +124,11 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
     '网络 出/入',
     '运行时间',
   ]) {
-    expect(
-      screen.getByRole('button', { name: new RegExp(`^${label}`) }),
-    ).toBeInTheDocument()
+    const sortButton = screen.getByRole('button', {
+      name: new RegExp(`^${label}`),
+    })
+    expect(sortButton).toBeInTheDocument()
+    expect(sortButton).toHaveClass('host-sort-button')
   }
   for (const label of ['IP 地址', 'CPU 核数', '内存容量', '状态']) {
     expect(

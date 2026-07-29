@@ -936,7 +936,7 @@ h1 {
 .mysql-list-controls {
   grid-template-columns:
     minmax(14rem, 1fr) minmax(7.5rem, 9rem) minmax(7.5rem, 9rem)
-    minmax(6rem, 7rem) auto;
+    minmax(7.5rem, 9rem) minmax(6rem, 7rem) auto;
 }
 
 .host-search,
@@ -1054,7 +1054,7 @@ h1 {
 .mysql-table-compact th {
   font-size: 0.68rem;
   line-height: 1.1;
-  white-space: normal;
+  white-space: nowrap;
 }
 
 .mysql-table-compact td {
@@ -1062,14 +1062,14 @@ h1 {
   line-height: 1.15;
 }
 
-.mysql-table-compact th:nth-child(1) { width: 14%; }
+.mysql-table-compact th:nth-child(1) { width: 13%; }
 .mysql-table-compact th:nth-child(2) { width: 9%; }
 .mysql-table-compact th:nth-child(3) { width: 9%; }
-.mysql-table-compact th:nth-child(4) { width: 10%; }
-.mysql-table-compact th:nth-child(5) { width: 7%; }
-.mysql-table-compact th:nth-child(6) { width: 6%; }
+.mysql-table-compact th:nth-child(4) { width: 9%; }
+.mysql-table-compact th:nth-child(5) { width: 6%; }
+.mysql-table-compact th:nth-child(6) { width: 5%; }
 .mysql-table-compact th:nth-child(7) { width: 7%; }
-.mysql-table-compact th:nth-child(8) { width: 9%; }
+.mysql-table-compact th:nth-child(8) { width: 13%; }
 .mysql-table-compact th:nth-child(9) { width: 12%; }
 .mysql-table-compact th:nth-child(10) { width: 8%; }
 .mysql-table-compact th:nth-child(11) { width: 9%; }
@@ -1111,7 +1111,7 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.12rem 0.18rem;
+  padding: 0.12rem 0;
   border: 0;
   border-radius: 0.35rem;
   color: inherit;
@@ -1252,7 +1252,7 @@ h1 {
 @media (min-width: 761px) and (max-width: 1100px) {
   .mysql-list-controls {
     grid-template-columns:
-      minmax(14rem, 1fr) repeat(3, minmax(6.5rem, 8rem));
+      minmax(14rem, 1fr) repeat(4, minmax(6.5rem, 8rem));
   }
 
   .mysql-list-controls .refresh-control {

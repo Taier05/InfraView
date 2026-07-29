@@ -85,12 +85,12 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('renders the eleven compact MySQL columns with complete titles', async () => {
+it('renders the eleven compact MySQL columns with complete single-line titles and shared sort buttons', async () => {
   renderMySQLPage('/mysql')
   expect(
     await screen.findByRole('heading', { name: 'MySQL 实例' }),
   ).toBeVisible()
-  for (const [heading, title] of [
+  const headers = [
     ['实例地址', 'MySQL 实例地址'],
     ['所属主机', '所属主机'],
     ['版本 / 角色', 'MySQL 版本 / 角色'],
@@ -102,12 +102,30 @@ it('renders the eleven compact MySQL columns with complete titles', async () => 
     ['复制 / 延迟', '复制状态 / 延迟'],
     ['运行时间', '运行时间'],
     ['状态', '实例状态'],
-  ]) {
+  ]
+  expect(screen.getAllByRole('columnheader')).toHaveLength(11)
+  for (const [heading, title] of headers) {
     const header = screen.getByRole('columnheader', {
       name: new RegExp(`^${heading}(排序|$)`),
     })
     expect(header).toBeVisible()
-    expect(within(header).getByTitle(title)).toBeVisible()
+    const titleElement = within(header).getByTitle(title)
+    expect(titleElement).toBeVisible()
+    expect(titleElement).toHaveAttribute('title', title)
+  }
+
+  for (const title of [
+    'MySQL 实例地址',
+    '连接使用',
+    '活跃线程',
+    '每秒查询数',
+    '慢查询速率',
+    'Buffer Pool 容量 / 使用率',
+    '复制状态 / 延迟',
+    '运行时间',
+    '实例状态',
+  ]) {
+    expect(screen.getByTitle(title)).toHaveClass('host-sort-button')
   }
 
   const instance = (await screen.findByText('192.0.2.101:3306')).closest('tr')
