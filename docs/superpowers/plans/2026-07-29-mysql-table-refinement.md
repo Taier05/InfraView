@@ -445,9 +445,11 @@ INFRAVIEW_ENV_FILE=/root/github/InfraView/.env INFRAVIEW_PORT=8080 docker compos
 - 原 8080 的 Host、MySQL 对齐差值满足 `<= 1px`；
 - 11 个 MySQL 表头单行；
 - 1440×900 无页面和表格水平溢出；
-- 标签筛选、地址展示、“读写”和 Buffer Pool 格式正确；
-- 页面没有控制台错误或失败请求；
+- 第 5 个受跟踪匿名用例只以布尔值或计数验证标签控件顺序与筛选参数、首列纯地址、“读写”和 Buffer Pool 四种合法形态；
+- 第 5 个用例在登录后注册监听，认证后的 console/page/request/MySQL API 错误计数均为 0；
 - 服务仍只连接测试 Nightingale，查询批次固定为 14。
+
+完整 `mysql-compact-live.spec.ts` 在原 8080 上为 Chromium 5/5 PASS；第 5 项不返回页面文本、真实地址/标签、URL 参数值、响应正文或请求头。
 
 执行：
 

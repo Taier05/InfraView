@@ -28,7 +28,7 @@ git status --short --branch
 git log -3 --oneline
 git diff --check
 
-InfraView 始终只读。MySQL 表格细化、范围化复审、完整无缓存构建和原 8080 测试 Nightingale Chromium 4/4 验收均已通过；当前下一步是等待用户决定是否集成，不得声明已合并或已推送。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/指标值或上游正文。不要自行 push、合并、部署或重启。
+InfraView 始终只读。MySQL 表格细化、范围化复审、完整无缓存构建和原 8080 测试 Nightingale Chromium 5/5 验收均已通过；第 5 项是受跟踪的匿名语义与认证后错误审计。当前下一步是等待用户决定是否集成，不得声明已合并或已推送。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/指标值或上游正文。不要自行 push、合并、部署或重启。
 ```
 
 ## 历史 main 恢复提示（不适用于当前 MySQL 暂停点）
@@ -75,7 +75,7 @@ Nightingale v8.4.1 兼容功能交付基线为 18d26a6，已合并并推送到 o
 
 同日完成 MySQL 表格细化收口：容量指标只接受非负最新有效值，缺失、非法或同一最新时间戳冲突均保持 `null`；`available_labels` 从完整 snapshot 的非空实例名去重排序，不受标签、状态、角色、搜索、排序和分页影响。`label` 去除首尾空白后按实例名精确匹配，并可与其他条件组合；服务端与页面 `search` 均只匹配实例地址或所属主机，不把实例名混入自由搜索。页面角色文案使用“读写/只读/未知”，Buffer Pool 按“容量 / 使用率”“容量 / —”“— / 使用率”“—”显示。
 
-MySQL 表格最终列为“实例地址、所属主机、版本 / 角色、连接、线程、QPS、慢查询、Buffer Pool、复制 / 延迟、运行时间、状态”，桌面列宽依次为 `13/9/9/9/6/5/7/13/12/8/9%`。状态列表头为状态圆点预留等宽起始偏移；原 8080 Chromium 4/4 已确认 Host/MySQL 共享列文本起点差值 `<= 1px`、11 个表头单行、1440×900 无页面或表格横向溢出、900px 控制区两行三列。认证后的业务页标签/搜索/地址/角色/Buffer Pool 匿名断言通过，且没有 console error、page error 或 request failure。恢复前曾在基线发现状态列 live 几何失败，修复提交 `aa54eae` 已通过范围复审并由本轮重新无缓存构建、部署和 live 验收确认。完整脱敏证据见 `docs/superpowers/reports/2026-07-29-mysql-table-refinement-verification.md`。
+MySQL 表格最终列为“实例地址、所属主机、版本 / 角色、连接、线程、QPS、慢查询、Buffer Pool、复制 / 延迟、运行时间、状态”，桌面列宽依次为 `13/9/9/9/6/5/7/13/12/8/9%`。状态列表头为状态圆点预留等宽起始偏移；原 8080 Chromium 5/5 已确认 Host/MySQL 共享列文本起点差值 `<= 1px`、11 个表头单行、1440×900 无页面或表格横向溢出、900px 控制区两行三列。第 5 项受跟踪匿名用例确认标签控件顺序与筛选参数、首列纯地址、“读写”文案及 Buffer Pool 四种合法形态，认证后的 console/page/request/MySQL API 错误计数均为 0。恢复前曾在基线发现状态列 live 几何失败，修复提交 `aa54eae` 已通过范围复审并由本轮重新无缓存构建、部署和 live 验收确认。完整脱敏证据见 `docs/superpowers/reports/2026-07-29-mysql-table-refinement-verification.md`。
 
 Nightingale v8.4.1 兼容功能已经快进合并并推送到 `origin/main`，功能交付基线为 `18d26a6`；原 `feature/nightingale-v8-compat` 分支和对应 worktree 已删除。该功能完成 v8.4.1 Target 时间字段的 RED→GREEN：`StatusTime` 优先采用有效 `beat_time`，缺失或无效时回退有效 `update_at`，两者都无效时保持零值。v8.4.1 的 profile、Target、数据源 brief、即时批量和区间批量只读契约预检通过；运行时不增加版本探测请求，v9.x 既有协议测试继续保留。
 

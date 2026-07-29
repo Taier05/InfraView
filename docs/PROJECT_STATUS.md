@@ -16,7 +16,7 @@
 
 MySQL 表格细化也已完成：`available_labels` 来自完整 snapshot 的稳定非空实例名集合，`label` 为去空白后的实例名精确筛选并可与状态、角色、搜索、排序和分页组合；服务端与页面 `search` 均只匹配实例地址或所属主机。页面使用“读写”而非“可写”，Buffer Pool 同列展示容量与使用率，缺失组合不伪造成零。桌面 11 列宽为 `13/9/9/9/6/5/7/13/12/8/9%`。
 
-修复提交 `aa54eae` 解决状态圆点导致的状态列表头文本起点偏移后，本轮在新 HEAD 上重新完成无缓存镜像、E2E safety、固定 14 查询定向测试及原 8080 重建。无正文检查为健康端点 200 JSON、未认证受保护 API 401 JSON；Chromium 4/4 确认 Host/MySQL 共享列 `<= 1px`、11 个表头单行、1440×900 无页面/表格横向溢出和 900px 控制区两行三列。认证后业务页匿名语义与 console/page/request 安全检查通过。原 8080 仍仅连接测试 Nightingale，未连接生产；本分支仍未推送、未合并。
+修复提交 `aa54eae` 解决状态圆点导致的状态列表头文本起点偏移后，本轮在新 HEAD 上重新完成无缓存镜像、E2E safety、固定 14 查询定向测试及原 8080 重建。无正文检查为健康端点 200 JSON、未认证受保护 API 401 JSON；受跟踪 Chromium 5/5 确认 Host/MySQL 共享列 `<= 1px`、11 个表头单行、1440×900 无页面/表格横向溢出和 900px 控制区两行三列。第 5 项匿名用例持久覆盖标签筛选、首列地址、角色文案、Buffer Pool 形态与认证后 console/page/request/MySQL API 错误计数。原 8080 仍仅连接测试 Nightingale，未连接生产；本分支仍未推送、未合并。
 
 Mock MVP、紧凑布局、Nightingale 只读接入、15 秒当前页面刷新、“数据连接”汇总和 Nightingale v8.4.1 兼容均已完成并进入 `main`。v8.4.1 功能交付基线为 `18d26a6`，已推送到 `origin/main`；原 `feature/nightingale-v8-compat` 分支和 worktree 已清理。当前以 Nightingale v8.4.1 为主要开发与真实验证版本，同时保留 v9.x 已覆盖的协议兼容。
 

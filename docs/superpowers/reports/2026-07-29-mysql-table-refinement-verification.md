@@ -27,8 +27,8 @@
 - 状态列首次部署暴露“圆点 + 间距”导致首文本起点偏移；修复提交 `aa54eae` 让 Host/MySQL 状态列表头预留对应偏移，并通过范围复审。
 - 在 `aa54eae` 上重新完成无缓存构建和安全回归后，只重建既有原 8080；容器达到 healthy。
 - 无正文 HTTP：`/healthz` 为 200 JSON，未认证受保护 API 为 401 JSON。
-- 完整 `mysql-compact-live.spec.ts`：Chromium 4/4 PASS。验收覆盖四列总览、11 个单行表头、Host/MySQL 共享列文本起点差值 `<= 1px`、1440×900 页面/表格无水平溢出及 900px 控制区两行三列。
-- 认证后业务页匿名探针：标签筛选、搜索 URL 边界、地址 `title`、角色文案和 Buffer Pool 格式均 PASS；console error、page error 和 request failure 均为 0。登录前预期未认证阶段与认证后业务页分开计数。
+- 完整受跟踪 `mysql-compact-live.spec.ts`：Chromium 5/5 PASS。前四项覆盖四列总览、11 个单行表头、Host/MySQL 共享列文本起点差值 `<= 1px`、1440×900 页面/表格无水平溢出及 900px 控制区两行三列。
+- 第五项受跟踪匿名用例在登录后才注册错误监听，并以布尔值或计数断言标签控件顺序、非空标签选择、URL/列表请求标签参数、首列纯地址、角色文案和 Buffer Pool 四种合法形态；认证后的 console error、page error、request failure 和 MySQL API 非成功响应均为 0。用例不返回页面文本、真实地址/标签、URL 参数值、响应正文或请求头。
 
 ## 结论
 
