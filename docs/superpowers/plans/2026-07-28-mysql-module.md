@@ -2007,7 +2007,7 @@ git commit -m "test: 验收 MySQL 只读模块"
 - Consumes: 完成的 MySQL 模块和全部自动化证据。
 - Produces: 可恢复交接、最终容器验证和脱敏 v8.4.1 真实只读验收结论。
 
-- [ ] **Step 1: 更新架构、设计、安全和状态文档**
+- [x] **Step 1: 更新架构、设计、安全和状态文档**
 
 统一记录：
 
@@ -2019,7 +2019,7 @@ git commit -m "test: 验收 MySQL 只读模块"
 
 不得把本计划中的“预期通过”提前写成“已经通过”。
 
-- [ ] **Step 2: 执行敏感模式和格式自审**
+- [x] **Step 2: 执行敏感模式和格式自审**
 
 ```bash
 git diff --check
@@ -2033,7 +2033,7 @@ fi
 
 Expected: 无输出且退出码 0。RFC 5737 测试地址若被规则命中，必须限定扫描排除 `internal/**/testdata` 和测试文件，而不是删除脱敏夹具。
 
-- [ ] **Step 3: 运行完整生产镜像验证**
+- [x] **Step 3: 运行完整生产镜像验证**
 
 ```bash
 docker build --tag infraview:mysql-module-verify .
@@ -2041,7 +2041,7 @@ docker build --tag infraview:mysql-module-verify .
 
 Expected: 前端 Vitest、typecheck、production build、Go 普通测试、race 测试和 Go build 全部 PASS。
 
-- [ ] **Step 4: 运行全仓聚焦的独立 race 复核**
+- [x] **Step 4: 运行全仓聚焦的独立 race 复核**
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
@@ -2156,11 +2156,11 @@ docker stop infraview-mysql-real-verify
 
 该容器使用 `--rm`，停止后自动删除；不得删除或重启其他容器。
 
-- [ ] **Step 8: 记录实际验证结果并勾选计划**
+- [x] **Step 8: 记录实际验证结果并勾选计划**
 
 只在相应命令真实通过后更新 `PROJECT_STATUS`、`HANDOFF`、`TODO`、`NIGHTINGALE` 和本计划复选框。记录结构性 PASS/FAIL，不记录真实数据。
 
-- [ ] **Step 9: 提交最终文档**
+- [x] **Step 9: 提交最终文档**
 
 ```bash
 git add README.md docs
@@ -2168,7 +2168,7 @@ git diff --cached --check
 git commit -m "docs: 记录 MySQL 模块实现与验证"
 ```
 
-- [ ] **Step 10: 最终分支核验**
+- [x] **Step 10: 最终分支核验**
 
 ```bash
 git status --short

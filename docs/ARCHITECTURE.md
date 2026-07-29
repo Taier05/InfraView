@@ -6,11 +6,12 @@
 浏览器 ──HTTP/HTTPS──> 可选 Nginx/Caddy ──> InfraView 单容器 :8080
                                              ├─ React SPA 静态资源
                                              ├─ Go 认证与只读 HTTP API
-                                             ├─ 查询/聚合服务
+                                             ├─ Linux 查询/聚合服务
+                                             ├─ MySQL 查询/聚合 Service
                                              ├─ 内存 TTL/stale/singleflight 缓存
                                              └─ 数据源接口
-                                                ├─ Mock（已实现）
-                                                └─ Nightingale（未配置空壳）
+                                                ├─ Mock（Linux 与 MySQL）
+                                                └─ Nightingale（受限只读客户端）
 ```
 
 应用不包含数据库、消息队列、SSH 客户端、远程执行器、配置下发或任务调度模块。
@@ -20,11 +21,12 @@
 1. Go 同源返回 SPA；`index.html` 使用 `no-cache`，只有带内容指纹的 `assets/*` 使用一年 `immutable`。
 2. 浏览器通过 HttpOnly 会话 Cookie 调用 `/api/v1/*`。
 3. 认证中间件验证内存会话；登录失败由并发安全限速器限制。
-4. 查询服务按数据类别构造缓存键：主机清单、单机身份、稳定排序后的主机 ID 集合当前指标、主机加时间范围的历史指标、总览时间范围和数据源健康。
+4. 查询服务按数据类别构造缓存键：主机清单、单机身份、稳定排序后的主机 ID 集合当前指标、主机加时间范围的历史指标、总览时间范围、MySQL 快照和数据源健康。
 5. 主机搜索、状态筛选、排序和分页在共享的清单/当前指标缓存读取后于内存中执行，不进入缓存键；命中有效缓存时直接返回，相同缓存未命中请求合并为一次数据源调用。
 6. 上游失败且旧值未超过 `INFRAVIEW_MAX_STALE` 时返回 `stale=true` 和采集时间；否则返回统一错误。
 7. 浏览器明确展示过期或错误状态，不把缺失指标转换为零。
 8. 总览服务复用同一批主机清单和当前指标，在进程内计算主机最高告警等级及 CPU、内存、IO、网络异常数量；该聚合不增加上游查询，也不存储告警事件。
+9. MySQL Service 从独立的快照缓存读取实例，服务端完成搜索、筛选、排序、分页与复制状态聚合；MySQL Provider 仅发送 13 条代码内置查询组成的一次即时 batch，并按实例身份归并，禁止按实例 N+1。
 
 ## 目录职责
 
@@ -35,9 +37,10 @@
 | `internal/auth` | 固定账号、会话、登录限速 |
 | `internal/cache` | TTL、旧值和请求合并 |
 | `internal/datasource` | 稳定领域模型与数据源契约 |
-| `internal/adapters/mock` | 最多 100 台确定性 Linux Mock 主机 |
-| `internal/adapters/nightingale` | 未配置占位实现，不猜测真实 API |
-| `internal/service` | 总览聚合、主机查询、范围步长、阈值与降级 |
+| `internal/mysql` | MySQL 领域模型、稳定实例 ID 与 Provider 契约 |
+| `internal/adapters/mock` | 确定性 Linux 与 MySQL Mock |
+| `internal/adapters/nightingale` | 代码内置查询、受限 HTTP 校验与只读归并 |
+| `internal/service` | Linux/MySQL 总览聚合、查询、阈值与降级 |
 | `internal/httpapi` | 只读路由、认证、错误、安全头、日志、SPA 托管 |
 | `web/src` | React 页面、共享组件、API 客户端与深色主题 |
 | `scripts` | smoke、E2E 编排和缓存延迟验收 |
@@ -46,15 +49,16 @@
 ## API 表面
 
 - 会话：`POST/GET/DELETE /api/v1/session`。
-- 只读查询：`GET /api/v1/overview`、`GET /api/v1/hosts`、`GET /api/v1/hosts/{id}`、`GET /api/v1/hosts/{id}/metrics`、`GET /api/v1/datasource/status`。
+- 只读查询：`GET /api/v1/overview`、`GET /api/v1/hosts`、`GET /api/v1/hosts/{id}`、`GET /api/v1/hosts/{id}/metrics`、`GET /api/v1/datasource/status`、`GET /api/v1/mysql/overview`、`GET /api/v1/mysql/instances`。
 - `GET /api/v1/overview` 的 `alerts` 字段包含受影响主机、严重/警告主机以及 CPU、内存、IO、网络分级数量；主机数按最高等级去重，指标数独立统计。
 - 主机清单与单机只读响应中的 `cpu_cores`、`memory_total_bytes` 为可选资产配置字段；数据源未知时返回 `null`。这两个字段来自主机资产清单，不从使用率指标反推。
 - 进程健康：`GET /healthz`，只反映 InfraView 进程与 HTTP 服务，不以数据源故障触发容器重启。
 - command、restart、delete、patch、proxy、任意 query 等运维路由不存在，并由自动化测试持续验证。
+- MySQL 路由只接受 GET；总览拒绝查询参数，实例清单只接受固定的搜索、状态、角色、排序与分页参数。没有 MySQL 历史、详情、写入或代理路由。
 
 ## 前端构建
 
-Vite 产物复制到忽略目录 `internal/httpapi/webdist` 后由 `go:embed` 嵌入。当前前端不包含主机详情页和图表运行时；总览使用服务端告警汇总渲染可点击板块卡，主机清单使用服务端规范化的指标值与等级直接渲染。总览与列表共用刷新控制组件。
+Vite 产物复制到忽略目录 `internal/httpapi/webdist` 后由 `go:embed` 嵌入。当前前端不包含主机详情页和图表运行时；总览使用服务端告警汇总渲染 Linux 与 MySQL 可点击板块卡，两个清单均使用服务端规范化的指标值与等级直接渲染。总览与列表共用刷新控制组件。
 
 ## 状态与持久化
 

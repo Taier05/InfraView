@@ -4,6 +4,12 @@
 
 ## 当前阶段
 
+### 2026-07-29 MySQL 模块文档与本地验收
+
+当前工作树 `feature/mysql-module` 已实现只读 MySQL 领域、Service、Mock、Nightingale 适配、两个 GET API、总览告警卡与 11 列实例页。MySQL 快照固定为 13 条代码内置即时查询，必须在一次 batch 内归并；不提供实例 N+1、历史、详情、写入、数据库连接或任意查询能力。
+
+复制线程任一明确停止为严重；复制延迟最大有效值 5 秒起警告、30 秒起严重。缺失复制通道、线程或延迟不转换为零：可写且未配置复制为正常，其余不完整数据为未知；未知实例单独统计并计入总览警告侧。2026-07-29 已在本地完成无缓存生产镜像构建（前端 Vitest 67/67、typecheck、production build、Go 普通/race 测试与编译）、独立全仓 race、E2E 隔离安全测试，以及一次性 Mock smoke、资源检查和 Chromium 6/6；专用 E2E 项目资源已确认清理。真实 Nightingale v8.4.1 MySQL API smoke 和真实浏览器验收均待用户单独授权。
+
 Mock MVP、紧凑布局、Nightingale 只读接入、15 秒当前页面刷新、“数据连接”汇总和 Nightingale v8.4.1 兼容均已完成并进入 `main`。v8.4.1 功能交付基线为 `18d26a6`，已推送到 `origin/main`；原 `feature/nightingale-v8-compat` 分支和 worktree 已清理。当前以 Nightingale v8.4.1 为主要开发与真实验证版本，同时保留 v9.x 已覆盖的协议兼容。
 
 v8.4.1 上游只读契约预检已经通过；Target 在当前环境提供 `update_at` 而非 `beat_time`。适配器已按 TDD 实现“有效 `beat_time` 优先、有效 `update_at` 回退、否则零值”，运行时不探测版本，也不增加额外上游请求。完整生产镜像、隔离 Mock E2E、8080 重建、应用端真实只读 smoke 和容器安全检查均已通过。
@@ -55,6 +61,7 @@ v8.4.1 上游只读契约预检已经通过；Target 在当前环境提供 `upda
 
 - 固定账号登录、内存会话、并发安全登录限速。
 - 稳定数据源领域契约、确定性 Mock、以 v8.4.1 为主要真实验证版本并保留 v9.x 协议兼容的只读 Nightingale Provider。
+- 独立 MySQL 领域与 Service、MySQL Mock、固定 13 查询单 batch 的 Nightingale MySQL Provider、MySQL 总览/实例 GET API、总览卡与 11 列实例页。
 - TTL 缓存、相同请求合并、最多 5 分钟旧值降级。
 - 总览、主机列表、单机详情和数据源状态只读 API。
 - 深色中文 React UI、板块告警摘要卡、统一刷新控件、搜索、筛选、排序、URL 状态和分页。

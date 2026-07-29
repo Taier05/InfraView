@@ -11,6 +11,7 @@
 - 生产 InfraView 应用容器不挂 Docker Socket，不使用特权模式、宿主 PID/host network 或业务写卷。
 - 静态路径拒绝 dotfile、路径穿越和缺失资源 SPA fallback；只有指纹资源可 immutable。
 - Nightingale 客户端只拼接代码内置路径和 PromQL 白名单，默认只允许 HTTPS；HTTP 必须通过测试环境专用开关显式选择。客户端校验 HTTP 状态、JSON Content-Type、envelope `err` 和 8 MiB 响应上限；401、非 JSON 与上游正文统一转换为不含 Token 的领域错误。
+- MySQL 复用上述 Nightingale 安全客户端，只允许代码固定的 13 条即时查询并合并为一次 batch；页面和 API 不接受 MySQL PromQL、上游 URL、查询体或认证信息。MySQL 仅有两个受认证 GET 路由，写方法由测试验证为 405。
 
 ## 信任边界与限制
 

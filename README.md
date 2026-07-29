@@ -1,8 +1,8 @@
 # InfraView
 
-InfraView 是一个轻量、只读的 Linux 基础设施可视化平台。当前版本具备固定账号登录、板块状态总览、紧凑主机清单、搜索/筛选/排序/分页、指标阈值着色、旧缓存提示和统一错误展示。
+InfraView 是一个轻量、只读的 Linux 基础设施可视化平台。当前版本具备固定账号登录、Linux 主机与 MySQL 板块状态总览、紧凑清单、搜索/筛选/排序/分页、指标阈值着色、旧缓存提示和统一错误展示。
 
-生产形态是一个非 root InfraView 容器：Go 同源提供只读 API 与 React 静态页面，无业务数据库、任务队列、SSH 客户端或远程执行器。数据源支持确定性 Mock 和 Nightingale 只读适配器；当前主要开发与真实验证版本为 Nightingale v8.4.1，v9.x 保留已覆盖的协议兼容。浏览器只接收归一化 InfraView API，不接触 Token 或任意 PromQL。
+生产形态是一个非 root InfraView 容器：Go 同源提供只读 API 与 React 静态页面，无业务数据库、任务队列、SSH 客户端或远程执行器。数据源支持确定性 Mock 和 Nightingale 只读适配器；MySQL 是独立领域与 Service，复用 Nightingale 的受限安全客户端。当前主要开发与真实验证版本为 Nightingale v8.4.1，v9.x 保留已覆盖的协议兼容。浏览器只接收归一化 InfraView API，不接触 Token 或任意 PromQL。
 
 ## 安全边界
 
@@ -10,6 +10,7 @@ InfraView 是一个轻量、只读的 Linux 基础设施可视化平台。当前
 - 不执行 SSH、远程命令、脚本、发布或自动化变更。
 - 不提供任意上游 URL、任意查询表达式或通用代理。
 - 除登录/退出 Web 会话外，业务 API 全部只读。
+- MySQL 仅提供总览和实例清单；不提供历史、实例详情、写入或运维操作。
 - 监控数据和会话只存在内存中，容器重启后清空。
 
 ## 快速部署

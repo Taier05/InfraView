@@ -53,6 +53,14 @@ Nightingale v8.4.1 兼容功能交付基线为 18d26a6，已合并并推送到 o
 
 ## 当前暂停点
 
+### 2026-07-29 MySQL 模块 Task 12
+
+当前授权工作树为 `<仓库根目录>/.worktrees/mysql-module`，分支 `feature/mysql-module`。MySQL 模块已完成独立领域/Service、Mock、Nightingale 受限适配、`GET /api/v1/mysql/overview`、`GET /api/v1/mysql/instances`、总览卡及 11 列实例页；复用 Nightingale 安全客户端，以固定 13 条查询构成一次即时 batch，禁止按实例 N+1。没有 MySQL 历史、详情、写入、数据库连接、任意 PromQL 或代理能力。
+
+复制线程任一明确停止为严重；最大有效复制延迟 5 秒为警告、30 秒为严重。缺失值不伪造成零：可写且无复制通道为“未配置复制/正常”，其他不完整复制数据为未知，未知实例单独计数并纳入总览警告侧。
+
+继续前先读取 `.superpowers/sdd/2026-07-28-mysql-module/task-12-brief.md`、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/datasources/NIGHTINGALE.md`、`docs/TESTING.md` 和本计划的 Task 12 段，再执行 `git status --short` 与 `git diff --check`。本地无缓存生产镜像、独立 race、E2E 安全测试、一次性 Mock smoke/资源检查与 Chromium 6/6 已通过，专用 E2E 项目资源已确认删除；完整按序命令见 `.superpowers/sdd/2026-07-28-mysql-module/task-12-implementer-report.md`。真实 Nightingale v8.4.1 MySQL API smoke 和真实 Chromium 验收必须再次取得用户单独授权，绝不能读取或输出私密环境文件、Token、Cookie、认证头、真实地址、标识、数量、指标或上游正文。
+
 Nightingale v8.4.1 兼容功能已经快进合并并推送到 `origin/main`，功能交付基线为 `18d26a6`；原 `feature/nightingale-v8-compat` 分支和对应 worktree 已删除。该功能完成 v8.4.1 Target 时间字段的 RED→GREEN：`StatusTime` 优先采用有效 `beat_time`，缺失或无效时回退有效 `update_at`，两者都无效时保持零值。v8.4.1 的 profile、Target、数据源 brief、即时批量和区间批量只读契约预检通过；运行时不增加版本探测请求，v9.x 既有协议测试继续保留。
 
 完整生产镜像构建、隔离 Mock smoke/Chromium 4/4、私密环境文件权限与 Git 忽略检查、8080 重建、真实 v8.4.1 应用端只读 smoke 和容器安全检查均已通过。应用端验收覆盖数据源状态、总览、主机清单、单机详情和 1 小时指标范围，返回均非 stale；真实资源信息和响应正文未输出或进入仓库。
