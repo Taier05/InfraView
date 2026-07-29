@@ -222,8 +222,15 @@ it('全正常时用绿色无异常文案展示所有零值状态', async () => {
   const mysqlCard = screen.getByRole('link', { name: '查看 MySQL 板块' })
   expect(mysqlCard).toHaveAttribute('data-level', 'normal')
   expect(within(mysqlCard).getAllByText('无异常')).toHaveLength(4)
-  expect(within(mysqlCard).getByText('无严重')).toBeVisible()
   expect(within(mysqlCard).getByText('无警告风险')).toBeVisible()
+  const mysqlBreakdown = mysqlCard.querySelector('.module-status-breakdown')
+  expect(mysqlBreakdown).not.toBeNull()
+  for (const label of ['正常 2', '无警告', '无严重', '无未知']) {
+    expect(within(mysqlBreakdown as HTMLElement).getByText(label)).toHaveAttribute(
+      'data-level',
+      'normal',
+    )
+  }
 })
 
 it('把未知实例作为 warning 风险但保留未知文案', async () => {
@@ -253,8 +260,61 @@ it('把未知实例作为 warning 风险但保留未知文案', async () => {
   expect(card).toHaveAttribute('data-level', 'warning')
   expect(within(card).getByText('存在警告或未知')).toBeVisible()
   expect(within(card).getByText('警告风险 1')).toBeVisible()
-  expect(within(card).queryByText('无警告')).not.toBeInTheDocument()
-  expect(within(card).getByText('未知 1')).toBeVisible()
+  const breakdown = card.querySelector('.module-status-breakdown')
+  expect(breakdown).not.toBeNull()
+  expect(within(breakdown as HTMLElement).getByText('无警告')).toHaveAttribute(
+    'data-level',
+    'normal',
+  )
+  expect(within(breakdown as HTMLElement).getByText('未知 1')).toHaveAttribute(
+    'data-level',
+    'unknown',
+  )
+})
+
+it('MySQL 紧凑状态栏分别展示警告、严重、正常和未知实例', async () => {
+  mockOverviewRequests({
+    mysql: mysqlOverviewFixture({
+      data: {
+        total: 10,
+        normal: 4,
+        warning: 2,
+        critical: 1,
+        unknown: 3,
+        affected_instances: 6,
+        warning_instances: 5,
+        critical_instances: 1,
+        alerts: {
+          availability: { warning: 2, critical: 1 },
+          replication_threads: { warning: 0, critical: 0 },
+          replication_lag: { warning: 0, critical: 0 },
+          replication_data: { warning: 0, critical: 0 },
+        },
+      },
+    }),
+  })
+  renderOverview()
+
+  const card = await screen.findByRole('link', { name: '查看 MySQL 板块' })
+  expect(within(card).getByText('警告风险 5')).toBeVisible()
+  const breakdown = card.querySelector('.module-status-breakdown')
+  expect(breakdown).not.toBeNull()
+  expect(within(breakdown as HTMLElement).getByText('警告 2')).toHaveAttribute(
+    'data-level',
+    'warning',
+  )
+  expect(within(breakdown as HTMLElement).getByText('严重 1')).toHaveAttribute(
+    'data-level',
+    'critical',
+  )
+  expect(within(breakdown as HTMLElement).getByText('正常 4')).toHaveAttribute(
+    'data-level',
+    'normal',
+  )
+  expect(within(breakdown as HTMLElement).getByText('未知 3')).toHaveAttribute(
+    'data-level',
+    'unknown',
+  )
 })
 
 it('Linux 无主机时显示中性空状态且不影响 MySQL 正常卡', async () => {

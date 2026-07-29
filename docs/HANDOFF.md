@@ -19,16 +19,16 @@
 2. docs/PROJECT_STATUS.md
 3. docs/TODO.md
 4. docs/datasources/NIGHTINGALE.md
-5. docs/superpowers/specs/2026-07-28-mysql-module-design.md
-6. docs/superpowers/plans/2026-07-28-mysql-module.md
-7. docs/superpowers/reports/2026-07-29-mysql-module-verification.md
+5. docs/superpowers/specs/2026-07-29-mysql-compact-layout-design.md
+6. docs/superpowers/plans/2026-07-29-mysql-compact-layout.md
+7. docs/superpowers/reports/2026-07-29-mysql-compact-layout-verification.md
 
 先只读执行：
 git status --short --branch
 git log -3 --oneline
 git diff --check
 
-InfraView 始终只读。真实 Nightingale v8.4.1 MySQL API smoke 与真实 Chromium 验收仍待用户单独授权；不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/指标值或上游正文。不要 push、合并、部署或重启。
+InfraView 始终只读。当前下一步是完成最终审查修复波及其验证；不得声明已合并或已推送。真实 Nightingale v8.4.1 MySQL API smoke 与真实 Chromium 验收仍待用户单独授权；不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/指标值或上游正文。不要 push、合并、部署或重启。
 ```
 
 ## 历史 main 恢复提示（不适用于当前 MySQL 暂停点）

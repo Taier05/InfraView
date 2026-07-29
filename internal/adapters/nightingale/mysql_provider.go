@@ -56,6 +56,11 @@ func (p *Provider) MySQLSnapshot(ctx context.Context) (mysql.Snapshot, error) {
 	if err != nil {
 		return mysql.Snapshot{}, mysqlUnavailableError()
 	}
+	for _, result := range results {
+		if result == nil {
+			return mysql.Snapshot{}, mysqlUnavailableError()
+		}
+	}
 
 	states := make(map[string]*mysqlInstanceState, len(results[0]))
 	for _, series := range results[0] {

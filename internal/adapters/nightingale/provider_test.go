@@ -153,6 +153,9 @@ func TestMySQLSnapshotRejectsInvalidBaseIdentity(t *testing.T) {
 
 func TestMySQLSnapshotLatestConflictsBecomeMissing(t *testing.T) {
 	groups := make([][]any, len(mysqlPromQL()))
+	for index := range groups {
+		groups[index] = []any{}
+	}
 	labels := mysqlFixtureLabels("mysql_up")
 	groups[0] = []any{mysqlFixtureSeries(labels, 1785123000, "1")}
 	groups[1] = []any{
@@ -270,6 +273,56 @@ func TestMySQLSnapshotEnforcesIdentityAndBatchShape(t *testing.T) {
 				t.Fatalf("error = %v, want unavailable=%v", err, tt.wantErr)
 			}
 			if tt.empty && (err != nil || len(snapshot.Instances) != 0) {
+				t.Fatalf("snapshot = %#v, err = %v", snapshot, err)
+			}
+		})
+	}
+}
+
+func TestMySQLSnapshotRejectsNullBatchElementsButAllowsEmptyVectors(t *testing.T) {
+	validGroups := make([][]any, len(mysqlPromQL()))
+	for index := range validGroups {
+		validGroups[index] = []any{}
+	}
+
+	tests := []struct {
+		name    string
+		groups  [][]any
+		wantErr bool
+	}{
+		{
+			name: "empty vectors produce an empty snapshot",
+			groups: validGroups,
+		},
+		{
+			name: "first null element is unavailable",
+			groups: func() [][]any {
+				groups := append([][]any(nil), validGroups...)
+				groups[0] = nil
+				return groups
+			}(),
+			wantErr: true,
+		},
+		{
+			name: "non-first null element is unavailable",
+			groups: func() [][]any {
+				groups := append([][]any(nil), validGroups...)
+				groups[8] = nil
+				return groups
+			}(),
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider, closeServer := newMySQLResponseProvider(t, tt.groups)
+			defer closeServer()
+
+			snapshot, err := provider.MySQLSnapshot(context.Background())
+			if tt.wantErr != errors.Is(err, mysql.ErrUnavailable) {
+				t.Fatalf("error = %v, want unavailable=%v", err, tt.wantErr)
+			}
+			if !tt.wantErr && (err != nil || len(snapshot.Instances) != 0) {
 				t.Fatalf("snapshot = %#v, err = %v", snapshot, err)
 			}
 		})

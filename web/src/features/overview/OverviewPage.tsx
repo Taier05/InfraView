@@ -370,6 +370,14 @@ function MySQLStatusCard({ data }: { data: MySQLOverviewData }) {
         <div className="module-status-breakdown">
           <StatusBadge level="normal" label={`正常 ${data.normal}`} />
           <StatusBadge
+            level={data.warning > 0 ? 'warning' : 'normal'}
+            label={data.warning > 0 ? `警告 ${data.warning}` : '无警告'}
+          />
+          <StatusBadge
+            level={data.critical > 0 ? 'critical' : 'normal'}
+            label={data.critical > 0 ? `严重 ${data.critical}` : '无严重'}
+          />
+          <StatusBadge
             level={data.unknown > 0 ? 'unknown' : 'normal'}
             label={data.unknown > 0 ? `未知 ${data.unknown}` : '无未知'}
           />
