@@ -82,6 +82,7 @@ type MySQLInstanceSummary struct {
 	QPS                    *float64
 	SlowQueriesPerSecond   *float64
 	BufferPoolUsagePercent *float64
+	BufferPoolSizeBytes    *float64
 	UptimeSeconds          *float64
 	Replication            MySQLReplicationSummary
 	Status                 Level

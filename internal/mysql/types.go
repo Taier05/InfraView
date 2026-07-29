@@ -38,6 +38,7 @@ type Instance struct {
 	QPS                    *float64
 	SlowQueriesPerSecond   *float64
 	BufferPoolUsagePercent *float64
+	BufferPoolSizeBytes    *float64
 	ReplicationChannels    []ReplicationChannel
 }
 

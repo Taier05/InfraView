@@ -34,6 +34,7 @@ func TestMySQLPromQLIsFixed(t *testing.T) {
 		"rate(mysql_global_status_questions[5m])",
 		"rate(mysql_global_status_slow_queries[5m])",
 		"mysql_global_status_buffer_pool_pages_utilization",
+		"mysql_global_variables_innodb_buffer_pool_size",
 		"mysql_slave_status_seconds_behind_master",
 		"mysql_slave_status_slave_io_running",
 		"mysql_slave_status_slave_sql_running",
@@ -52,8 +53,11 @@ func TestMySQLSnapshotUsesOneBatchAndMergesInstances(t *testing.T) {
 			writeFixture(t, w, "datasource-brief.json")
 		case "/api/n9e/query-instant-batch":
 			batchCalls++
+			if len(mysqlPromQL()) != 14 {
+				t.Fatalf("MySQL batch query count = %d, want 14", len(mysqlPromQL()))
+			}
 			assertMySQLBatchRequest(t, request, mysqlPromQL())
-			writeFixture(t, w, "mysql-instant-batch.json")
+			writeMySQLSnapshotFixture(t, w)
 		default:
 			t.Fatalf("unexpected path %q", request.URL.Path)
 		}
@@ -86,6 +90,7 @@ func TestMySQLSnapshotUsesOneBatchAndMergesInstances(t *testing.T) {
 	assertFloat(t, first.QPS, 32)
 	assertFloat(t, first.SlowQueriesPerSecond, 0)
 	assertFloat(t, first.BufferPoolUsagePercent, 48)
+	assertFloat(t, mysqlBufferPoolSizeBytes(t, first), 1024)
 	if len(first.ReplicationChannels) != 2 {
 		t.Fatalf("first replication channels = %#v", first.ReplicationChannels)
 	}
@@ -101,6 +106,9 @@ func TestMySQLSnapshotUsesOneBatchAndMergesInstances(t *testing.T) {
 		len(second.ReplicationChannels) != 1 {
 		t.Fatalf("second instance = %#v", second)
 	}
+	if mysqlBufferPoolSizeBytes(t, second) != nil {
+		t.Fatalf("conflicting Buffer Pool size = %#v", mysqlBufferPoolSizeBytes(t, second))
+	}
 	assertFloat(t, second.ReplicationChannels[0].LagSeconds, 12)
 	assertBool(t, second.ReplicationChannels[0].IORunning, true)
 	if second.ReplicationChannels[0].SQLRunning != nil {
@@ -110,6 +118,9 @@ func TestMySQLSnapshotUsesOneBatchAndMergesInstances(t *testing.T) {
 	third := snapshot.Instances[2]
 	if third.Availability != mysql.AvailabilityUnknown || third.Role != mysql.RoleUnknown {
 		t.Fatalf("non-binary status = %#v", third)
+	}
+	if mysqlBufferPoolSizeBytes(t, third) != nil {
+		t.Fatalf("invalid Buffer Pool size = %#v", mysqlBufferPoolSizeBytes(t, third))
 	}
 	for _, instance := range snapshot.Instances {
 		if instance.Host == "fixture-ghost-host" {
@@ -170,7 +181,7 @@ func TestMySQLSnapshotLatestConflictsBecomeMissing(t *testing.T) {
 		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_status_threads_connected"), 1785123000, "24"),
 		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_status_threads_connected"), 1785123000, "25"),
 	}
-	groups[10] = []any{
+	groups[11] = []any{
 		mysqlFixtureSeries(mysqlReplicationLabels("mysql_slave_status_seconds_behind_master"), 1785123000, "3"),
 		mysqlFixtureSeries(mysqlReplicationLabels("mysql_slave_status_seconds_behind_master"), 1785123000, "4"),
 	}
@@ -291,7 +302,7 @@ func TestMySQLSnapshotRejectsNullBatchElementsButAllowsEmptyVectors(t *testing.T
 		wantErr bool
 	}{
 		{
-			name: "empty vectors produce an empty snapshot",
+			name:   "empty vectors produce an empty snapshot",
 			groups: validGroups,
 		},
 		{
@@ -371,9 +382,9 @@ func TestMySQLSnapshotSelectsLatestValidScalarAndReplicationSamples(t *testing.T
 		instantSeries{Metric: cloneLabels(result[9][0].Metric), Value: rawInstantValue(1785200200, "101")},
 		instantSeries{Metric: cloneLabels(result[9][0].Metric), Value: rawInstantValue(1785200100, "55")},
 	)
-	result[10] = append(result[10],
-		instantSeries{Metric: cloneLabels(result[10][0].Metric), Value: rawInstantValue(1785200200, "-1")},
-		instantSeries{Metric: cloneLabels(result[10][0].Metric), Value: rawInstantValue(1785200100, "3")},
+	result[11] = append(result[11],
+		instantSeries{Metric: cloneLabels(result[11][0].Metric), Value: rawInstantValue(1785200200, "-1")},
+		instantSeries{Metric: cloneLabels(result[11][0].Metric), Value: rawInstantValue(1785200100, "3")},
 	)
 
 	snapshot, err := runMySQLBatch(t, result)
@@ -393,7 +404,7 @@ func TestMySQLSnapshotSelectsLatestValidScalarAndReplicationSamples(t *testing.T
 
 func TestMySQLSnapshotAcceptsEmptyDefaultChannelAndIgnoresMissingIdentityKeys(t *testing.T) {
 	result := mysqlBatchResultsFixture()
-	for queryIndex := 10; queryIndex <= 12; queryIndex++ {
+	for queryIndex := 11; queryIndex <= 13; queryIndex++ {
 		result[queryIndex][0].Metric["channel_name"] = ""
 		missingKey := instantSeries{
 			Metric: cloneLabels(result[queryIndex][0].Metric),
@@ -1736,6 +1747,55 @@ func mysqlFixtureSeries(labels map[string]string, timestamp int64, value string)
 	return map[string]any{"metric": labels, "value": []any{timestamp, value}}
 }
 
+func mysqlBufferPoolSizeBytes(t *testing.T, instance mysql.Instance) *float64 {
+	t.Helper()
+	field := reflect.ValueOf(instance).FieldByName("BufferPoolSizeBytes")
+	if !field.IsValid() {
+		t.Fatal("MySQL instance does not expose BufferPoolSizeBytes")
+	}
+	value, ok := field.Interface().(*float64)
+	if !ok {
+		t.Fatalf("BufferPoolSizeBytes type = %s, want *float64", field.Type())
+	}
+	return value
+}
+
+func writeMySQLSnapshotFixture(t *testing.T, w http.ResponseWriter) {
+	t.Helper()
+	fixture, err := os.ReadFile("testdata/mysql-instant-batch.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var response struct {
+		Data [][]any `json:"dat"`
+	}
+	if err := json.Unmarshal(fixture, &response); err != nil {
+		t.Fatal(err)
+	}
+	second := cloneLabels(mysqlFixtureLabels("mysql_global_variables_innodb_buffer_pool_size"))
+	second["ident"] = "fixture-host-b"
+	second["instance"] = "fixture-mysql-b"
+	second["address"] = "192.0.2.11:3306"
+	third := cloneLabels(mysqlFixtureLabels("mysql_global_variables_innodb_buffer_pool_size"))
+	third["ident"] = "fixture-host-c"
+	third["instance"] = "fixture-mysql-c"
+	third["address"] = "192.0.2.12:3306"
+	bufferPoolSize := []any{
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_variables_innodb_buffer_pool_size"), 1785122900, "512"),
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_variables_innodb_buffer_pool_size"), 1785123100, "-1"),
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_variables_innodb_buffer_pool_size"), 1785123110, "NaN"),
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_variables_innodb_buffer_pool_size"), 1785123120, "Inf"),
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_variables_innodb_buffer_pool_size"), 1785123130, "1024"),
+		mysqlFixtureSeries(second, 1785123000, "1024"),
+		mysqlFixtureSeries(second, 1785123000, "2048"),
+		mysqlFixtureSeries(third, 1785123000, "-1"),
+		mysqlFixtureSeries(third, 1785123010, "NaN"),
+		mysqlFixtureSeries(third, 1785123020, "Inf"),
+	}
+	response.Data = append(response.Data[:10], append([][]any{bufferPoolSize}, response.Data[10:]...)...)
+	writeEnvelope(t, w, response.Data)
+}
+
 func mysqlInstantSeries(labels map[string]string, timestamp int64, value string) instantSeries {
 	return instantSeries{
 		Metric: labels,
@@ -1768,8 +1828,9 @@ func mysqlBatchResultsFixture() [][]instantSeries {
 		{metric: "mysql_global_status_questions", value: "18"},
 		{metric: "mysql_global_status_slow_queries", value: "0.5"},
 		{metric: "mysql_global_status_buffer_pool_pages_utilization", value: "42"},
+		{metric: "mysql_global_variables_innodb_buffer_pool_size", value: "1024"},
 	}
-	result := make([][]instantSeries, len(mysqlPromQL()))
+	result := make([][]instantSeries, 14)
 	for index, item := range metricValues {
 		labels := mysqlFixtureLabels(item.metric)
 		if index == 1 {
@@ -1788,7 +1849,7 @@ func mysqlBatchResultsFixture() [][]instantSeries {
 		{metric: "mysql_slave_status_slave_io_running", value: "1"},
 		{metric: "mysql_slave_status_slave_sql_running", value: "1"},
 	} {
-		result[index+10] = []instantSeries{{
+		result[index+11] = []instantSeries{{
 			Metric: mysqlReplicationLabels(item.metric),
 			Value:  rawInstantValue(1785200000, item.value),
 		}}
@@ -1797,7 +1858,7 @@ func mysqlBatchResultsFixture() [][]instantSeries {
 }
 
 func addSecondFixtureReplicationChannel(result [][]instantSeries) {
-	for queryIndex := 10; queryIndex <= 12; queryIndex++ {
+	for queryIndex := 11; queryIndex <= 13; queryIndex++ {
 		labels := cloneLabels(result[queryIndex][0].Metric)
 		labels["channel_name"] = "fixture-channel-b"
 		labels["master_host"] = "fixture-source-b"

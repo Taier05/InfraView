@@ -67,6 +67,7 @@ func cloneMySQLSnapshot(source mysql.Snapshot) mysql.Snapshot {
 		instances[i].QPS = cloneFloat(instance.QPS)
 		instances[i].SlowQueriesPerSecond = cloneFloat(instance.SlowQueriesPerSecond)
 		instances[i].BufferPoolUsagePercent = cloneFloat(instance.BufferPoolUsagePercent)
+		instances[i].BufferPoolSizeBytes = cloneFloat(instance.BufferPoolSizeBytes)
 		instances[i].ReplicationChannels = make([]mysql.ReplicationChannel, len(instance.ReplicationChannels))
 		for j, channel := range instance.ReplicationChannels {
 			instances[i].ReplicationChannels[j] = mysql.ReplicationChannel{
@@ -345,6 +346,7 @@ func summarizeMySQLInstance(source mysql.Instance) MySQLInstanceSummary {
 		QPS:                    cloneFloat(source.QPS),
 		SlowQueriesPerSecond:   cloneFloat(source.SlowQueriesPerSecond),
 		BufferPoolUsagePercent: cloneFloat(source.BufferPoolUsagePercent),
+		BufferPoolSizeBytes:    cloneFloat(source.BufferPoolSizeBytes),
 		UptimeSeconds:          cloneFloat(source.UptimeSeconds),
 		Replication:            replication,
 		Status:                 mysqlHigherLevel(mysqlAvailabilityLevel(source.Availability), replication.Level),

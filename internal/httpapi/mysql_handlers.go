@@ -47,6 +47,7 @@ type mysqlInstanceView struct {
 	QPS                    *float64             `json:"qps"`
 	SlowQueriesPerSecond   *float64             `json:"slow_queries_per_second"`
 	BufferPoolUsagePercent *float64             `json:"buffer_pool_usage_percent"`
+	BufferPoolSizeBytes    *float64             `json:"buffer_pool_size_bytes"`
 	UptimeSeconds          *float64             `json:"uptime_seconds"`
 	Replication            mysqlReplicationView `json:"replication"`
 	Status                 service.Level        `json:"status"`
@@ -176,6 +177,7 @@ func mysqlInstanceViewFrom(value service.MySQLInstanceSummary) mysqlInstanceView
 		QPS:                    value.QPS,
 		SlowQueriesPerSecond:   value.SlowQueriesPerSecond,
 		BufferPoolUsagePercent: value.BufferPoolUsagePercent,
+		BufferPoolSizeBytes:    value.BufferPoolSizeBytes,
 		UptimeSeconds:          value.UptimeSeconds,
 		Replication: mysqlReplicationView{
 			State:      value.Replication.State,

@@ -12,6 +12,7 @@ func mysqlPromQL() []string {
 		"rate(mysql_global_status_questions[5m])",
 		"rate(mysql_global_status_slow_queries[5m])",
 		"mysql_global_status_buffer_pool_pages_utilization",
+		"mysql_global_variables_innodb_buffer_pool_size",
 		"mysql_slave_status_seconds_behind_master",
 		"mysql_slave_status_slave_io_running",
 		"mysql_slave_status_slave_sql_running",

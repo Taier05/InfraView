@@ -18,6 +18,7 @@ const (
 	mysqlQPS
 	mysqlSlowQueries
 	mysqlBufferPoolUsage
+	mysqlBufferPoolSize
 	mysqlScalarCount
 )
 
@@ -188,7 +189,7 @@ func newestMySQLValue(current **float64, currentAt *time.Time, candidate float64
 }
 
 func mergeMySQLScalars(states map[string]*mysqlInstanceState, results [][]instantSeries) {
-	for queryIndex := 2; queryIndex <= 9; queryIndex++ {
+	for queryIndex := 2; queryIndex <= 10; queryIndex++ {
 		for _, series := range results[queryIndex] {
 			state, ok := mysqlStateForSeries(states, series)
 			if !ok {
@@ -228,13 +229,15 @@ func mysqlScalarIndex(queryIndex int) (int, bool) {
 		return mysqlSlowQueries, true
 	case 9:
 		return mysqlBufferPoolUsage, true
+	case 10:
+		return mysqlBufferPoolSize, true
 	default:
 		return 0, false
 	}
 }
 
 func mergeMySQLReplication(states map[string]*mysqlInstanceState, results [][]instantSeries) {
-	for queryIndex := 10; queryIndex <= 12; queryIndex++ {
+	for queryIndex := 11; queryIndex <= 13; queryIndex++ {
 		for _, series := range results[queryIndex] {
 			state, ok := mysqlStateForSeries(states, series)
 			if !ok {
@@ -250,11 +253,11 @@ func mergeMySQLReplication(states map[string]*mysqlInstanceState, results [][]in
 				state.channels[channelKey] = replication
 			}
 			switch queryIndex {
-			case 10:
-				mergeMySQLScalar(&replication.channel.LagSeconds, &replication.lagTime, series)
 			case 11:
-				mergeMySQLBool(&replication.io, series)
+				mergeMySQLScalar(&replication.channel.LagSeconds, &replication.lagTime, series)
 			case 12:
+				mergeMySQLBool(&replication.io, series)
+			case 13:
 				mergeMySQLBool(&replication.sql, series)
 			}
 		}
@@ -326,6 +329,7 @@ func finalizeMySQLInstance(state *mysqlInstanceState) {
 	state.instance.QPS = state.scalars[mysqlQPS].value
 	state.instance.SlowQueriesPerSecond = state.scalars[mysqlSlowQueries].value
 	state.instance.BufferPoolUsagePercent = state.scalars[mysqlBufferPoolUsage].value
+	state.instance.BufferPoolSizeBytes = state.scalars[mysqlBufferPoolSize].value
 
 	channelKeys := make([]string, 0, len(state.channels))
 	for key := range state.channels {

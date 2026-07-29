@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"testing"
 	"time"
 
@@ -148,6 +149,7 @@ func TestMySQLSummaryDoesNotThresholdOtherMetrics(t *testing.T) {
 		QPS:                    floatPointer(1_000_000),
 		SlowQueriesPerSecond:   floatPointer(1_000_000),
 		BufferPoolUsagePercent: floatPointer(100),
+		BufferPoolSizeBytes:    floatPointer(1_000_000),
 	}
 	summary := summarizeMySQLInstance(instance)
 	if summary.Status != LevelNormal {
@@ -156,7 +158,8 @@ func TestMySQLSummaryDoesNotThresholdOtherMetrics(t *testing.T) {
 	if summary.ThreadsRunning == nil || *summary.ThreadsRunning != 1_000_000 ||
 		summary.QPS == nil || *summary.QPS != 1_000_000 ||
 		summary.SlowQueriesPerSecond == nil || *summary.SlowQueriesPerSecond != 1_000_000 ||
-		summary.BufferPoolUsagePercent == nil || *summary.BufferPoolUsagePercent != 100 {
+		summary.BufferPoolUsagePercent == nil || *summary.BufferPoolUsagePercent != 100 ||
+		mysqlSummaryBufferPoolSizeBytes(t, summary) == nil || *mysqlSummaryBufferPoolSizeBytes(t, summary) != 1_000_000 {
 		t.Fatalf("metrics = %#v", summary)
 	}
 }
@@ -247,6 +250,7 @@ func TestMySQLServiceSnapshotDeepCopiesMetricsAndReplicationChannels(t *testing.
 	*instance.QPS = 999
 	*instance.SlowQueriesPerSecond = 999
 	*instance.BufferPoolUsagePercent = 999
+	*instance.BufferPoolSizeBytes = 999
 	*instance.ReplicationChannels[0].IORunning = false
 	*instance.ReplicationChannels[0].SQLRunning = false
 	*instance.ReplicationChannels[0].LagSeconds = 999
@@ -264,6 +268,7 @@ func TestMySQLServiceSnapshotDeepCopiesMetricsAndReplicationChannels(t *testing.
 		*got.QPS == 999 ||
 		*got.SlowQueriesPerSecond == 999 ||
 		*got.BufferPoolUsagePercent == 999 ||
+		*got.BufferPoolSizeBytes == 999 ||
 		!*got.ReplicationChannels[0].IORunning ||
 		!*got.ReplicationChannels[0].SQLRunning ||
 		*got.ReplicationChannels[0].LagSeconds == 999 ||
@@ -525,6 +530,19 @@ func TestMySQLInstancesPaginatesAfterFilteringAndSorting(t *testing.T) {
 func boolPointer(value bool) *bool        { return &value }
 func floatPointer(value float64) *float64 { return &value }
 
+func mysqlSummaryBufferPoolSizeBytes(t *testing.T, summary MySQLInstanceSummary) *float64 {
+	t.Helper()
+	field := reflect.ValueOf(summary).FieldByName("BufferPoolSizeBytes")
+	if !field.IsValid() {
+		t.Fatal("MySQL summary does not expose BufferPoolSizeBytes")
+	}
+	value, ok := field.Interface().(*float64)
+	if !ok {
+		t.Fatalf("BufferPoolSizeBytes type = %s, want *float64", field.Type())
+	}
+	return value
+}
+
 type mysqlTestClock struct{ now time.Time }
 
 func (c *mysqlTestClock) Now() time.Time              { return c.now }
@@ -561,6 +579,7 @@ func fixtureMySQLSnapshot() mysql.Snapshot {
 	first.QPS = floatPointer(10)
 	first.SlowQueriesPerSecond = floatPointer(0.5)
 	first.BufferPoolUsagePercent = floatPointer(70)
+	first.BufferPoolSizeBytes = floatPointer(1_073_741_824)
 
 	second := instanceWithChannels(mysql.ReplicationChannel{
 		IORunning: boolPointer(true), SQLRunning: boolPointer(true), LagSeconds: floatPointer(8),

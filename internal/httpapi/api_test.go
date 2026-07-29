@@ -168,6 +168,7 @@ func TestMySQLViewsExposeCompleteSchemaAndPreserveNullMetrics(t *testing.T) {
 		"qps",
 		"slow_queries_per_second",
 		"buffer_pool_usage_percent",
+		"buffer_pool_size_bytes",
 		"uptime_seconds",
 		"replication",
 		"status",
@@ -186,6 +187,7 @@ func TestMySQLViewsExposeCompleteSchemaAndPreserveNullMetrics(t *testing.T) {
 		"qps",
 		"slow_queries_per_second",
 		"buffer_pool_usage_percent",
+		"buffer_pool_size_bytes",
 		"uptime_seconds",
 	} {
 		path := "data.instances.0." + field
@@ -204,6 +206,21 @@ func TestMySQLViewsExposeCompleteSchemaAndPreserveNullMetrics(t *testing.T) {
 		t.Fatal("replication lag is not null")
 	}
 	assertMySQLResponseMetaSchema(t, instancesBody)
+}
+
+func TestMySQLInstanceViewExposesBufferPoolSizeBytes(t *testing.T) {
+	snapshot := fixtureMySQLSnapshot()
+	capacity := float64(1_073_741_824)
+	snapshot.Instances[0].BufferPoolSizeBytes = &capacity
+	handler, sessionCookie := newMySQLAPITestHandler(t, snapshot)
+
+	response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances?page=1&page_size=20", "", sessionCookie)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d", response.Code)
+	}
+	if got := jsonPathValue(t, response.Body.Bytes(), "data.instances.0.buffer_pool_size_bytes"); got != float64(1_073_741_824) {
+		t.Fatalf("buffer_pool_size_bytes = %#v, want %d", got, 1_073_741_824)
+	}
 }
 
 func TestMySQLInstancesEncodeEmptySnapshotAsArray(t *testing.T) {
