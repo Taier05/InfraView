@@ -1251,12 +1251,20 @@ h1 {
 
 @media (min-width: 761px) and (max-width: 1100px) {
   .mysql-list-controls {
-    grid-template-columns:
-      minmax(14rem, 1fr) repeat(4, minmax(6.5rem, 8rem));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mysql-list-controls > * {
+    min-width: 0;
   }
 
   .mysql-list-controls .refresh-control {
-    grid-column: 1 / -1;
+    grid-column: auto;
+  }
+
+  .mysql-list-controls .refresh-time {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 

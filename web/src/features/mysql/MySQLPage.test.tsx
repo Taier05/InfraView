@@ -167,6 +167,17 @@ it('renders the eleven compact MySQL columns with complete single-line titles an
       .getByRole('searchbox', { name: '搜索实例地址或所属主机' })
       .closest('.mysql-list-controls'),
   ).not.toBeNull()
+  const controls = screen
+    .getByRole('searchbox', { name: '搜索实例地址或所属主机' })
+    .closest('.mysql-list-controls')
+  expect(controls).not.toBeNull()
+  if (!(controls instanceof HTMLElement)) {
+    throw new Error('MySQL 控制区未渲染为 HTML 元素')
+  }
+  expect(within(controls).getAllByRole('combobox')).toHaveLength(4)
+  expect(
+    within(controls).getByRole('button', { name: '刷新 MySQL 实例列表' }),
+  ).toBeInTheDocument()
   expect(screen.getByRole('option', { name: '读写' })).toHaveValue('writable')
   expect(screen.queryByRole('option', { name: '可写' })).not.toBeInTheDocument()
   const table = screen.getByRole('table')
