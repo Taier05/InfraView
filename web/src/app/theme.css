@@ -859,6 +859,12 @@ h1 {
   margin-bottom: 0.5rem;
 }
 
+.mysql-list-controls {
+  grid-template-columns:
+    minmax(14rem, 1fr) minmax(7.5rem, 9rem) minmax(7.5rem, 9rem)
+    minmax(6rem, 7rem) auto;
+}
+
 .host-search,
 .host-status-filter,
 .host-page-size {
@@ -917,6 +923,10 @@ h1 {
   table-layout: fixed;
 }
 
+.mysql-table {
+  min-width: 104rem;
+}
+
 .host-table th,
 .host-table td {
   padding: 0.42rem 0.48rem;
@@ -957,8 +967,26 @@ h1 {
 .host-table th:nth-child(10) { width: 10%; }
 .host-table th:nth-child(11) { width: 7%; }
 
+.mysql-table th:nth-child(1) { width: 14%; }
+.mysql-table th:nth-child(2) { width: 10%; }
+.mysql-table th:nth-child(3) { width: 11%; }
+.mysql-table th:nth-child(4) { width: 12%; }
+.mysql-table th:nth-child(5) { width: 7%; }
+.mysql-table th:nth-child(6) { width: 6%; }
+.mysql-table th:nth-child(7) { width: 9%; }
+.mysql-table th:nth-child(8) { width: 10%; }
+.mysql-table th:nth-child(9) { width: 11%; }
+.mysql-table th:nth-child(10),
+.mysql-table th:nth-child(11) { width: 5%; }
+
 .host-table th:nth-child(1) .host-sort-button,
 .host-table th:nth-child(n + 5):nth-child(-n + 10) .host-sort-button {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.mysql-table th:nth-child(4) .host-sort-button,
+.mysql-table th:nth-child(11) .host-sort-button {
   width: 100%;
   justify-content: flex-start;
 }
@@ -1044,6 +1072,13 @@ h1 {
   white-space: nowrap;
 }
 
+.mysql-version-role,
+.mysql-connection {
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+}
+
 .host-ip {
   color: inherit;
 }
@@ -1119,6 +1154,17 @@ h1 {
   gap: 0.55rem;
 }
 
+@media (min-width: 761px) and (max-width: 1100px) {
+  .mysql-list-controls {
+    grid-template-columns:
+      minmax(14rem, 1fr) repeat(3, minmax(6.5rem, 8rem));
+  }
+
+  .mysql-list-controls .refresh-control {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 760px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -1134,6 +1180,15 @@ h1 {
 
   .host-list-controls {
     grid-template-columns: 1fr;
+  }
+
+  .mysql-list-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mysql-list-controls .host-search,
+  .mysql-list-controls .refresh-control {
+    grid-column: 1 / -1;
   }
 
   .refresh-control {

@@ -135,6 +135,63 @@ it('renders the eleven compact MySQL columns', async () => {
   expect(
     screen.queryByRole('button', { name: /重启|删除|执行|修改|详情|历史/ }),
   ).not.toBeInTheDocument()
+  expect(
+    screen
+      .getByRole('searchbox', { name: '搜索实例名称、地址或所属主机' })
+      .closest('.mysql-list-controls'),
+  ).not.toBeNull()
+  expect(screen.getByRole('table')).toHaveClass('mysql-table')
+})
+
+it('renders missing and unknown versions as Chinese unknown with the role', async () => {
+  renderMySQLPage()
+
+  const missingVersionRow = (
+    await screen.findByText('fixture-mysql-d')
+  ).closest('tr')
+  expect(missingVersionRow).not.toBeNull()
+  const missingVersionCell = within(missingVersionRow!).getAllByRole('cell')[2]
+  expect(missingVersionCell).toHaveTextContent('未知 · 只读')
+  expect(missingVersionCell).not.toHaveTextContent(/^\s*·/)
+
+  const unknownVersionRow = screen.getByText('fixture-mysql-e').closest('tr')
+  expect(unknownVersionRow).not.toBeNull()
+  expect(within(unknownVersionRow!).getAllByRole('cell')[2]).toHaveTextContent(
+    '未知 · 只读',
+  )
+})
+
+it('uses only service-valid fixture replication combinations', () => {
+  const [normal, threadsStopped, notConfigured, missingReadOnly, warning] =
+    mysqlInstancePageFixture().data.instances
+
+  expect(normal).toMatchObject({
+    role: 'writable',
+    replication: { state: 'normal', level: 'normal' },
+    status: 'normal',
+  })
+  expect(threadsStopped).toMatchObject({
+    role: 'read_only',
+    replication: { state: 'threads_stopped', level: 'critical' },
+    status: 'critical',
+  })
+  expect(notConfigured).toMatchObject({
+    role: 'writable',
+    replication: { state: 'not_configured', level: 'normal' },
+    status: 'normal',
+  })
+  expect(missingReadOnly).toMatchObject({
+    version: '',
+    role: 'read_only',
+    replication: { state: 'unknown', level: 'unknown' },
+    status: 'unknown',
+  })
+  expect(warning).toMatchObject({
+    version: 'unknown',
+    role: 'read_only',
+    replication: { state: 'normal', level: 'warning' },
+    status: 'warning',
+  })
 })
 
 it('writes filters sort and pagination to the URL', async () => {
@@ -171,6 +228,30 @@ it('writes filters sort and pagination to the URL', async () => {
       page_size: '50',
     })
   })
+})
+
+it('requests the fixed endpoint with GET and an AbortSignal', async () => {
+  renderMySQLPage()
+  await screen.findByText('fixture-mysql-a')
+
+  const [input, init] = vi.mocked(globalThis.fetch).mock.calls[0]
+  expect(requestURL(input).pathname).toBe('/api/v1/mysql/instances')
+  expect(init?.method).toBe('GET')
+  expect(init?.signal).toBeInstanceOf(AbortSignal)
+})
+
+it('uses server pagination for next and previous pages', async () => {
+  const user = userEvent.setup()
+  renderMySQLPage('/mysql?page=2')
+  expect(await screen.findByText('第 2 / 4 页，共 64 个实例')).toBeVisible()
+
+  await user.click(screen.getByRole('button', { name: '下一页' }))
+  await waitFor(() => expect(lastRequest().searchParams.get('page')).toBe('3'))
+  expect(window.location.search).toContain('page=3')
+
+  await user.click(screen.getByRole('button', { name: '上一页' }))
+  await waitFor(() => expect(lastRequest().searchParams.get('page')).toBe('2'))
+  expect(window.location.search).toContain('page=2')
 })
 
 it('debounces search and sends only fixed GET parameters', async () => {
@@ -243,10 +324,11 @@ it('renders every replication and instance state with text and level', async () 
     ['严重', 'critical'],
     ['未知', 'unknown'],
   ] as const) {
-    expect(screen.getByText(label, { selector: '.mysql-status' })).toHaveAttribute(
-      'data-level',
-      level,
-    )
+    expect(
+      screen
+        .getAllByText(label, { selector: '.mysql-status' })
+        .some((element) => element.dataset.level === level),
+    ).toBe(true)
   }
 })
 
@@ -342,6 +424,8 @@ it('keeps stale data visible and reports background errors', async () => {
   await userEvent
     .setup()
     .click(screen.getByRole('button', { name: '刷新 MySQL 实例列表' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent('刷新失败')
+  expect(await screen.findByText('MySQL 实例列表刷新失败')).toBeVisible()
+  expect(screen.getByText('数据已过期')).toBeVisible()
+  expect(screen.getAllByRole('alert')).toHaveLength(2)
   expect(screen.getByText('fixture-mysql-a')).toBeVisible()
 })

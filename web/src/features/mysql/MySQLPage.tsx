@@ -122,6 +122,13 @@ function connectionUsage(instance: MySQLInstance) {
     : `${values} (${connection_usage_percent.toFixed(1)}%)`
 }
 
+function versionRole(instance: MySQLInstance) {
+  const version = instance.version.trim()
+  const versionLabel =
+    version === '' || version.toLowerCase() === 'unknown' ? '未知' : version
+  return `${versionLabel} · ${roleLabels[instance.role]}`
+}
+
 function uptime(seconds: number | null) {
   if (seconds === null) return '暂无数据'
   const days = Math.floor(seconds / 86_400)
@@ -242,7 +249,7 @@ export function MySQLPage() {
     queryFn: ({ signal }) =>
       apiRequest<MySQLInstancePageResponse>(
         `/api/v1/mysql/instances?${requestParameters.toString()}`,
-        { signal },
+        { method: 'GET', signal },
       ),
     refetchInterval: refreshIntervalMs,
     refetchIntervalInBackground: false,
@@ -335,13 +342,26 @@ export function MySQLPage() {
     {
       id: 'version-role',
       header: '版本 / 角色',
-      cell: ({ row }) =>
-        `${row.original.version} · ${roleLabels[row.original.role]}`,
+      cell: ({ row }) => {
+        const value = versionRole(row.original)
+        return (
+          <span className="mysql-version-role" title={value}>
+            {value}
+          </span>
+        )
+      },
     },
     {
       id: 'connections',
       header: () => sortButton('connections', '连接使用'),
-      cell: ({ row }) => connectionUsage(row.original),
+      cell: ({ row }) => {
+        const value = connectionUsage(row.original)
+        return (
+          <span className="mysql-connection" title={value}>
+            {value}
+          </span>
+        )
+      },
     },
     {
       id: 'threads-running',
@@ -402,7 +422,7 @@ export function MySQLPage() {
       <h1 id="mysql-title">MySQL 实例</h1>
       <p className="page-description">查看 MySQL 实例的只读运行状态与指标。</p>
 
-      <div className="host-list-controls">
+      <div className="host-list-controls mysql-list-controls">
         <label className="host-search">
           <span>搜索实例名称、地址或所属主机</span>
           <input
@@ -465,8 +485,7 @@ export function MySQLPage() {
       </div>
 
       {instances.data?.meta.stale === true &&
-        instances.data.meta.collected_at !== undefined &&
-        apiError === null && (
+        instances.data.meta.collected_at !== undefined && (
           <StaleBanner collectedAt={instances.data.meta.collected_at} />
         )}
 
@@ -484,7 +503,7 @@ export function MySQLPage() {
 
       <div className="host-table-panel">
         <div className="host-table-scroll">
-          <table className="host-table">
+          <table className="host-table mysql-table">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
