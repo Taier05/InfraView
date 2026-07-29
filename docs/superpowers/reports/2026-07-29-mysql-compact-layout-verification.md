@@ -19,8 +19,15 @@
 
 ## 完整构建补跑结果
 
-控制器在提交 `0f36501` 的 HEAD 上随后完整运行 `docker build --no-cache --progress=plain .`，退出码为 0。该构建覆盖前端全量 Vitest、typecheck、production build、Go 普通测试、Go race、Linux build 及镜像导出，均通过。
+控制器在最终审查修复提交 `3679071` 上完整运行 `docker build --no-cache --progress=plain .`，退出码为 0。该构建覆盖前端全量 Vitest、typecheck、production build、Go 普通测试、Go race、Linux build 及镜像导出，均通过。
+
+## 最终审查收口
+
+- 上游 MySQL batch 中任意 JSON `null` 元素现按不可用处理，合法空数组仍保持空快照语义。
+- 总览 MySQL 卡片保留“警告风险”口径，并直接展示正常、警告、严重、未知四个互斥状态。
+- 最终修复通过聚焦 TDD、范围化复审和完整无缓存构建。
+- 原 8080 随后只使用测试 Nightingale 重新构建；健康、无正文 HTTP、E2E safety 和两项 1440×900 Chromium live 用例再次通过。
 
 ## 结论
 
-MySQL 紧凑布局的 1440×900 回归证据已保存在受 Git 跟踪的文档中。开发 8080 始终使用测试 Nightingale；本次没有额外端口、预览服务或生产连接。
+MySQL 紧凑布局与最终审查修复的回归证据已保存在受 Git 跟踪的文档中。开发 8080 始终使用测试 Nightingale；本次没有额外端口、预览服务或生产连接。

@@ -12,6 +12,8 @@
 
 同日的 MySQL 紧凑布局验收已完成：总览桌面四列紧凑模块位已锁定，Linux/MySQL 模块等宽；MySQL 11 列和所有表头在 1440×900 下可见，页面与表格均无横向滚动。完整无缓存镜像验证和 E2E 清理边界测试已运行；只重建既有 `infraview` Compose 项目的原 8080，健康与无正文 HTTP 检查通过，原 8080 Chromium live 两项布局用例通过。该开发服务只连接测试 Nightingale，未连接生产，也没有创建其他测试端口或 Compose 项目。受跟踪的脱敏验证记录见 `docs/superpowers/reports/2026-07-29-mysql-compact-layout-verification.md`。
 
+最终全分支审查发现的 MySQL batch `null` 语义和总览四类互斥状态已按 TDD 修复，范围化复审通过；最终提交重新完成无缓存镜像、原 8080 健康与无正文 HTTP、E2E safety 和 Chromium live 验收。当前未合并、未推送，等待用户决定。
+
 Mock MVP、紧凑布局、Nightingale 只读接入、15 秒当前页面刷新、“数据连接”汇总和 Nightingale v8.4.1 兼容均已完成并进入 `main`。v8.4.1 功能交付基线为 `18d26a6`，已推送到 `origin/main`；原 `feature/nightingale-v8-compat` 分支和 worktree 已清理。当前以 Nightingale v8.4.1 为主要开发与真实验证版本，同时保留 v9.x 已覆盖的协议兼容。
 
 v8.4.1 上游只读契约预检已经通过；Target 在当前环境提供 `update_at` 而非 `beat_time`。适配器已按 TDD 实现“有效 `beat_time` 优先、有效 `update_at` 回退、否则零值”，运行时不探测版本，也不增加额外上游请求。完整生产镜像、隔离 Mock E2E、8080 重建、应用端真实只读 smoke 和容器安全检查均已通过。

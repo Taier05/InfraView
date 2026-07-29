@@ -28,7 +28,7 @@ git status --short --branch
 git log -3 --oneline
 git diff --check
 
-InfraView 始终只读。当前下一步是完成最终审查修复波及其验证；不得声明已合并或已推送。真实 Nightingale v8.4.1 MySQL API smoke 与真实 Chromium 验收仍待用户单独授权；不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/指标值或上游正文。不要 push、合并、部署或重启。
+InfraView 始终只读。最终审查修复波、范围化复审、完整构建和原 8080 测试 Nightingale Chromium 验收均已通过；当前下一步是等待用户决定是否合并，不得声明已合并或已推送。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/指标值或上游正文。不要自行 push、合并、部署或重启。
 ```
 
 ## 历史 main 恢复提示（不适用于当前 MySQL 暂停点）
