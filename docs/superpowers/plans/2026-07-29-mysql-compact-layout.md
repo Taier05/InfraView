@@ -35,7 +35,7 @@
 - Consumes: 现有 `HostStatusCard`、`MySQLStatusCard` 及独立 query 状态。
 - Produces: 可通过 `role="group"`、`aria-label="基础设施模块"` 和 `overview-compact-grid` 定位的模块网格。
 
-- [ ] **Step 1: 写失败的 DOM 布局契约测试**
+- [x] **Step 1: 写失败的 DOM 布局契约测试**
 
 在 `OverviewPage.test.tsx` 的总览成功场景中增加：
 
@@ -94,7 +94,7 @@ expect(Math.abs(hostBox!.y - mysqlBox!.y)).toBeLessThanOrEqual(1)
 })
 ```
 
-- [ ] **Step 2: 运行 Vitest 和原 8080 Chromium 确认 RED**
+- [x] **Step 2: 运行 Vitest 和原 8080 Chromium 确认 RED**
 
 Run:
 
@@ -124,7 +124,7 @@ docker run --rm \
 
 Expected: Vitest 找不到名为“基础设施模块”的 group；当前旧版 8080 的 Chromium 尺寸断言失败。命令不得输出环境变量值、响应正文或真实数据。
 
-- [ ] **Step 3: 增加明确的紧凑网格 DOM**
+- [x] **Step 3: 增加明确的紧凑网格 DOM**
 
 将 `OverviewPage.tsx` 的模块容器改为：
 
@@ -136,7 +136,7 @@ Expected: Vitest 找不到名为“基础设施模块”的 group；当前旧版
 >
 ```
 
-- [ ] **Step 4: 实现桌面四列和紧凑卡片 CSS**
+- [x] **Step 4: 实现桌面四列和紧凑卡片 CSS**
 
 在 `theme.css` 中让桌面默认使用四列：
 
@@ -171,7 +171,7 @@ Expected: Vitest 找不到名为“基础设施模块”的 group；当前旧版
 
 同步调整现有媒体查询：默认四列，`max-width: 1100px` 两列，`max-width: 480px` 一列。对应选择器使用 `.overview-compact-grid`，不得让 `.overview-status-grid` 的旧两列规则覆盖桌面四列。
 
-- [ ] **Step 5: 运行聚焦测试确认 GREEN**
+- [x] **Step 5: 运行聚焦测试确认 GREEN**
 
 Run:
 
@@ -185,7 +185,7 @@ docker run --rm \
 
 Expected: PASS；现有 loading、empty、error、stale 和刷新测试均保持通过。浏览器 GREEN 在 Task 3 重建同一个 8080 后确认。
 
-- [ ] **Step 6: 提交总览布局**
+- [x] **Step 6: 提交总览布局**
 
 ```bash
 git add \
@@ -211,7 +211,7 @@ git commit -m "fix: 压缩基础设施总览模块"
 - Consumes: 现有 11 列 `ColumnDef<MySQLInstance>[]` 和 `host-table` 基础样式。
 - Produces: `mysql-table-scroll` 与 `mysql-table-compact` 专用布局 class；11 列字段和排序接口保持不变。
 
-- [ ] **Step 1: 写失败的紧凑表格契约测试**
+- [x] **Step 1: 写失败的紧凑表格契约测试**
 
 在 `MySQLPage.test.tsx` 的 11 列场景增加：
 
@@ -267,7 +267,7 @@ expect(tableViewport.scrollWidth).toBeLessThanOrEqual(
 })
 ```
 
-- [ ] **Step 2: 运行 Vitest 和原 8080 Chromium 确认 RED**
+- [x] **Step 2: 运行 Vitest 和原 8080 Chromium 确认 RED**
 
 Run:
 
@@ -297,7 +297,7 @@ docker run --rm \
 
 Expected: Vitest 因缺少紧凑 class、短连接格式和复制 `title` 失败；当前旧版 8080 因缺少专用 class 或表格横向溢出而失败。
 
-- [ ] **Step 3: 压缩显示格式并增加完整提示**
+- [x] **Step 3: 压缩显示格式并增加完整提示**
 
 将连接使用率格式从：
 
@@ -326,7 +326,7 @@ Expected: Vitest 因缺少紧凑 class、短连接格式和复制 `title` 失败
   <table className="host-table mysql-table mysql-table-compact">
 ```
 
-- [ ] **Step 4: 实现桌面无滚动的专用表格 CSS**
+- [x] **Step 4: 实现桌面无滚动的专用表格 CSS**
 
 在 `theme.css` 中替换 `104rem` 规则：
 
@@ -385,7 +385,7 @@ Expected: Vitest 因缺少紧凑 class、短连接格式和复制 `title` 失败
 }
 ```
 
-- [ ] **Step 5: 运行 MySQL 与 Host 聚焦回归**
+- [x] **Step 5: 运行 MySQL 与 Host 聚焦回归**
 
 Run:
 
@@ -399,7 +399,7 @@ docker run --rm \
 
 Expected: PASS；MySQL 11 列和 Host 表格均无回归。浏览器 GREEN 在 Task 3 重建同一个 8080 后确认。
 
-- [ ] **Step 6: 提交表格布局**
+- [x] **Step 6: 提交表格布局**
 
 ```bash
 git add \
@@ -425,7 +425,7 @@ git commit -m "fix: 压缩 MySQL 实例表格"
 - Consumes: Task 1 的 `overview-compact-grid`、Task 2 的 `mysql-table-scroll`。
 - Produces: 1440×900 计算后布局回归证据和只使用原 8080 测试服务的交接状态。
 
-- [ ] **Step 1: 运行完整前端和生产镜像验证**
+- [x] **Step 1: 运行完整前端和生产镜像验证**
 
 Run:
 
@@ -435,7 +435,7 @@ docker build --no-cache --progress=plain .
 
 Expected: 全量 Vitest、typecheck、production build、Go test、Go race、Linux build 全部通过。
 
-- [ ] **Step 2: 运行 E2E 清理边界安全测试**
+- [x] **Step 2: 运行 E2E 清理边界安全测试**
 
 Run:
 
@@ -445,7 +445,7 @@ Run:
 
 Expected: PASS。不得运行会绑定 18080 或其他宿主机端口的 `scripts/e2e.sh`；本计划所有实际页面测试只针对原 8080。
 
-- [ ] **Step 3: 只重建现有 8080 测试服务**
+- [x] **Step 3: 只重建现有 8080 测试服务**
 
 执行前由控制器在 shell 中提供 Git 忽略且权限安全的 `INFRAVIEW_ENV_FILE`，不得输出其值。
 
@@ -458,7 +458,7 @@ docker compose -p infraview up -d --build --force-recreate
 
 Expected: 既有 `infraview` 容器被精确重建；没有创建其他 Compose 项目、预览服务或端口。
 
-- [ ] **Step 4: 等待健康并做无正文 HTTP 检查**
+- [x] **Step 4: 等待健康并做无正文 HTTP 检查**
 
 Run:
 
@@ -490,7 +490,7 @@ test "$(
 
 Expected: 容器达到 healthy；根页面为 200，未认证 MySQL GET 为 401。命令只以退出码表示结果，不输出响应正文。
 
-- [ ] **Step 5: 在原 8080 执行脱敏 Chromium 验收**
+- [x] **Step 5: 在原 8080 执行脱敏 Chromium 验收**
 
 Run:
 
@@ -514,7 +514,7 @@ Run:
 
 Expected: PASS；认证后页面来自测试 Nightingale，总览四列轨道、Linux/MySQL 同宽、MySQL 11 列和所有表头可见，页面与表格均无横向滚动。不得输出响应正文、真实标识、地址、资源数量或指标值。
 
-- [ ] **Step 6: 同步状态文档、计划复选框并提交证据**
+- [x] **Step 6: 同步状态文档、计划复选框并提交证据**
 
 文档必须记录：
 

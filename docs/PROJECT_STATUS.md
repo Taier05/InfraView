@@ -10,6 +10,8 @@
 
 复制线程任一明确停止为严重；复制延迟最大有效值 5 秒起警告、30 秒起严重。缺失复制通道、线程或延迟不转换为零：仅可写且零复制通道为正常，只读或角色未知且零通道时复制线程与实例状态均为未知并计入警告风险。Nightingale 适配器先忽略非法候选再选择最新有效样本，复制通道身份按标签键存在性判定并允许合法空值。2026-07-29 已在本地完成无缓存生产镜像构建（前端 Vitest 67/67、typecheck、production build、Go 普通/race 测试与编译）、独立全仓 race、E2E 隔离安全测试，以及一次性 Mock smoke、资源检查和 Chromium 6/6；专用 E2E 项目资源已确认清理。真实 Nightingale v8.4.1 MySQL API smoke 和真实浏览器验收均待用户单独授权。
 
+同日的 MySQL 紧凑布局验收已完成：总览桌面四列紧凑模块位已锁定，Linux/MySQL 模块等宽；MySQL 11 列和所有表头在 1440×900 下可见，页面与表格均无横向滚动。完整无缓存镜像验证和 E2E 清理边界测试已运行；只重建既有 `infraview` Compose 项目的原 8080，健康与无正文 HTTP 检查通过，原 8080 Chromium live 两项布局用例通过。该开发服务只连接测试 Nightingale，未连接生产，也没有创建其他测试端口或 Compose 项目。
+
 Mock MVP、紧凑布局、Nightingale 只读接入、15 秒当前页面刷新、“数据连接”汇总和 Nightingale v8.4.1 兼容均已完成并进入 `main`。v8.4.1 功能交付基线为 `18d26a6`，已推送到 `origin/main`；原 `feature/nightingale-v8-compat` 分支和 worktree 已清理。当前以 Nightingale v8.4.1 为主要开发与真实验证版本，同时保留 v9.x 已覆盖的协议兼容。
 
 v8.4.1 上游只读契约预检已经通过；Target 在当前环境提供 `update_at` 而非 `beat_time`。适配器已按 TDD 实现“有效 `beat_time` 优先、有效 `update_at` 回退、否则零值”，运行时不探测版本，也不增加额外上游请求。完整生产镜像、隔离 Mock E2E、8080 重建、应用端真实只读 smoke 和容器安全检查均已通过。

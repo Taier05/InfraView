@@ -58,5 +58,6 @@
 ## MySQL 后续验收
 
 - [x] 本地 Docker/Mock 验收：无缓存生产镜像、独立 race、E2E 隔离安全测试、smoke、资源检查和 Chromium 已完成；专用 E2E 项目资源已清理。
+- [x] 完成 MySQL 紧凑布局验收：总览桌面四列紧凑模块位，MySQL 11 列在 1440×900 下无页面或表格横向滚动；仅重建测试 Nightingale 的原 8080，未创建其他测试端口。
 - [ ] 在用户单独授权后，使用一次性只读容器完成真实 Nightingale v8.4.1 的 MySQL API smoke 和 Chromium 页面验收；不得触碰既有 Compose 服务、输出私密环境文件或记录真实实例/指标。
 - [ ] 按真实契约证据再决定是否扩展 MySQL 指标；当前固定 13 条查询、一次 batch 和无 N+1 设计不接受前端自定义查询。
