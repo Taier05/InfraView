@@ -1,29 +1,38 @@
 # InfraView 开发交接
 
-最后更新：2026-07-28
+最后更新：2026-07-29
 
-## 新对话恢复入口
+## 当前 MySQL 暂停点恢复入口
 
-请先阅读：
+本暂停点只能在 MySQL 专用工作树恢复；下方历史 `main` 提示不适用于本暂停点，禁止据此切换到仓库根目录或 `main`。
 
-1. `docs/HANDOFF.md`（本文件）
-2. `docs/PROJECT_STATUS.md`
-3. `docs/TODO.md`
-4. `docs/datasources/NIGHTINGALE.md`
+在新账号或新对话中直接粘贴：
 
-继续开发时使用：
+```text
+继续开发 InfraView MySQL 模块。请始终使用简体中文回复。
 
-- 工作目录：`<仓库根目录>`
-- 分支：`main`
-- Nightingale 私密环境文件：`/secure/path/infraview.env`
-- 当前 InfraView 访问地址：由私有部署环境提供，不进入公开仓库
-- Nightingale API：由私有部署环境提供，不进入公开仓库
+工作目录：/root/github/InfraView/.worktrees/mysql-module
+分支：feature/mysql-module
 
-不要在聊天、测试夹具、日志、错误消息或 Git 中输出 Nightingale Token。仓库内没有 Token；后续 Compose 若从仓库启动，应显式设置 `INFRAVIEW_ENV_FILE=/secure/path/infraview.env`，不要复制私密文件进仓库。
+请先完整阅读并遵循：
+1. docs/HANDOFF.md
+2. docs/PROJECT_STATUS.md
+3. docs/TODO.md
+4. docs/datasources/NIGHTINGALE.md
+5. docs/superpowers/specs/2026-07-28-mysql-module-design.md
+6. docs/superpowers/plans/2026-07-28-mysql-module.md（仅定位并阅读 Task 12 段）
 
-## 切换 Codex 账号后的恢复提示词
+先只读执行：
+git status --short
+git log -3 --oneline
+git diff --check
 
-在新账号的新对话中直接粘贴以下内容：
+InfraView 始终只读。真实 Nightingale v8.4.1 MySQL API smoke 与真实 Chromium 验收仍待用户单独授权；不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/指标值或上游正文。不要 push、合并、部署或重启。
+```
+
+## 历史 main 恢复提示（不适用于当前 MySQL 暂停点）
+
+以下内容仅保留给仓库根目录的历史 `main` 基线；当前 MySQL 工作必须使用上方专用提示。
 
 ```text
 继续开发 InfraView。请始终使用简体中文回复。
