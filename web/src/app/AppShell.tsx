@@ -101,6 +101,7 @@ export function AppShell() {
             总览
           </NavLink>
           <NavLink to="/hosts">主机</NavLink>
+          <NavLink to="/mysql">MySQL</NavLink>
         </nav>
 
         <details

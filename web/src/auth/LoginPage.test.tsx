@@ -6,6 +6,7 @@ import { afterEach, vi } from 'vitest'
 
 import { App } from '../app/App'
 import {
+  mysqlOverviewFixture,
   overviewFixture,
   SESSION_PATH,
   sessionFixture,
@@ -42,6 +43,9 @@ function mockAuthenticatedRequests(
   vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
     if (requestPath(input) === '/api/v1/overview') {
       return Promise.resolve(jsonResponse(overviewFixture()))
+    }
+    if (requestPath(input) === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
     }
     if (requestPath(input) === '/api/v1/datasource/status') {
       return Promise.resolve(
@@ -94,6 +98,9 @@ it('已认证会话 bootstrap 后直接进入基础设施总览', async () => {
   expect(
     await screen.findByRole('heading', { name: '基础设施总览' }),
   ).toBeInTheDocument()
+  expect(
+    await screen.findByRole('link', { name: '查看 MySQL 板块' }),
+  ).toHaveAttribute('href', '/mysql')
   expect(screen.queryByLabelText('用户名')).not.toBeInTheDocument()
 })
 
@@ -246,6 +253,9 @@ it('容器重启导致受保护 API 会话失效时清空缓存并回到登录�
         return Promise.resolve(jsonResponse(overviewFixture()))
       }
       return Promise.resolve(jsonResponse(unauthenticatedFixture, 401))
+    }
+    if (path === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
     }
     if (path === '/api/v1/datasource/status') {
       return Promise.resolve(

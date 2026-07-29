@@ -72,6 +72,25 @@ export interface OverviewTrend {
 
 export type OverviewResponse = ApiResponse<OverviewData>
 
+export interface MySQLOverviewData {
+  total: number
+  normal: number
+  warning: number
+  critical: number
+  unknown: number
+  affected_instances: number
+  warning_instances: number
+  critical_instances: number
+  alerts: {
+    availability: AlertCount
+    replication_threads: AlertCount
+    replication_lag: AlertCount
+    replication_data: AlertCount
+  }
+}
+
+export type MySQLOverviewResponse = ApiResponse<MySQLOverviewData>
+
 export type HostStatus = 'online' | 'offline' | 'unknown'
 
 export interface CurrentMetrics {

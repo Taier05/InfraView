@@ -600,8 +600,27 @@ h1 {
 
 .overview-status-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.45rem;
+}
+
+.overview-module-state {
+  min-width: 0;
+  min-height: 12rem;
+  margin: 0;
+}
+
+.overview-module-state[role="status"] {
+  display: grid;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  color: var(--text-muted);
+  background: linear-gradient(150deg, var(--surface-raised), var(--surface));
+  place-items: center;
+}
+
+.overview-refresh-error {
+  min-height: 0;
 }
 
 .module-status-card {
@@ -630,6 +649,12 @@ h1 {
   border-color: #684443;
   background:
     linear-gradient(135deg, rgb(62 34 36 / 82%), rgb(18 25 32 / 98%));
+}
+
+.module-status-card[data-level="empty"] {
+  border-color: var(--border-strong);
+  background:
+    linear-gradient(135deg, rgb(33 42 49 / 84%), rgb(18 25 32 / 98%));
 }
 
 .module-status-card:hover {
@@ -683,6 +708,11 @@ h1 {
   background: #321f21;
 }
 
+.module-status-level[data-level="empty"] {
+  color: var(--text-muted);
+  background: #252c31;
+}
+
 .module-status-action {
   color: var(--accent-strong);
   font-size: 0.72rem;
@@ -715,6 +745,23 @@ h1 {
   font-size: 1.25rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.03em;
+}
+
+.mysql-overview-empty-state {
+  display: grid;
+  min-height: 7.1rem;
+  margin-top: 0.55rem;
+  border-top: 1px solid rgb(255 255 255 / 7%);
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  place-content: center;
+  text-align: center;
+}
+
+.mysql-overview-empty-state strong {
+  color: var(--text);
+  font-size: 0.82rem;
 }
 
 .module-alert-total small {

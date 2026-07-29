@@ -2,6 +2,7 @@ import { HttpResponse, http } from 'msw'
 
 export const SESSION_PATH = '/api/v1/session'
 export const OVERVIEW_PATH = '*/api/v1/overview'
+export const MYSQL_OVERVIEW_PATH = '*/api/v1/mysql/overview'
 export const MYSQL_INSTANCES_PATH = '*/api/v1/mysql/instances'
 
 export interface SessionFixture {
@@ -160,6 +161,30 @@ export interface MySQLInstancePageFixture {
     page: number
     page_size: number
     total_pages: number
+  }
+  meta: {
+    request_id: string
+    stale: boolean
+    collected_at: string
+  }
+}
+
+export interface MySQLOverviewFixture {
+  data: {
+    total: number
+    normal: number
+    warning: number
+    critical: number
+    unknown: number
+    affected_instances: number
+    warning_instances: number
+    critical_instances: number
+    alerts: {
+      availability: { warning: number; critical: number }
+      replication_threads: { warning: number; critical: number }
+      replication_lag: { warning: number; critical: number }
+      replication_data: { warning: number; critical: number }
+    }
   }
   meta: {
     request_id: string
@@ -456,11 +481,47 @@ export function mysqlInstancePageFixture(
   }
 }
 
+export function mysqlOverviewFixture(
+  overrides: {
+    data?: Partial<MySQLOverviewFixture['data']>
+    meta?: Partial<MySQLOverviewFixture['meta']>
+  } = {},
+): MySQLOverviewFixture {
+  return {
+    data: {
+      total: 5,
+      normal: 2,
+      warning: 1,
+      critical: 1,
+      unknown: 1,
+      affected_instances: 3,
+      warning_instances: 2,
+      critical_instances: 1,
+      alerts: {
+        availability: { warning: 1, critical: 0 },
+        replication_threads: { warning: 0, critical: 1 },
+        replication_lag: { warning: 1, critical: 0 },
+        replication_data: { warning: 1, critical: 0 },
+      },
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-fixture-mysql-overview-001',
+      stale: false,
+      collected_at: '2026-07-28T08:00:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
 export function resetFixtureState() {
   authenticatedUsername = null
 }
 
 export const mysqlHandlers = [
+  http.get(MYSQL_OVERVIEW_PATH, () =>
+    HttpResponse.json(mysqlOverviewFixture()),
+  ),
   http.get(MYSQL_INSTANCES_PATH, () =>
     HttpResponse.json(mysqlInstancePageFixture()),
   ),
