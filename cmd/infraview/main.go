@@ -90,6 +90,7 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 	queryService := service.New(hostProvider, store, service.Options{
 		InventoryTTL:       cfg.InventoryTTL,
 		CurrentMetricsTTL:  cfg.CurrentMetricsTTL,
+		CollectionInterval: cfg.ExpectedCollectionInterval,
 		RangeTTL:           cfg.RangeTTL,
 		HealthTTL:          cfg.HealthTTL,
 		MaxStale:           cfg.MaxStale,
@@ -100,9 +101,10 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 		Clock:              clock,
 	})
 	mysqlService := service.NewMySQL(mysqlProvider, store, service.MySQLOptions{
-		CurrentMetricsTTL: cfg.CurrentMetricsTTL,
-		MaxStale:          cfg.MaxStale,
-		Clock:             clock,
+		CurrentMetricsTTL:  cfg.CurrentMetricsTTL,
+		CollectionInterval: cfg.ExpectedCollectionInterval,
+		MaxStale:           cfg.MaxStale,
+		Clock:              clock,
 	})
 	return httpapi.New(httpapi.Dependencies{
 		Config:       cfg,

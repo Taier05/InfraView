@@ -215,27 +215,26 @@ test('shows the read-only MySQL overview and compact instance list', async ({
 
   await expect(page.getByRole('heading', { name: 'MySQL 实例' })).toBeVisible()
   const headers = page.getByRole('columnheader')
-  await expect(headers).toHaveCount(11)
-  for (const name of [
-    /^实例/,
-    /^所属主机$/,
-    /^版本 \/ 角色$/,
-    /^连接使用/,
-    /^活跃线程/,
-    /^QPS/,
-    /^慢查询速率/,
-    /^Buffer Pool 使用率/,
-    /^复制状态 \/ 延迟/,
-    /^运行时间/,
-    /^状态/,
+  await expect(headers).toHaveCount(10)
+  for (const heading of [
+    '实例地址',
+    '版本 / 角色',
+    '连接',
+    '线程',
+    'QPS / TPS',
+    '慢查询',
+    'Buffer Pool',
+    '复制 / 延迟',
+    '运行时间',
+    '状态',
   ]) {
-    await expect(page.getByRole('columnheader', { name })).toBeVisible()
+    await expect(headers.filter({ hasText: heading })).toHaveCount(1)
   }
 
   const stoppedReplication = page
     .getByRole('row')
-    .filter({ hasText: 'fixture-mysql-stopped-replication' })
-  await expect(stoppedReplication.getByText('线程异常')).toBeVisible()
+    .filter({ hasText: '线程异常' })
+  await expect(stoppedReplication).toHaveCount(1)
   await expect(
     stoppedReplication.getByText('严重', { exact: true }),
   ).toBeVisible()

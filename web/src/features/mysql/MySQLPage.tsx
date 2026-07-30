@@ -95,6 +95,11 @@ function decimal(value: number | null, digits = 2) {
   return value.toFixed(digits).replace(/\.?0+$/, '')
 }
 
+function qpsTps(instance: MySQLInstance) {
+  if (instance.qps === null && instance.tps === null) return '暂无数据'
+  return `${decimal(instance.qps)} / ${decimal(instance.tps)}`
+}
+
 function percentage(value: number | null) {
   return value === null ? '暂无数据' : `${value.toFixed(1)}%`
 }
@@ -184,11 +189,27 @@ function ReplicationText({
   )
 }
 
-function StatusText({ level }: { level: MetricLevel }) {
+function StatusText({
+  level,
+  collectionLevel,
+}: {
+  level: MetricLevel
+  collectionLevel: MetricLevel
+}) {
+  const effectiveLevel =
+    collectionLevel === 'warning' || collectionLevel === 'critical'
+      ? collectionLevel
+      : level
+  const text =
+    collectionLevel === 'critical'
+      ? '采集失联'
+      : collectionLevel === 'warning'
+        ? '采集延迟'
+        : statusLabels[level]
   return (
-    <span className="status-badge mysql-status" data-level={level}>
+    <span className="status-badge mysql-status" data-level={effectiveLevel}>
       <span className="status-badge-dot" aria-hidden="true" />
-      {statusLabels[level]}
+      {text}
     </span>
   )
 }
@@ -374,15 +395,6 @@ export function MySQLPage() {
       },
     },
     {
-      id: 'host',
-      header: () => <span title="所属主机">所属主机</span>,
-      cell: ({ row }) => (
-        <span className="host-cell-text" title={row.original.host}>
-          {row.original.host}
-        </span>
-      ),
-    },
-    {
       id: 'version-role',
       header: () => <span title="MySQL 版本 / 角色">版本 / 角色</span>,
       cell: ({ row }) => {
@@ -413,8 +425,13 @@ export function MySQLPage() {
     },
     {
       id: 'qps',
-      header: () => sortButton('qps', 'QPS', '每秒查询数'),
-      cell: ({ row }) => decimal(row.original.qps),
+      header: () =>
+        sortButton(
+          'qps',
+          'QPS / TPS',
+          '每秒查询数 / 显式事务数（按 QPS 排序）',
+        ),
+      cell: ({ row }) => qpsTps(row.original),
     },
     {
       id: 'slow-queries',
@@ -466,7 +483,12 @@ export function MySQLPage() {
           '实例状态',
           'status-align-header mysql-status-align-header',
         ),
-      cell: ({ row }) => <StatusText level={row.original.status} />,
+      cell: ({ row }) => (
+        <StatusText
+          level={row.original.status}
+          collectionLevel={row.original.collection_level}
+        />
+      ),
     },
   ]
 
@@ -488,7 +510,7 @@ export function MySQLPage() {
 
       <div className="host-list-controls mysql-list-controls">
         <label className="host-search">
-          <span>搜索实例地址或所属主机</span>
+          <span>搜索实例地址</span>
           <input
             type="search"
             value={searchText}

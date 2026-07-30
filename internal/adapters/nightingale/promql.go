@@ -8,6 +8,8 @@ import (
 	"github.com/Taier05/InfraView/internal/datasource"
 )
 
+const currentCollectionTimestampQueryIndex = 6
+
 func inventoryPromQL(metric string, hostIDs []string) string {
 	return metric + "{" + identMatcher(hostIDs) + "}"
 }
@@ -22,6 +24,7 @@ func currentPromQL(hostIDs []string, excludeExpr string) []string {
 		`max by (ident) (diskio_io_util{` + ident + `})`,
 		`sum by (ident) (rate(net_bytes_sent{` + ident + `,` + exclude + `}[2m]))`,
 		`sum by (ident) (rate(net_bytes_recv{` + ident + `,` + exclude + `}[2m]))`,
+		`tlast_over_time(system_uptime{` + ident + `}[24h])`,
 	}
 }
 

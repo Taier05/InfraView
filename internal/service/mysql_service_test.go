@@ -187,6 +187,63 @@ func TestMySQLSummaryMakesUnavailableInstanceCritical(t *testing.T) {
 	}
 }
 
+func TestMySQLServiceUsesObservedSampleProgressForCollectionLevel(t *testing.T) {
+	now := time.Date(2026, time.July, 29, 12, 0, 0, 0, time.UTC)
+	sampleAt := now.Add(-time.Hour)
+	instance := mysql.Instance{
+		ID:                "fixture-instance",
+		Name:              "fixture-instance",
+		Address:           "192.0.2.10:3306",
+		Availability:      mysql.AvailabilityUp,
+		Role:              mysql.RoleWritable,
+		CollectionTracked: true,
+		Reporting:         true,
+		ReportedAt:        sampleAt,
+	}
+	provider := &recordingMySQLProvider{snapshot: mysql.Snapshot{Instances: []mysql.Instance{instance}}}
+	clock := &mysqlTestClock{now: now}
+	svc := NewMySQL(provider, cache.New(clock.Now), MySQLOptions{
+		CurrentMetricsTTL:  time.Second,
+		CollectionInterval: 15 * time.Second,
+		MaxStale:           5 * time.Minute,
+		Clock:              clock.Now,
+	})
+
+	assertState := func(wantCollection, wantStatus Level, wantWarning, wantCritical int) {
+		t.Helper()
+		page, _, err := svc.Instances(context.Background(), MySQLQuery{Page: 1, PageSize: 20})
+		if err != nil {
+			t.Fatalf("Instances() error = %v", err)
+		}
+		if len(page.Instances) != 1 ||
+			page.Instances[0].CollectionLevel != wantCollection ||
+			page.Instances[0].Status != wantStatus {
+			t.Fatalf("instances = %#v", page.Instances)
+		}
+		overview, _, err := svc.Overview(context.Background())
+		if err != nil {
+			t.Fatalf("Overview() error = %v", err)
+		}
+		if overview.WarningInstances != wantWarning ||
+			overview.CriticalInstances != wantCritical {
+			t.Fatalf("overview = %#v", overview)
+		}
+	}
+
+	assertState(LevelNormal, LevelNormal, 0, 0)
+
+	clock.Advance(30 * time.Second)
+	assertState(LevelWarning, LevelWarning, 1, 0)
+
+	clock.Advance(45 * time.Second)
+	assertState(LevelCritical, LevelCritical, 0, 1)
+
+	instance.ReportedAt = sampleAt.Add(15 * time.Second)
+	provider.snapshot = mysql.Snapshot{Instances: []mysql.Instance{instance}}
+	clock.Advance(2 * time.Second)
+	assertState(LevelNormal, LevelNormal, 0, 0)
+}
+
 func TestMySQLServiceSharesOneSnapshotAcrossOverviewAndList(t *testing.T) {
 	provider := &recordingMySQLProvider{snapshot: fixtureMySQLSnapshot()}
 	clock := &mysqlTestClock{now: time.Date(2026, 7, 28, 0, 0, 0, 0, time.UTC)}
@@ -358,26 +415,25 @@ func TestMySQLOverviewClassifiesZeroReplicationChannelsByRole(t *testing.T) {
 	}
 }
 
-func TestMySQLInstancesSearchesOnlyAddressAndHost(t *testing.T) {
-	tests := []struct {
-		search string
-		want   string
-	}{
-		{search: "192.0.2.11", want: "fixture-mysql-b"},
-		{search: "fixture-host-c", want: "fixture-mysql-c"},
+func TestMySQLInstancesSearchesOnlyAddress(t *testing.T) {
+	page, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{
+		Search: "192.0.2.11", Page: 1, PageSize: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.search, func(t *testing.T) {
-			page, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{
-				Search: tt.search, Page: 1, PageSize: 20,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if page.Total != 1 || len(page.Instances) != 1 || page.Instances[0].Name != tt.want {
-				t.Fatalf("search %q returned %#v", tt.search, page)
-			}
-		})
+	if page.Total != 1 || len(page.Instances) != 1 || page.Instances[0].Name != "fixture-mysql-b" {
+		t.Fatalf("address search returned %#v", page)
+	}
+
+	page, _, err = fixtureMySQLService().Instances(context.Background(), MySQLQuery{
+		Search: "fixture-host-c", Page: 1, PageSize: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 0 || len(page.Instances) != 0 {
+		t.Fatalf("hidden host search returned %#v", page)
 	}
 }
 
@@ -409,7 +465,7 @@ func TestMySQLInstancesReturnsStableAvailableLabelsFromCompleteSnapshot(t *testi
 	page, _, err := newMySQLServiceWithSnapshot(snapshot).Instances(context.Background(), MySQLQuery{
 		Status:   LevelWarning,
 		Role:     mysql.RoleReadOnly,
-		Search:   "fixture-host-b",
+		Search:   "192.0.2.11",
 		Label:    "fixture-mysql-b",
 		Sort:     "status",
 		Order:    "desc",
@@ -466,16 +522,20 @@ func TestMySQLInstancesFiltersStatusAndRole(t *testing.T) {
 	}
 }
 
-func TestMySQLInstancesDefaultsToInstanceAscendingSort(t *testing.T) {
-	page, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{
+func TestMySQLInstancesDefaultsToAddressAscendingSort(t *testing.T) {
+	snapshot := fixtureMySQLSnapshot()
+	snapshot.Instances[0].Name = "fixture-z"
+	snapshot.Instances[1].Name = "fixture-a"
+	snapshot.Instances[2].Name = "fixture-m"
+	page, _, err := newMySQLServiceWithSnapshot(snapshot).Instances(context.Background(), MySQLQuery{
 		Page: 1, PageSize: 20,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i, want := range []string{"fixture-mysql-a", "fixture-mysql-b", "fixture-mysql-c"} {
-		if page.Instances[i].Name != want {
-			t.Fatalf("instances[%d].Name = %q, want %q", i, page.Instances[i].Name, want)
+	for i, want := range []string{"192.0.2.10:3306", "192.0.2.11:3306", "192.0.2.12:3306"} {
+		if page.Instances[i].Address != want {
+			t.Fatalf("instances[%d].Address = %q, want %q", i, page.Instances[i].Address, want)
 		}
 	}
 }

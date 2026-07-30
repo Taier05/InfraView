@@ -30,13 +30,14 @@ func (s *Service) Hosts(ctx context.Context, query HostQuery) (HostPage, Meta, e
 	search := strings.ToLower(strings.TrimSpace(query.Search))
 	items := make([]HostSummary, 0, len(hosts))
 	for _, host := range hosts {
-		if query.Status != "" && host.Status != query.Status {
-			continue
-		}
 		if search != "" && !strings.Contains(strings.ToLower(host.Name), search) && !strings.Contains(strings.ToLower(host.IP), search) {
 			continue
 		}
-		items = append(items, s.hostSummary(host, metrics[host.ID]))
+		summary := s.hostSummary(host, metrics[host.ID])
+		if query.Status != "" && summary.Status != query.Status {
+			continue
+		}
+		items = append(items, summary)
 	}
 	sortHosts(items, query.Sort, query.Order)
 
@@ -67,6 +68,7 @@ func (s *Service) Host(ctx context.Context, id string) (HostDetail, Meta, error)
 	if err != nil {
 		return HostDetail{}, Meta{}, err
 	}
+	collectionLevel := s.hostCollectionLevel(id, metrics[id])
 	detail := HostDetail{
 		ID:               host.ID,
 		Name:             host.Name,
@@ -74,15 +76,17 @@ func (s *Service) Host(ctx context.Context, id string) (HostDetail, Meta, error)
 		OS:               host.OS,
 		CPUCores:         host.CPUCores,
 		MemoryTotalBytes: host.MemoryTotalBytes,
-		Status:           host.Status,
+		Status:           effectiveHostStatus(host.Status, collectionLevel),
 		StatusTime:       host.StatusTime,
 		Uptime:           host.Uptime,
 		Metrics:          s.currentView(metrics[id]),
+		CollectionLevel:  collectionLevel,
 	}
 	return detail, mergeMeta(hostMeta, metricsMeta), nil
 }
 
 func (s *Service) hostSummary(host datasource.Host, metrics datasource.CurrentMetrics) HostSummary {
+	collectionLevel := s.hostCollectionLevel(host.ID, metrics)
 	return HostSummary{
 		ID:               host.ID,
 		Name:             host.Name,
@@ -90,10 +94,11 @@ func (s *Service) hostSummary(host datasource.Host, metrics datasource.CurrentMe
 		OS:               host.OS,
 		CPUCores:         host.CPUCores,
 		MemoryTotalBytes: host.MemoryTotalBytes,
-		Status:           host.Status,
+		Status:           effectiveHostStatus(host.Status, collectionLevel),
 		StatusTime:       host.StatusTime,
 		Uptime:           host.Uptime,
 		Metrics:          s.currentView(metrics),
+		CollectionLevel:  collectionLevel,
 	}
 }
 

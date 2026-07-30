@@ -35,9 +35,11 @@ func TestMySQLPromQLIsFixed(t *testing.T) {
 		"rate(mysql_global_status_slow_queries[5m])",
 		"mysql_global_status_buffer_pool_pages_utilization",
 		"mysql_global_variables_innodb_buffer_pool_size",
+		`sum by (ident, instance, address) (rate(mysql_global_status_commands_total{command=~"commit|rollback"}[5m]))`,
 		"mysql_slave_status_seconds_behind_master",
 		"mysql_slave_status_slave_io_running",
 		"mysql_slave_status_slave_sql_running",
+		"tlast_over_time(mysql_up[24h])",
 	}
 	if got := mysqlPromQL(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("mysqlPromQL() = %#v, want %#v", got, want)
@@ -53,8 +55,8 @@ func TestMySQLSnapshotUsesOneBatchAndMergesInstances(t *testing.T) {
 			writeFixture(t, w, "datasource-brief.json")
 		case "/api/n9e/query-instant-batch":
 			batchCalls++
-			if len(mysqlPromQL()) != 14 {
-				t.Fatalf("MySQL batch query count = %d, want 14", len(mysqlPromQL()))
+			if len(mysqlPromQL()) != 16 {
+				t.Fatalf("MySQL batch query count = %d, want 16", len(mysqlPromQL()))
 			}
 			assertMySQLBatchRequest(t, request, mysqlPromQL())
 			writeMySQLSnapshotFixture(t, w)
@@ -88,9 +90,14 @@ func TestMySQLSnapshotUsesOneBatchAndMergesInstances(t *testing.T) {
 	assertFloat(t, first.MaxConnections, 160)
 	assertFloat(t, first.ThreadsRunning, 4)
 	assertFloat(t, first.QPS, 32)
+	assertFloat(t, first.TPS, 6)
 	assertFloat(t, first.SlowQueriesPerSecond, 0)
 	assertFloat(t, first.BufferPoolUsagePercent, 48)
 	assertFloat(t, mysqlBufferPoolSizeBytes(t, first), 1024)
+	if !first.CollectionTracked || !first.Reporting ||
+		!first.ReportedAt.Equal(time.Unix(1785122900, 500000000).UTC()) {
+		t.Fatalf("first collection state = %#v", first)
+	}
 	if len(first.ReplicationChannels) != 2 {
 		t.Fatalf("first replication channels = %#v", first.ReplicationChannels)
 	}
@@ -181,7 +188,7 @@ func TestMySQLSnapshotLatestConflictsBecomeMissing(t *testing.T) {
 		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_status_threads_connected"), 1785123000, "24"),
 		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_status_threads_connected"), 1785123000, "25"),
 	}
-	groups[11] = []any{
+	groups[12] = []any{
 		mysqlFixtureSeries(mysqlReplicationLabels("mysql_slave_status_seconds_behind_master"), 1785123000, "3"),
 		mysqlFixtureSeries(mysqlReplicationLabels("mysql_slave_status_seconds_behind_master"), 1785123000, "4"),
 	}
@@ -202,6 +209,49 @@ func TestMySQLSnapshotLatestConflictsBecomeMissing(t *testing.T) {
 	assertFloat(t, instance.UptimeSeconds, 20)
 	if len(instance.ReplicationChannels) != 1 || instance.ReplicationChannels[0].LagSeconds != nil {
 		t.Fatalf("replication conflict = %#v", instance.ReplicationChannels)
+	}
+}
+
+func TestMySQLSnapshotRetainsRecentlySeenInstanceWithoutCurrentSample(t *testing.T) {
+	groups := make([][]any, len(mysqlPromQL()))
+	for index := range groups {
+		groups[index] = []any{}
+	}
+	groups[15] = []any{
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_up"), 1785124000, "1785122900.5"),
+	}
+	provider, closeServer := newMySQLResponseProvider(t, groups)
+	defer closeServer()
+
+	snapshot, err := provider.MySQLSnapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Instances) != 1 {
+		t.Fatalf("snapshot = %#v", snapshot)
+	}
+	instance := snapshot.Instances[0]
+	if !instance.CollectionTracked || instance.Reporting ||
+		!instance.ReportedAt.Equal(time.Unix(1785122900, 500000000).UTC()) ||
+		instance.Availability != mysql.AvailabilityUnknown ||
+		instance.QPS != nil || instance.TPS != nil {
+		t.Fatalf("retained instance = %#v", instance)
+	}
+}
+
+func TestMySQLSnapshotRejectsInvalidRawSampleTimestamp(t *testing.T) {
+	groups := make([][]any, len(mysqlPromQL()))
+	for index := range groups {
+		groups[index] = []any{}
+	}
+	groups[15] = []any{
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_up"), 1785124000, "not-a-timestamp"),
+	}
+	provider, closeServer := newMySQLResponseProvider(t, groups)
+	defer closeServer()
+
+	if _, err := provider.MySQLSnapshot(context.Background()); !errors.Is(err, mysql.ErrUnavailable) {
+		t.Fatalf("MySQLSnapshot() error = %v, want mysql.ErrUnavailable", err)
 	}
 }
 
@@ -256,10 +306,10 @@ func TestMergeMySQLScalarSelectsLatestAndClearsTies(t *testing.T) {
 
 func TestMySQLSnapshotEnforcesIdentityAndBatchShape(t *testing.T) {
 	tests := []struct {
-		name    string
-		mutate  func([][]instantSeries) [][]instantSeries
-		wantErr bool
-		empty   bool
+		name     string
+		mutate   func([][]instantSeries) [][]instantSeries
+		wantErr  bool
+		retained bool
 	}{
 		{name: "missing identity", wantErr: true, mutate: func(result [][]instantSeries) [][]instantSeries {
 			delete(result[0][0].Metric, "ident")
@@ -272,7 +322,7 @@ func TestMySQLSnapshotEnforcesIdentityAndBatchShape(t *testing.T) {
 		{name: "wrong outer cardinality", wantErr: true, mutate: func(result [][]instantSeries) [][]instantSeries {
 			return result[:len(result)-1]
 		}},
-		{name: "successful empty up vector", empty: true, mutate: func(result [][]instantSeries) [][]instantSeries {
+		{name: "empty current up vector retains recent inventory", retained: true, mutate: func(result [][]instantSeries) [][]instantSeries {
 			result[0] = []instantSeries{}
 			return result
 		}},
@@ -283,7 +333,7 @@ func TestMySQLSnapshotEnforcesIdentityAndBatchShape(t *testing.T) {
 			if tt.wantErr != errors.Is(err, mysql.ErrUnavailable) {
 				t.Fatalf("error = %v, want unavailable=%v", err, tt.wantErr)
 			}
-			if tt.empty && (err != nil || len(snapshot.Instances) != 0) {
+			if tt.retained && (err != nil || len(snapshot.Instances) != 1 || snapshot.Instances[0].Reporting) {
 				t.Fatalf("snapshot = %#v, err = %v", snapshot, err)
 			}
 		})
@@ -382,9 +432,9 @@ func TestMySQLSnapshotSelectsLatestValidScalarAndReplicationSamples(t *testing.T
 		instantSeries{Metric: cloneLabels(result[9][0].Metric), Value: rawInstantValue(1785200200, "101")},
 		instantSeries{Metric: cloneLabels(result[9][0].Metric), Value: rawInstantValue(1785200100, "55")},
 	)
-	result[11] = append(result[11],
-		instantSeries{Metric: cloneLabels(result[11][0].Metric), Value: rawInstantValue(1785200200, "-1")},
-		instantSeries{Metric: cloneLabels(result[11][0].Metric), Value: rawInstantValue(1785200100, "3")},
+	result[12] = append(result[12],
+		instantSeries{Metric: cloneLabels(result[12][0].Metric), Value: rawInstantValue(1785200200, "-1")},
+		instantSeries{Metric: cloneLabels(result[12][0].Metric), Value: rawInstantValue(1785200100, "3")},
 	)
 
 	snapshot, err := runMySQLBatch(t, result)
@@ -404,7 +454,7 @@ func TestMySQLSnapshotSelectsLatestValidScalarAndReplicationSamples(t *testing.T
 
 func TestMySQLSnapshotAcceptsEmptyDefaultChannelAndIgnoresMissingIdentityKeys(t *testing.T) {
 	result := mysqlBatchResultsFixture()
-	for queryIndex := 11; queryIndex <= 13; queryIndex++ {
+	for queryIndex := 12; queryIndex <= 14; queryIndex++ {
 		result[queryIndex][0].Metric["channel_name"] = ""
 		missingKey := instantSeries{
 			Metric: cloneLabels(result[queryIndex][0].Metric),
@@ -665,7 +715,7 @@ func TestGetCurrentMetricsUsesOneNestedBatchAndMapsMissingValues(t *testing.T) {
 			instantCalls++
 			var body batchRequest
 			decodeRequest(t, request, &body)
-			if body.DatasourceID != 7 || len(body.Queries) != 6 {
+			if body.DatasourceID != 7 || len(body.Queries) != 7 {
 				t.Fatalf("current batch = %#v", body)
 			}
 			for _, query := range body.Queries {
@@ -675,6 +725,9 @@ func TestGetCurrentMetricsUsesOneNestedBatchAndMapsMissingValues(t *testing.T) {
 			}
 			if !strings.Contains(body.Queries[4].Query, `interface!~"lo|docker.*|veth.*|cali.*|br-.*|tunl.*"`) {
 				t.Fatalf("network query = %q", body.Queries[4].Query)
+			}
+			if body.Queries[6].Query != `tlast_over_time(system_uptime{ident=~"^(?:host-alpha|host-beta)$"}[24h])` {
+				t.Fatalf("collection timestamp query = %q", body.Queries[6].Query)
 			}
 			writeFixture(t, w, "current-instant-batch.json")
 		default:
@@ -698,7 +751,7 @@ func TestGetCurrentMetricsUsesOneNestedBatchAndMapsMissingValues(t *testing.T) {
 	assertFloat(t, alpha.IOBusyPercent, 8.5)
 	assertFloat(t, alpha.NetworkTransmitBytesPerSecond, 2048)
 	assertFloat(t, alpha.NetworkReceiveBytesPerSecond, 4096)
-	if !alpha.Timestamp.Equal(time.Unix(1785123006, 0).UTC()) {
+	if !alpha.Timestamp.Equal(time.Unix(1785122900, 500000000).UTC()) {
 		t.Fatalf("timestamp = %s", alpha.Timestamp)
 	}
 	if metrics["host-beta"].CPUUsage != nil {
@@ -781,7 +834,7 @@ func TestEmptyBatchReturnsMissingDataWithoutError(t *testing.T) {
 			writeFixture(t, w, "datasource-brief.json")
 			return
 		}
-		writeEnvelope(t, w, make([][]any, 6))
+		writeEnvelope(t, w, make([][]any, 7))
 	}))
 	defer server.Close()
 
@@ -1033,14 +1086,14 @@ func TestProviderRejectsMismatchedBatchResultCount(t *testing.T) {
 		run    func(datasource.Provider) error
 	}{
 		{
-			name: "instant fewer result groups", path: "/api/n9e/query-instant-batch", groups: 5,
+			name: "instant fewer result groups", path: "/api/n9e/query-instant-batch", groups: 6,
 			run: func(provider datasource.Provider) error {
 				_, err := provider.GetCurrentMetrics(context.Background(), []string{"host-alpha"})
 				return err
 			},
 		},
 		{
-			name: "instant more result groups", path: "/api/n9e/query-instant-batch", groups: 7,
+			name: "instant more result groups", path: "/api/n9e/query-instant-batch", groups: 8,
 			run: func(provider datasource.Provider) error {
 				_, err := provider.GetCurrentMetrics(context.Background(), []string{"host-alpha"})
 				return err
@@ -1542,11 +1595,11 @@ func TestProviderNumericBoundaries(t *testing.T) {
 		wantTimestamp time.Time
 		wantValue     *float64
 	}{
-		{name: "timestamp beyond safe Unix conversion", timestamp: "1e300", wantTimestamp: fixedClock()},
-		{name: "timestamp NaN", timestamp: "NaN", wantTimestamp: fixedClock()},
-		{name: "timestamp positive infinity", timestamp: "+Inf", wantTimestamp: fixedClock()},
-		{name: "timestamp negative infinity", timestamp: "-Inf", wantTimestamp: fixedClock()},
-		{name: "timestamp preserves fractional seconds", timestamp: "1785123000.5", wantTimestamp: time.Unix(1785123000, 500000000).UTC(), wantValue: float64Pointer(12.5)},
+		{name: "timestamp beyond safe Unix conversion", timestamp: "1e300", wantTimestamp: time.Time{}},
+		{name: "timestamp NaN", timestamp: "NaN", wantTimestamp: time.Time{}},
+		{name: "timestamp positive infinity", timestamp: "+Inf", wantTimestamp: time.Time{}},
+		{name: "timestamp negative infinity", timestamp: "-Inf", wantTimestamp: time.Time{}},
+		{name: "timestamp preserves fractional seconds", timestamp: "1785123000.5", wantTimestamp: time.Time{}, wantValue: float64Pointer(12.5)},
 	}
 	for _, tt := range timestampCases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1556,7 +1609,7 @@ func TestProviderNumericBoundaries(t *testing.T) {
 				case "/api/n9e/datasource/brief":
 					writeFixture(t, w, "datasource-brief.json")
 				case "/api/n9e/query-instant-batch":
-					groups := make([][]any, 6)
+					groups := make([][]any, 7)
 					groups[0] = []any{map[string]any{"metric": map[string]string{"ident": "host-alpha"}, "value": []any{tt.timestamp, "12.5"}}}
 					writeEnvelope(t, w, groups)
 				default:
@@ -1793,6 +1846,23 @@ func writeMySQLSnapshotFixture(t *testing.T, w http.ResponseWriter) {
 		mysqlFixtureSeries(third, 1785123020, "Inf"),
 	}
 	response.Data = append(response.Data[:10], append([][]any{bufferPoolSize}, response.Data[10:]...)...)
+	tps := []any{
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_global_status_commands_total"), 1785123000, "6"),
+	}
+	response.Data = append(response.Data[:11], append([][]any{tps}, response.Data[11:]...)...)
+	inventorySecond := cloneLabels(mysqlFixtureLabels("mysql_up"))
+	inventorySecond["ident"] = "fixture-host-b"
+	inventorySecond["instance"] = "fixture-mysql-b"
+	inventorySecond["address"] = "192.0.2.11:3306"
+	inventoryThird := cloneLabels(mysqlFixtureLabels("mysql_up"))
+	inventoryThird["ident"] = "fixture-host-c"
+	inventoryThird["instance"] = "fixture-mysql-c"
+	inventoryThird["address"] = "192.0.2.12:3306"
+	response.Data = append(response.Data, []any{
+		mysqlFixtureSeries(mysqlFixtureLabels("mysql_up"), 1785124000, "1785122900.5"),
+		mysqlFixtureSeries(inventorySecond, 1785124000, "1785122901"),
+		mysqlFixtureSeries(inventoryThird, 1785124000, "1785122902"),
+	})
 	writeEnvelope(t, w, response.Data)
 }
 
@@ -1829,8 +1899,9 @@ func mysqlBatchResultsFixture() [][]instantSeries {
 		{metric: "mysql_global_status_slow_queries", value: "0.5"},
 		{metric: "mysql_global_status_buffer_pool_pages_utilization", value: "42"},
 		{metric: "mysql_global_variables_innodb_buffer_pool_size", value: "1024"},
+		{metric: "mysql_global_status_commands_total", value: "6"},
 	}
-	result := make([][]instantSeries, 14)
+	result := make([][]instantSeries, 16)
 	for index, item := range metricValues {
 		labels := mysqlFixtureLabels(item.metric)
 		if index == 1 {
@@ -1849,16 +1920,20 @@ func mysqlBatchResultsFixture() [][]instantSeries {
 		{metric: "mysql_slave_status_slave_io_running", value: "1"},
 		{metric: "mysql_slave_status_slave_sql_running", value: "1"},
 	} {
-		result[index+11] = []instantSeries{{
+		result[index+12] = []instantSeries{{
 			Metric: mysqlReplicationLabels(item.metric),
 			Value:  rawInstantValue(1785200000, item.value),
 		}}
 	}
+	result[15] = []instantSeries{{
+		Metric: mysqlFixtureLabels("mysql_up"),
+		Value:  rawInstantValue(1785200100, "1785200000"),
+	}}
 	return result
 }
 
 func addSecondFixtureReplicationChannel(result [][]instantSeries) {
-	for queryIndex := 11; queryIndex <= 13; queryIndex++ {
+	for queryIndex := 12; queryIndex <= 14; queryIndex++ {
 		labels := cloneLabels(result[queryIndex][0].Metric)
 		labels["channel_name"] = "fixture-channel-b"
 		labels["master_host"] = "fixture-source-b"

@@ -1062,17 +1062,16 @@ h1 {
   line-height: 1.15;
 }
 
-.mysql-table-compact th:nth-child(1) { width: 13%; }
-.mysql-table-compact th:nth-child(2) { width: 9%; }
-.mysql-table-compact th:nth-child(3) { width: 9%; }
-.mysql-table-compact th:nth-child(4) { width: 9%; }
-.mysql-table-compact th:nth-child(5) { width: 6%; }
-.mysql-table-compact th:nth-child(6) { width: 5%; }
-.mysql-table-compact th:nth-child(7) { width: 7%; }
-.mysql-table-compact th:nth-child(8) { width: 13%; }
-.mysql-table-compact th:nth-child(9) { width: 12%; }
+.mysql-table-compact th:nth-child(1) { width: 15%; }
+.mysql-table-compact th:nth-child(2) { width: 10%; }
+.mysql-table-compact th:nth-child(3) { width: 10%; }
+.mysql-table-compact th:nth-child(4) { width: 7%; }
+.mysql-table-compact th:nth-child(5) { width: 10%; }
+.mysql-table-compact th:nth-child(6) { width: 7%; }
+.mysql-table-compact th:nth-child(7) { width: 14%; }
+.mysql-table-compact th:nth-child(8) { width: 12%; }
+.mysql-table-compact th:nth-child(9) { width: 7%; }
 .mysql-table-compact th:nth-child(10) { width: 8%; }
-.mysql-table-compact th:nth-child(11) { width: 9%; }
 
 .host-table th:nth-child(1) .host-sort-button,
 .host-table th:nth-child(n + 5):nth-child(-n + 10) .host-sort-button {
@@ -1080,8 +1079,8 @@ h1 {
   justify-content: flex-start;
 }
 
-.mysql-table th:nth-child(4) .host-sort-button,
-.mysql-table th:nth-child(11) .host-sort-button {
+.mysql-table th:nth-child(3) .host-sort-button,
+.mysql-table th:nth-child(10) .host-sort-button {
   width: 100%;
   justify-content: flex-start;
 }
@@ -1229,15 +1228,19 @@ h1 {
   background: currentColor;
 }
 
-.host-status[data-status="online"] {
+.host-status[data-level="normal"] {
   color: var(--success);
 }
 
-.host-status[data-status="offline"] {
+.host-status[data-level="warning"] {
+  color: var(--warning);
+}
+
+.host-status[data-level="critical"] {
   color: var(--danger);
 }
 
-.host-status[data-status="unknown"] {
+.host-status[data-level="unknown"] {
   color: #a7b0b6;
 }
 

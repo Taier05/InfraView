@@ -81,6 +81,7 @@ export interface HostPageFixture {
       memory_total_bytes: number | null
       status: HostStatusFixture
       status_time: string
+      collection_level: MetricLevelFixture
       uptime_seconds: number
       metrics: {
         timestamp: string
@@ -143,6 +144,7 @@ export interface MySQLInstancePageFixture {
       connection_usage_percent: number | null
       threads_running: number | null
       qps: number | null
+      tps: number | null
       slow_queries_per_second: number | null
       buffer_pool_size_bytes: number | null
       buffer_pool_usage_percent: number | null
@@ -157,6 +159,7 @@ export interface MySQLInstancePageFixture {
         level: MetricLevelFixture
       }
       status: MetricLevelFixture
+      collection_level: MetricLevelFixture
     }>
     available_labels: string[]
     total: number
@@ -294,6 +297,7 @@ export function hostPageFixture(
           memory_total_bytes: 32 * 1024 * 1024 * 1024,
           status: 'online',
           status_time: '2026-07-21T00:30:00.000Z',
+          collection_level: 'normal',
           uptime_seconds: 93_600,
           metrics: {
             timestamp: '2026-07-21T00:30:00.000Z',
@@ -320,6 +324,7 @@ export function hostPageFixture(
           memory_total_bytes: null,
           status: 'offline',
           status_time: '2026-07-20T22:30:00.000Z',
+          collection_level: 'critical',
           uptime_seconds: 7_200,
           metrics: {
             timestamp: '2026-07-20T22:30:00.000Z',
@@ -369,6 +374,7 @@ export function mysqlInstancePageFixture(
           connection_usage_percent: 16,
           threads_running: 5,
           qps: 123.456,
+          tps: 45.25,
           slow_queries_per_second: 0.125,
           buffer_pool_size_bytes: 8 * 1024 ** 3,
           buffer_pool_usage_percent: 82.34,
@@ -379,6 +385,7 @@ export function mysqlInstancePageFixture(
             level: 'normal',
           },
           status: 'normal',
+          collection_level: 'normal',
         },
         {
           id: 'mysql-fixture-002',
@@ -392,6 +399,7 @@ export function mysqlInstancePageFixture(
           connection_usage_percent: 75,
           threads_running: 18,
           qps: 87,
+          tps: 20,
           slow_queries_per_second: 1.2,
           buffer_pool_size_bytes: 16 * 1024 ** 3,
           buffer_pool_usage_percent: 91.25,
@@ -402,6 +410,7 @@ export function mysqlInstancePageFixture(
             level: 'critical',
           },
           status: 'critical',
+          collection_level: 'normal',
         },
         {
           id: 'mysql-fixture-003',
@@ -415,6 +424,7 @@ export function mysqlInstancePageFixture(
           connection_usage_percent: 99,
           threads_running: 43,
           qps: 212.5,
+          tps: 80.5,
           slow_queries_per_second: 4.75,
           buffer_pool_size_bytes: 4 * 1024 ** 3,
           buffer_pool_usage_percent: 98.6,
@@ -425,6 +435,7 @@ export function mysqlInstancePageFixture(
             level: 'normal',
           },
           status: 'normal',
+          collection_level: 'normal',
         },
         {
           id: 'mysql-fixture-004',
@@ -438,6 +449,7 @@ export function mysqlInstancePageFixture(
           connection_usage_percent: null,
           threads_running: null,
           qps: null,
+          tps: null,
           slow_queries_per_second: null,
           buffer_pool_size_bytes: null,
           buffer_pool_usage_percent: null,
@@ -447,7 +459,8 @@ export function mysqlInstancePageFixture(
             lag_seconds: null,
             level: 'unknown',
           },
-          status: 'unknown',
+          status: 'critical',
+          collection_level: 'critical',
         },
         {
           id: 'mysql-fixture-005',
@@ -461,6 +474,7 @@ export function mysqlInstancePageFixture(
           connection_usage_percent: 48,
           threads_running: 11,
           qps: 64.75,
+          tps: 12,
           slow_queries_per_second: 0.25,
           buffer_pool_size_bytes: 2 * 1024 ** 3,
           buffer_pool_usage_percent: 73.5,
@@ -471,6 +485,7 @@ export function mysqlInstancePageFixture(
             level: 'warning',
           },
           status: 'warning',
+          collection_level: 'warning',
         },
       ],
       available_labels: ['tier-fixture', 'team-fixture'],

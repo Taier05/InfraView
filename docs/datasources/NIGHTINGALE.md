@@ -54,12 +54,14 @@ CPU 核数、内存总量和网络接口映射已通过脱敏夹具验证。公�
 ## MySQL 只读映射
 
 - MySQL 是独立领域；Nightingale 共享的同一个 `*Provider` 同时实现 Linux 主机 `datasource.Provider` 与 `mysql.Provider`，复用受限 HTTP 客户端和数据源发现缓存，不会增加任意代理、任意 PromQL 或数据库连接能力。
-- 快照仅发送一次 `POST /api/n9e/query-instant-batch`，请求内固定包含 14 条代码内置查询：可用性、版本、运行时间、只读角色、连接数、最大连接数、运行线程、QPS、慢查询速率、Buffer Pool 使用率、Buffer Pool 容量、复制延迟、复制 IO 线程、复制 SQL 线程。容量固定使用 `mysql_global_variables_innodb_buffer_pool_size`，原始单位为字节。
+- 快照仅发送一次 `POST /api/n9e/query-instant-batch`，请求内固定包含 16 条代码内置查询：原有可用性、版本、运行时间、只读角色、连接、线程、QPS、慢查询、Buffer Pool 与复制指标，加上显式事务 TPS 和 `tlast_over_time(mysql_up[24h])` 近期实例身份/原始最后样本时间。容量固定使用 `mysql_global_variables_innodb_buffer_pool_size`，TPS 固定归并 `commit|rollback` 的 5 分钟速率。
 - `BufferPoolSizeBytes` / `buffer_pool_size_bytes` 为可空字段：只接受非负最新有效样本；缺失、负数、NaN、Inf 或最新同时间戳冲突均保持 `null`，不得伪造成零。新增容量不增加第二次 batch，也不改变复制查询索引的身份规则。
 - Provider 按完整实例身份与复制通道归并批量结果；没有按实例发起的 N+1 查询。批量基数、身份标签、数值范围和上游错误均由脱敏契约测试验证，错误映射为安全的 MySQL 数据源不可用状态。
-- 实例列表的 `available_labels` 从完整 snapshot 的非空实例名去重并排序，独立于标签、状态、角色、搜索、排序和分页；`label` 仅按去除首尾空白后的实例名精确匹配。服务端 `search` 只匹配实例地址或所属主机。
+- 实例列表的 `available_labels` 从完整 snapshot 的非空实例名去重并排序，独立于标签、状态、角色、搜索、排序和分页；`label` 仅按去除首尾空白后的实例名精确匹配。服务端 `search` 只匹配实例地址，`sort=instance` 按 IP 与端口自然排序。
+- Linux 固定当前指标 batch 额外使用 `tlast_over_time(system_uptime[24h])` 的查询值识别主机原始样本是否推进；Target 时间和其他即时查询的外层求值时间不参与新鲜度。MySQL 使用 `tlast_over_time(mysql_up[24h])` 的查询值识别实例样本推进；Service 按本地最后观察到推进后经过的 2/5 周期判断等级，不直接使用原始时间的绝对年龄。仅近期身份查询命中的实例保留在清单且即时指标为空，显示“采集延迟/采集失联”。超过 24 小时没有 `mysql_up` 样本后才退出近期清单。TPS 只表示显式 `COMMIT` 与 `ROLLBACK`，可能低估默认 autocommit 工作负载。
 - 不提供 MySQL 历史、实例详情、数据库写入或运维操作。2026-07-29 已获授权在仅连接测试 Nightingale 的原 8080 完成脱敏 MySQL API 与浏览器验收；该证据不等同于生产验收。
-- 本轮已通过无缓存生产镜像、Go 普通/race、E2E 隔离安全测试、固定 14 查询定向测试和原 8080 Chromium 5/5。没有连接生产、创建额外端口或增加运行时查询能力。
+- 历史 MySQL 版本已通过无缓存生产镜像、Go 普通/race、E2E 隔离安全测试和原 8080 Chromium 验收。原始样本新鲜度修复已通过无缓存生产镜像、Go 普通/race 与原有测试 8080 的脱敏登录态现场验收；停采对象在 Linux、MySQL 和两张总览卡均为严重，响应非 stale。
+- 样本推进修复已通过无缓存生产镜像、Go 普通/race、前端状态颜色测试及原有测试 8080 脱敏验收；持续采集对象跨越多个缓存刷新和至少两个采集周期保持正常且非 stale。冻结升级由自动化测试验证，本轮未再次停止采集器。
 
 Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能只依赖 HTTP 状态，还必须检查 `err`。错误路径会被 SPA 接管并返回 HTML，因此适配器必须同时校验 Content-Type 和 JSON 结构。
 

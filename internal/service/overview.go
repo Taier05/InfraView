@@ -34,7 +34,10 @@ func (s *Service) Overview(ctx context.Context, rangeName string) (Overview, Met
 	var cpuTotal, memoryTotal float64
 	var cpuCount, memoryCount int
 	for _, host := range hosts {
-		switch host.Status {
+		current := metrics[host.ID]
+		collectionLevel := s.hostCollectionLevel(host.ID, current)
+		status := effectiveHostStatus(host.Status, collectionLevel)
+		switch status {
 		case datasource.StatusOnline:
 			overview.Online++
 		case datasource.StatusOffline:
@@ -42,7 +45,6 @@ func (s *Service) Overview(ctx context.Context, rangeName string) (Overview, Met
 		default:
 			overview.Unknown++
 		}
-		current := metrics[host.ID]
 		if current.CPUUsage != nil {
 			cpuTotal += *current.CPUUsage
 			cpuCount++
@@ -64,12 +66,13 @@ func (s *Service) Overview(ctx context.Context, rangeName string) (Overview, Met
 		)
 
 		hostLevel := LevelNormal
-		switch host.Status {
+		switch status {
 		case datasource.StatusOffline:
 			hostLevel = LevelCritical
 		case datasource.StatusUnknown:
 			hostLevel = LevelWarning
 		}
+		hostLevel = higherLevel(hostLevel, collectionLevel)
 		for _, level := range []Level{
 			view.CPUUsage.Level,
 			view.MemoryUsage.Level,

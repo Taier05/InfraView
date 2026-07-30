@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net"
+	"net/netip"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,9 +18,10 @@ import (
 const mysqlSnapshotCacheKey = "service:mysql:snapshot"
 
 type MySQLService struct {
-	provider mysql.Provider
-	store    *cache.Store
-	options  MySQLOptions
+	provider  mysql.Provider
+	store     *cache.Store
+	options   MySQLOptions
+	freshness *freshnessTracker
 }
 
 func NewMySQL(provider mysql.Provider, store *cache.Store, options MySQLOptions) *MySQLService {
@@ -27,13 +31,21 @@ func NewMySQL(provider mysql.Provider, store *cache.Store, options MySQLOptions)
 	if options.CurrentMetricsTTL <= 0 {
 		options.CurrentMetricsTTL = 15 * time.Second
 	}
+	if options.CollectionInterval <= 0 {
+		options.CollectionInterval = 15 * time.Second
+	}
 	if options.MaxStale <= 0 {
 		options.MaxStale = 5 * time.Minute
 	}
 	if store == nil {
 		store = cache.New(options.Clock)
 	}
-	return &MySQLService{provider: provider, store: store, options: options}
+	return &MySQLService{
+		provider:  provider,
+		store:     store,
+		options:   options,
+		freshness: newFreshnessTracker(options.Clock, options.CollectionInterval),
+	}
 }
 
 func (s *MySQLService) snapshot(ctx context.Context) (mysql.Snapshot, Meta, error) {
@@ -43,7 +55,18 @@ func (s *MySQLService) snapshot(ctx context.Context) (mysql.Snapshot, Meta, erro
 		s.options.CurrentMetricsTTL,
 		s.options.MaxStale,
 		func(loadCtx context.Context) (any, error) {
-			return s.provider.MySQLSnapshot(loadCtx)
+			snapshot, err := s.provider.MySQLSnapshot(loadCtx)
+			if err != nil {
+				return mysql.Snapshot{}, err
+			}
+			samples := make(map[string]time.Time, len(snapshot.Instances))
+			for _, instance := range snapshot.Instances {
+				if instance.CollectionTracked {
+					samples[instance.ID] = instance.ReportedAt
+				}
+			}
+			s.freshness.Observe(samples)
+			return snapshot, nil
 		},
 	)
 	if err != nil {
@@ -65,6 +88,7 @@ func cloneMySQLSnapshot(source mysql.Snapshot) mysql.Snapshot {
 		instances[i].MaxConnections = cloneFloat(instance.MaxConnections)
 		instances[i].ThreadsRunning = cloneFloat(instance.ThreadsRunning)
 		instances[i].QPS = cloneFloat(instance.QPS)
+		instances[i].TPS = cloneFloat(instance.TPS)
 		instances[i].SlowQueriesPerSecond = cloneFloat(instance.SlowQueriesPerSecond)
 		instances[i].BufferPoolUsagePercent = cloneFloat(instance.BufferPoolUsagePercent)
 		instances[i].BufferPoolSizeBytes = cloneFloat(instance.BufferPoolSizeBytes)
@@ -95,7 +119,7 @@ func (s *MySQLService) Overview(ctx context.Context) (MySQLOverview, Meta, error
 	}
 	overview := MySQLOverview{Total: len(snapshot.Instances)}
 	for _, instance := range snapshot.Instances {
-		summary := summarizeMySQLInstance(instance)
+		summary := s.summarizeMySQLInstance(instance)
 		switch summary.Status {
 		case LevelNormal:
 			overview.Normal++
@@ -113,7 +137,10 @@ func (s *MySQLService) Overview(ctx context.Context) (MySQLOverview, Meta, error
 			overview.AffectedInstances++
 		}
 
-		addMySQLAlert(&overview.Alerts.Availability, mysqlAvailabilityLevel(instance.Availability))
+		addMySQLAlert(
+			&overview.Alerts.Availability,
+			mysqlHigherLevel(mysqlAvailabilityLevel(instance.Availability), summary.CollectionLevel),
+		)
 		addMySQLAlert(&overview.Alerts.ReplicationThreads, mysqlReplicationThreadsLevel(instance.Role, instance.ReplicationChannels))
 		if level, available := mysqlReplicationLagLevel(instance.ReplicationChannels); available {
 			addMySQLAlert(&overview.Alerts.ReplicationLag, level)
@@ -147,7 +174,7 @@ func (s *MySQLService) Instances(ctx context.Context, query MySQLQuery) (MySQLPa
 	search := strings.ToLower(strings.TrimSpace(query.Search))
 	items := make([]MySQLInstanceSummary, 0, len(snapshot.Instances))
 	for _, instance := range snapshot.Instances {
-		summary := summarizeMySQLInstance(instance)
+		summary := s.summarizeMySQLInstance(instance)
 		if query.Label != "" && summary.Name != query.Label {
 			continue
 		}
@@ -158,8 +185,7 @@ func (s *MySQLService) Instances(ctx context.Context, query MySQLQuery) (MySQLPa
 			continue
 		}
 		if search != "" &&
-			!strings.Contains(strings.ToLower(summary.Address), search) &&
-			!strings.Contains(strings.ToLower(summary.Host), search) {
+			!strings.Contains(strings.ToLower(summary.Address), search) {
 			continue
 		}
 		items = append(items, summary)
@@ -268,12 +294,40 @@ func mysqlMetricSortValue(item MySQLInstanceSummary, field string) (float64, boo
 func compareMySQLInstances(left, right MySQLInstanceSummary, field string) int {
 	switch field {
 	case "instance":
-		return strings.Compare(strings.ToLower(left.Name), strings.ToLower(right.Name))
+		return compareMySQLAddresses(left.Address, right.Address)
 	case "status":
 		return strings.Compare(string(left.Status), string(right.Status))
 	default:
 		return 0
 	}
+}
+
+func compareMySQLAddresses(left, right string) int {
+	leftHost, leftPort, leftOK := parseMySQLAddress(left)
+	rightHost, rightPort, rightOK := parseMySQLAddress(right)
+	if leftOK && rightOK {
+		if comparison := leftHost.Compare(rightHost); comparison != 0 {
+			return comparison
+		}
+		return leftPort - rightPort
+	}
+	return strings.Compare(strings.ToLower(left), strings.ToLower(right))
+}
+
+func parseMySQLAddress(value string) (netip.Addr, int, bool) {
+	host, portValue, err := net.SplitHostPort(value)
+	if err != nil {
+		return netip.Addr{}, 0, false
+	}
+	address, err := netip.ParseAddr(host)
+	if err != nil {
+		return netip.Addr{}, 0, false
+	}
+	port, err := strconv.Atoi(portValue)
+	if err != nil {
+		return netip.Addr{}, 0, false
+	}
+	return address, port, true
 }
 
 func addMySQLAlert(count *MySQLAlertCount, level Level) {
@@ -362,13 +416,25 @@ func summarizeMySQLInstance(source mysql.Instance) MySQLInstanceSummary {
 		ConnectionUsagePercent: connectionUsagePercent,
 		ThreadsRunning:         cloneFloat(source.ThreadsRunning),
 		QPS:                    cloneFloat(source.QPS),
+		TPS:                    cloneFloat(source.TPS),
 		SlowQueriesPerSecond:   cloneFloat(source.SlowQueriesPerSecond),
 		BufferPoolUsagePercent: cloneFloat(source.BufferPoolUsagePercent),
 		BufferPoolSizeBytes:    cloneFloat(source.BufferPoolSizeBytes),
 		UptimeSeconds:          cloneFloat(source.UptimeSeconds),
 		Replication:            replication,
 		Status:                 mysqlHigherLevel(mysqlAvailabilityLevel(source.Availability), replication.Level),
+		CollectionLevel:        LevelNormal,
 	}
+}
+
+func (s *MySQLService) summarizeMySQLInstance(source mysql.Instance) MySQLInstanceSummary {
+	summary := summarizeMySQLInstance(source)
+	if !source.CollectionTracked {
+		return summary
+	}
+	summary.CollectionLevel = s.freshness.Level(source.ID, source.ReportedAt)
+	summary.Status = mysqlHigherLevel(summary.Status, summary.CollectionLevel)
+	return summary
 }
 
 func replicationSummary(role mysql.Role, channels []mysql.ReplicationChannel) MySQLReplicationSummary {

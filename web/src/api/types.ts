@@ -111,6 +111,7 @@ export interface HostSummary {
   cpu_cores: number | null
   memory_total_bytes: number | null
   status: HostStatus
+  collection_level: MetricLevel
   status_time: string
   uptime_seconds: number
   metrics: CurrentMetrics
@@ -146,6 +147,7 @@ export interface MySQLInstance {
   connection_usage_percent: number | null
   threads_running: number | null
   qps: number | null
+  tps: number | null
   slow_queries_per_second: number | null
   buffer_pool_size_bytes: number | null
   buffer_pool_usage_percent: number | null
@@ -156,6 +158,7 @@ export interface MySQLInstance {
     level: MetricLevel
   }
   status: MetricLevel
+  collection_level: MetricLevel
 }
 
 export interface MySQLInstancePageData {

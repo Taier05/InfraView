@@ -7,9 +7,10 @@ import (
 )
 
 type MySQLOptions struct {
-	CurrentMetricsTTL time.Duration
-	MaxStale          time.Duration
-	Clock             func() time.Time
+	CurrentMetricsTTL  time.Duration
+	CollectionInterval time.Duration
+	MaxStale           time.Duration
+	Clock              func() time.Time
 }
 
 type MySQLQuery struct {
@@ -82,10 +83,12 @@ type MySQLInstanceSummary struct {
 	ConnectionUsagePercent *float64
 	ThreadsRunning         *float64
 	QPS                    *float64
+	TPS                    *float64
 	SlowQueriesPerSecond   *float64
 	BufferPoolUsagePercent *float64
 	BufferPoolSizeBytes    *float64
 	UptimeSeconds          *float64
 	Replication            MySQLReplicationSummary
 	Status                 Level
+	CollectionLevel        Level
 }

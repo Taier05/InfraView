@@ -20,6 +20,7 @@
 | `INFRAVIEW_NIGHTINGALE_ALLOW_INSECURE_HTTP` | `false` | 布尔值；仅受控测试环境确实没有 TLS 时可显式设为 `true`，允许通过 HTTP 发送 Token；生产必须保持 `false` |
 | `INFRAVIEW_NIGHTINGALE_INTERFACE_EXCLUDE_REGEX` | `lo\|docker.*\|veth.*\|cali.*\|br-.*\|tunl.*` | 有效 RE2 正则；排除回环和常见虚拟接口，作为 PromQL 字符串安全转义，不接受前端覆盖 |
 | `INFRAVIEW_REFRESH_INTERVAL` | `15s` | 不小于 `1s` 的整秒时长；通过数据源状态 API 下发，驱动当前可见页面与左下角数据源状态的自动刷新周期 |
+| `INFRAVIEW_EXPECTED_COLLECTION_INTERVAL` | `15s` | 不小于 `1s` 的整秒时长；原始样本连续 2 个周期未推进标记采集延迟，连续 5 个周期未推进标记采集失联 |
 | `INFRAVIEW_INVENTORY_TTL` | `60s` | 正时长，主机清单缓存 |
 | `INFRAVIEW_CURRENT_METRICS_TTL` | `15s` | 正时长，当前指标缓存 |
 | `INFRAVIEW_RANGE_TTL` | `60s` | 正时长，历史范围缓存 |

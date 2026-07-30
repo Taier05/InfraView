@@ -19,6 +19,7 @@ const (
 	mysqlSlowQueries
 	mysqlBufferPoolUsage
 	mysqlBufferPoolSize
+	mysqlTPS
 	mysqlScalarCount
 )
 
@@ -63,15 +64,43 @@ func (p *Provider) MySQLSnapshot(ctx context.Context) (mysql.Snapshot, error) {
 		}
 	}
 
-	states := make(map[string]*mysqlInstanceState, len(results[0]))
-	for _, series := range results[0] {
+	states := make(map[string]*mysqlInstanceState, len(results[15]))
+	for _, series := range results[15] {
 		host, name, address, key, ok := mysqlIdentity(series.Metric)
+		if !ok {
+			return mysql.Snapshot{}, mysqlUnavailableError()
+		}
+		if len(series.Value) != 2 {
+			return mysql.Snapshot{}, mysqlUnavailableError()
+		}
+		reportedAt, ok := parseUnixTime(series.Value[1])
 		if !ok {
 			return mysql.Snapshot{}, mysqlUnavailableError()
 		}
 		if _, exists := states[key]; exists {
 			return mysql.Snapshot{}, mysqlUnavailableError()
 		}
+		state := newMySQLInstanceState(host, name, address)
+		state.instance.ReportedAt = reportedAt
+		states[key] = state
+	}
+
+	currentKeys := make(map[string]struct{}, len(results[0]))
+	for _, series := range results[0] {
+		host, name, address, key, ok := mysqlIdentity(series.Metric)
+		if !ok {
+			return mysql.Snapshot{}, mysqlUnavailableError()
+		}
+		if _, exists := currentKeys[key]; exists {
+			return mysql.Snapshot{}, mysqlUnavailableError()
+		}
+		currentKeys[key] = struct{}{}
+		state, exists := states[key]
+		if !exists {
+			state = newMySQLInstanceState(host, name, address)
+			states[key] = state
+		}
+		state.instance.Reporting = true
 		availability := mysql.AvailabilityUnknown
 		if up, _, ok := mysqlBinary(series); ok {
 			if *up {
@@ -80,17 +109,7 @@ func (p *Provider) MySQLSnapshot(ctx context.Context) (mysql.Snapshot, error) {
 				availability = mysql.AvailabilityDown
 			}
 		}
-		states[key] = &mysqlInstanceState{
-			instance: mysql.Instance{
-				ID:           mysql.StableInstanceID(host, name, address),
-				Name:         name,
-				Address:      address,
-				Host:         host,
-				Availability: availability,
-				Role:         mysql.RoleUnknown,
-			},
-			channels: make(map[string]*mysqlReplicationState),
-		}
+		state.instance.Availability = availability
 	}
 
 	for _, series := range results[1] {
@@ -115,6 +134,21 @@ func (p *Provider) MySQLSnapshot(ctx context.Context) (mysql.Snapshot, error) {
 		instances = append(instances, state.instance)
 	}
 	return mysql.Snapshot{Instances: instances}, nil
+}
+
+func newMySQLInstanceState(host, name, address string) *mysqlInstanceState {
+	return &mysqlInstanceState{
+		instance: mysql.Instance{
+			ID:                mysql.StableInstanceID(host, name, address),
+			Name:              name,
+			Address:           address,
+			Host:              host,
+			Availability:      mysql.AvailabilityUnknown,
+			Role:              mysql.RoleUnknown,
+			CollectionTracked: true,
+		},
+		channels: make(map[string]*mysqlReplicationState),
+	}
 }
 
 func mysqlIdentity(labels map[string]string) (host, name, address, key string, ok bool) {
@@ -189,7 +223,7 @@ func newestMySQLValue(current **float64, currentAt *time.Time, candidate float64
 }
 
 func mergeMySQLScalars(states map[string]*mysqlInstanceState, results [][]instantSeries) {
-	for queryIndex := 2; queryIndex <= 10; queryIndex++ {
+	for queryIndex := 2; queryIndex <= 11; queryIndex++ {
 		for _, series := range results[queryIndex] {
 			state, ok := mysqlStateForSeries(states, series)
 			if !ok {
@@ -231,13 +265,15 @@ func mysqlScalarIndex(queryIndex int) (int, bool) {
 		return mysqlBufferPoolUsage, true
 	case 10:
 		return mysqlBufferPoolSize, true
+	case 11:
+		return mysqlTPS, true
 	default:
 		return 0, false
 	}
 }
 
 func mergeMySQLReplication(states map[string]*mysqlInstanceState, results [][]instantSeries) {
-	for queryIndex := 11; queryIndex <= 13; queryIndex++ {
+	for queryIndex := 12; queryIndex <= 14; queryIndex++ {
 		for _, series := range results[queryIndex] {
 			state, ok := mysqlStateForSeries(states, series)
 			if !ok {
@@ -253,11 +289,11 @@ func mergeMySQLReplication(states map[string]*mysqlInstanceState, results [][]in
 				state.channels[channelKey] = replication
 			}
 			switch queryIndex {
-			case 11:
-				mergeMySQLScalar(&replication.channel.LagSeconds, &replication.lagTime, series)
 			case 12:
-				mergeMySQLBool(&replication.io, series)
+				mergeMySQLScalar(&replication.channel.LagSeconds, &replication.lagTime, series)
 			case 13:
+				mergeMySQLBool(&replication.io, series)
+			case 14:
 				mergeMySQLBool(&replication.sql, series)
 			}
 		}
@@ -270,7 +306,7 @@ func mysqlStateForSeries(states map[string]*mysqlInstanceState, series instantSe
 		return nil, false
 	}
 	state, ok := states[key]
-	return state, ok
+	return state, ok && state.instance.Reporting
 }
 
 func mysqlReplicationIdentity(labels map[string]string) (string, bool) {
@@ -327,6 +363,7 @@ func finalizeMySQLInstance(state *mysqlInstanceState) {
 	state.instance.MaxConnections = state.scalars[mysqlMaxConnections].value
 	state.instance.ThreadsRunning = state.scalars[mysqlThreadsRunning].value
 	state.instance.QPS = state.scalars[mysqlQPS].value
+	state.instance.TPS = state.scalars[mysqlTPS].value
 	state.instance.SlowQueriesPerSecond = state.scalars[mysqlSlowQueries].value
 	state.instance.BufferPoolUsagePercent = state.scalars[mysqlBufferPoolUsage].value
 	state.instance.BufferPoolSizeBytes = state.scalars[mysqlBufferPoolSize].value

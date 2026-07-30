@@ -4,6 +4,8 @@ InfraView 是一个轻量、只读的 Linux 基础设施可视化平台。当前
 
 生产形态是一个非 root InfraView 容器：Go 同源提供只读 API 与 React 静态页面，无业务数据库、任务队列、SSH 客户端或远程执行器。数据源支持确定性 Mock 和 Nightingale 只读适配器；MySQL 是独立领域与 Service，复用 Nightingale 的受限安全客户端。当前主要开发与真实验证版本为 Nightingale v8.4.1，v9.x 保留已覆盖的协议兼容。浏览器只接收归一化 InfraView API，不接触 Token 或任意 PromQL。
 
+Linux 主机与 MySQL 实例会按原始样本是否持续推进判断数据新鲜度：连续 2 个预期采集周期未推进显示“采集延迟”，连续 5 个周期未推进显示“采集失联”。MySQL 清单通过固定的 24 小时近期身份查询保留刚停止上报的实例，并以“QPS / TPS”展示查询吞吐与显式事务吞吐。
+
 ## 安全边界
 
 - 只展示监控数据，不修改、删除、重启服务器、服务或配置。

@@ -136,9 +136,7 @@ it('总览展示可进入 Linux 主机和 MySQL 板块的告警摘要卡', async
     expect(within(metric as HTMLElement).getByText(total)).toBeInTheDocument()
     expect(within(metric as HTMLElement).getByText(details)).toBeInTheDocument()
   }
-  expect(within(hostCard).getByText('在线 9')).toBeInTheDocument()
-  expect(within(hostCard).getByText('离线 2')).toBeInTheDocument()
-  expect(within(hostCard).getByText('未知 1')).toBeInTheDocument()
+  expect(hostCard.querySelector('.module-status-breakdown')).toBeNull()
   expect(screen.queryByText('CPU 平均使用率')).not.toBeInTheDocument()
   expect(screen.queryByText('内存平均使用率')).not.toBeInTheDocument()
   expect(
@@ -203,7 +201,7 @@ it('全正常时用绿色无异常文案展示所有零值状态', async () => {
     name: '查看 Linux 主机板块',
   })
   expect(hostCard).toHaveAttribute('data-level', 'normal')
-  for (const label of ['无严重', '无警告', '无离线', '无未知']) {
+  for (const label of ['无严重', '无警告']) {
     expect(within(hostCard).getByText(label)).toHaveAttribute(
       'data-level',
       'normal',
@@ -223,14 +221,7 @@ it('全正常时用绿色无异常文案展示所有零值状态', async () => {
   expect(mysqlCard).toHaveAttribute('data-level', 'normal')
   expect(within(mysqlCard).getAllByText('无异常')).toHaveLength(4)
   expect(within(mysqlCard).getByText('无警告风险')).toBeVisible()
-  const mysqlBreakdown = mysqlCard.querySelector('.module-status-breakdown')
-  expect(mysqlBreakdown).not.toBeNull()
-  for (const label of ['正常 2', '无警告', '无严重', '无未知']) {
-    expect(within(mysqlBreakdown as HTMLElement).getByText(label)).toHaveAttribute(
-      'data-level',
-      'normal',
-    )
-  }
+  expect(mysqlCard.querySelector('.module-status-breakdown')).toBeNull()
 })
 
 it('把未知实例作为 warning 风险但保留未知文案', async () => {
@@ -260,19 +251,10 @@ it('把未知实例作为 warning 风险但保留未知文案', async () => {
   expect(card).toHaveAttribute('data-level', 'warning')
   expect(within(card).getByText('存在警告或未知')).toBeVisible()
   expect(within(card).getByText('警告风险 1')).toBeVisible()
-  const breakdown = card.querySelector('.module-status-breakdown')
-  expect(breakdown).not.toBeNull()
-  expect(within(breakdown as HTMLElement).getByText('无警告')).toHaveAttribute(
-    'data-level',
-    'normal',
-  )
-  expect(within(breakdown as HTMLElement).getByText('未知 1')).toHaveAttribute(
-    'data-level',
-    'unknown',
-  )
+  expect(card.querySelector('.module-status-breakdown')).toBeNull()
 })
 
-it('MySQL 紧凑状态栏分别展示警告、严重、正常和未知实例', async () => {
+it('MySQL 卡片只保留上方异常严重度摘要', async () => {
   mockOverviewRequests({
     mysql: mysqlOverviewFixture({
       data: {
@@ -297,24 +279,7 @@ it('MySQL 紧凑状态栏分别展示警告、严重、正常和未知实例', a
 
   const card = await screen.findByRole('link', { name: '查看 MySQL 板块' })
   expect(within(card).getByText('警告风险 5')).toBeVisible()
-  const breakdown = card.querySelector('.module-status-breakdown')
-  expect(breakdown).not.toBeNull()
-  expect(within(breakdown as HTMLElement).getByText('警告 2')).toHaveAttribute(
-    'data-level',
-    'warning',
-  )
-  expect(within(breakdown as HTMLElement).getByText('严重 1')).toHaveAttribute(
-    'data-level',
-    'critical',
-  )
-  expect(within(breakdown as HTMLElement).getByText('正常 4')).toHaveAttribute(
-    'data-level',
-    'normal',
-  )
-  expect(within(breakdown as HTMLElement).getByText('未知 3')).toHaveAttribute(
-    'data-level',
-    'unknown',
-  )
+  expect(card.querySelector('.module-status-breakdown')).toBeNull()
 })
 
 it('Linux 无主机时显示中性空状态且不影响 MySQL 正常卡', async () => {

@@ -622,6 +622,7 @@ func newService(provider datasource.Provider, clock *serviceClock) *service.Serv
 	return service.New(provider, cache.New(clock.Now), service.Options{
 		InventoryTTL:       time.Minute,
 		CurrentMetricsTTL:  time.Minute,
+		CollectionInterval: 15 * time.Second,
 		RangeTTL:           time.Minute,
 		HealthTTL:          15 * time.Second,
 		MaxStale:           5 * time.Minute,
@@ -631,6 +632,135 @@ func newService(provider datasource.Provider, clock *serviceClock) *service.Serv
 		NetworkCriticalBPS: 100 * 1024 * 1024,
 		Clock:              clock.Now,
 	})
+}
+
+func TestHostsAndOverviewUseObservedSampleProgressForCollectionLevel(t *testing.T) {
+	now := time.Date(2026, time.July, 29, 12, 0, 0, 0, time.UTC)
+	clock := newServiceClock()
+	clock.now = now
+	provider := fixtureProvider(now)
+	provider.hosts = []datasource.Host{{
+		ID: "h1", Name: "fixture-host", Status: datasource.StatusOnline,
+		StatusTime: now,
+	}}
+	sampleAt := now.Add(-time.Hour)
+	provider.metrics = map[string]datasource.CurrentMetrics{
+		"h1": {Timestamp: sampleAt},
+	}
+	svc := service.New(provider, cache.New(clock.Now), service.Options{
+		InventoryTTL:       time.Minute,
+		CurrentMetricsTTL:  time.Second,
+		CollectionInterval: 15 * time.Second,
+		RangeTTL:           time.Minute,
+		HealthTTL:          15 * time.Second,
+		MaxStale:           5 * time.Minute,
+		WarningPercent:     80,
+		CriticalPercent:    90,
+		NetworkWarningBPS:  80 * 1024 * 1024,
+		NetworkCriticalBPS: 100 * 1024 * 1024,
+		Clock:              clock.Now,
+	})
+
+	assertState := func(wantCollection service.Level, wantStatus datasource.HostStatus, wantWarning, wantCritical int) {
+		t.Helper()
+		page, _, err := svc.Hosts(context.Background(), service.HostQuery{
+			Page: 1, PageSize: 20,
+		})
+		if err != nil {
+			t.Fatalf("Hosts() error = %v", err)
+		}
+		if len(page.Hosts) != 1 ||
+			page.Hosts[0].CollectionLevel != wantCollection ||
+			page.Hosts[0].Status != wantStatus {
+			t.Fatalf("host = %#v", page.Hosts)
+		}
+
+		overview, _, err := svc.Overview(context.Background(), "24h")
+		if err != nil {
+			t.Fatalf("Overview() error = %v", err)
+		}
+		if overview.Alerts.WarningHosts != wantWarning ||
+			overview.Alerts.CriticalHosts != wantCritical {
+			t.Fatalf("alerts = %#v", overview.Alerts)
+		}
+	}
+
+	assertState(service.LevelNormal, datasource.StatusOnline, 0, 0)
+
+	clock.Advance(30 * time.Second)
+	assertState(service.LevelWarning, datasource.StatusUnknown, 1, 0)
+
+	clock.Advance(45 * time.Second)
+	assertState(service.LevelCritical, datasource.StatusOffline, 0, 1)
+
+	provider.metrics = map[string]datasource.CurrentMetrics{
+		"h1": {Timestamp: sampleAt.Add(15 * time.Second)},
+	}
+	clock.Advance(2 * time.Second)
+	assertState(service.LevelNormal, datasource.StatusOnline, 0, 0)
+}
+
+func TestHostsCollectionRemainsNormalWhileOldSampleTimeKeepsAdvancing(t *testing.T) {
+	now := time.Date(2026, time.July, 29, 12, 0, 0, 0, time.UTC)
+	clock := newServiceClock()
+	clock.now = now
+	provider := fixtureProvider(now)
+	provider.hosts = []datasource.Host{{
+		ID: "h1", Name: "fixture-host", Status: datasource.StatusOnline,
+	}}
+	sampleAt := now.Add(-time.Hour)
+	provider.metrics = map[string]datasource.CurrentMetrics{"h1": {Timestamp: sampleAt}}
+	svc := service.New(provider, cache.New(clock.Now), service.Options{
+		InventoryTTL:       time.Minute,
+		CurrentMetricsTTL:  time.Second,
+		CollectionInterval: 15 * time.Second,
+		RangeTTL:           time.Minute,
+		HealthTTL:          15 * time.Second,
+		MaxStale:           5 * time.Minute,
+		Clock:              clock.Now,
+	})
+
+	for index := 0; index < 4; index++ {
+		page, _, err := svc.Hosts(context.Background(), service.HostQuery{
+			Page: 1, PageSize: 20,
+		})
+		if err != nil {
+			t.Fatalf("Hosts() error = %v", err)
+		}
+		if len(page.Hosts) != 1 ||
+			page.Hosts[0].CollectionLevel != service.LevelNormal ||
+			page.Hosts[0].Status != datasource.StatusOnline {
+			t.Fatalf("host = %#v", page.Hosts)
+		}
+		clock.Advance(15 * time.Second)
+		sampleAt = sampleAt.Add(15 * time.Second)
+		provider.metrics = map[string]datasource.CurrentMetrics{"h1": {Timestamp: sampleAt}}
+	}
+}
+
+func TestHostsTreatMissingMetricHeartbeatAsCriticalEvenWhenTargetIsFresh(t *testing.T) {
+	now := time.Date(2026, time.July, 30, 12, 0, 0, 0, time.UTC)
+	clock := newServiceClock()
+	clock.now = now
+	provider := fixtureProvider(now)
+	provider.hosts = []datasource.Host{{
+		ID: "h1", Name: "fixture-host", Status: datasource.StatusOnline,
+		StatusTime: now,
+	}}
+	provider.metrics = map[string]datasource.CurrentMetrics{"h1": {}}
+	svc := newService(provider, clock)
+
+	page, _, err := svc.Hosts(context.Background(), service.HostQuery{
+		Page: 1, PageSize: 20,
+	})
+	if err != nil {
+		t.Fatalf("Hosts() error = %v", err)
+	}
+	if len(page.Hosts) != 1 ||
+		page.Hosts[0].CollectionLevel != service.LevelCritical ||
+		page.Hosts[0].Status != datasource.StatusOffline {
+		t.Fatalf("host = %#v", page.Hosts)
+	}
 }
 
 func fixtureProvider(now time.Time) *recordingProvider {

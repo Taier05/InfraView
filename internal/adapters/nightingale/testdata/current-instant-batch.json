@@ -18,6 +18,9 @@
     ],
     [
       {"metric": {"ident": "host-alpha"}, "value": [1785123006, "4096"]}
+    ],
+    [
+      {"metric": {"ident": "host-alpha"}, "value": [1785124000, "1785122900.5"]}
     ]
   ],
   "err": "",

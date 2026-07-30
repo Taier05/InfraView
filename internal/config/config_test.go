@@ -47,6 +47,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.RefreshInterval != 15*time.Second {
 		t.Fatalf("refresh = %s", cfg.RefreshInterval)
 	}
+	if cfg.ExpectedCollectionInterval != 15*time.Second {
+		t.Fatalf("expected collection interval = %s", cfg.ExpectedCollectionInterval)
+	}
 	if cfg.InventoryTTL != 60*time.Second || cfg.CurrentMetricsTTL != 15*time.Second {
 		t.Fatalf("inventory/current TTL = %s/%s", cfg.InventoryTTL, cfg.CurrentMetricsTTL)
 	}
@@ -96,6 +99,7 @@ func TestLoadAllValues(t *testing.T) {
 		"INFRAVIEW_NIGHTINGALE_ALLOW_INSECURE_HTTP":     "true",
 		"INFRAVIEW_MOCK_HOST_COUNT":                     "100",
 		"INFRAVIEW_REFRESH_INTERVAL":                    "45s",
+		"INFRAVIEW_EXPECTED_COLLECTION_INTERVAL":        "20s",
 		"INFRAVIEW_INVENTORY_TTL":                       "2m",
 		"INFRAVIEW_CURRENT_METRICS_TTL":                 "25s",
 		"INFRAVIEW_RANGE_TTL":                           "90s",
@@ -133,6 +137,9 @@ func TestLoadAllValues(t *testing.T) {
 	}
 	if cfg.RefreshInterval != 45*time.Second || cfg.InventoryTTL != 2*time.Minute || cfg.CurrentMetricsTTL != 25*time.Second {
 		t.Fatalf("short durations = %#v", cfg)
+	}
+	if cfg.ExpectedCollectionInterval != 20*time.Second {
+		t.Fatalf("expected collection interval = %s", cfg.ExpectedCollectionInterval)
 	}
 	if cfg.RangeTTL != 90*time.Second || cfg.HealthTTL != 20*time.Second || cfg.MaxStale != 4*time.Minute || cfg.UpstreamTimeout != 15*time.Second {
 		t.Fatalf("cache durations = %#v", cfg)
@@ -175,6 +182,9 @@ func TestLoadRejectsInvalidValues(t *testing.T) {
 		{name: "non-positive duration", overrides: map[string]string{"INFRAVIEW_REFRESH_INTERVAL": "0s"}, wantError: `INFRAVIEW_REFRESH_INTERVAL 必须大于 0，当前值为 "0s"`},
 		{name: "refresh interval below one second", overrides: map[string]string{"INFRAVIEW_REFRESH_INTERVAL": "500ms"}, wantError: `INFRAVIEW_REFRESH_INTERVAL 必须是不小于 1s 的整秒时长，当前值为 "500ms"`},
 		{name: "refresh interval with fractional second", overrides: map[string]string{"INFRAVIEW_REFRESH_INTERVAL": "1500ms"}, wantError: `INFRAVIEW_REFRESH_INTERVAL 必须是不小于 1s 的整秒时长，当前值为 "1500ms"`},
+		{name: "invalid expected collection interval", overrides: map[string]string{"INFRAVIEW_EXPECTED_COLLECTION_INTERVAL": "later"}, wantError: `INFRAVIEW_EXPECTED_COLLECTION_INTERVAL 必须是有效时长，当前值为 "later"`},
+		{name: "expected collection interval below one second", overrides: map[string]string{"INFRAVIEW_EXPECTED_COLLECTION_INTERVAL": "500ms"}, wantError: `INFRAVIEW_EXPECTED_COLLECTION_INTERVAL 必须是不小于 1s 的整秒时长，当前值为 "500ms"`},
+		{name: "expected collection interval with fractional second", overrides: map[string]string{"INFRAVIEW_EXPECTED_COLLECTION_INTERVAL": "1500ms"}, wantError: `INFRAVIEW_EXPECTED_COLLECTION_INTERVAL 必须是不小于 1s 的整秒时长，当前值为 "1500ms"`},
 		{name: "invalid boolean", overrides: map[string]string{"INFRAVIEW_COOKIE_SECURE": "sometimes"}, wantError: `INFRAVIEW_COOKIE_SECURE 必须是布尔值（true 或 false），当前值为 "sometimes"`},
 		{name: "invalid trusted proxy CIDR", overrides: map[string]string{"INFRAVIEW_TRUSTED_PROXY_CIDRS": "10.0.0.1"}, wantError: `INFRAVIEW_TRUSTED_PROXY_CIDRS 必须是逗号分隔的有效 CIDR，非法值为 "10.0.0.1"`},
 		{name: "empty trusted proxy CIDR", overrides: map[string]string{"INFRAVIEW_TRUSTED_PROXY_CIDRS": "10.0.0.0/8,,127.0.0.1/32"}, wantError: `INFRAVIEW_TRUSTED_PROXY_CIDRS 不得包含空的 CIDR`},

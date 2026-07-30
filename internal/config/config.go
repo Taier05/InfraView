@@ -25,6 +25,7 @@ type Config struct {
 	NightingaleAllowInsecureHTTP     bool
 	MockHostCount                    int
 	RefreshInterval                  time.Duration
+	ExpectedCollectionInterval       time.Duration
 	InventoryTTL                     time.Duration
 	CurrentMetricsTTL                time.Duration
 	RangeTTL                         time.Duration
@@ -116,6 +117,19 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, fmt.Errorf(
 			"INFRAVIEW_REFRESH_INTERVAL 必须是不小于 1s 的整秒时长，当前值为 %q",
 			valueOrDefault(getenv, "INFRAVIEW_REFRESH_INTERVAL", "15s"),
+		)
+	}
+	if cfg.ExpectedCollectionInterval, err = durationValue(
+		getenv,
+		"INFRAVIEW_EXPECTED_COLLECTION_INTERVAL",
+		"15s",
+	); err != nil {
+		return Config{}, err
+	}
+	if cfg.ExpectedCollectionInterval < time.Second || cfg.ExpectedCollectionInterval%time.Second != 0 {
+		return Config{}, fmt.Errorf(
+			"INFRAVIEW_EXPECTED_COLLECTION_INTERVAL 必须是不小于 1s 的整秒时长，当前值为 %q",
+			valueOrDefault(getenv, "INFRAVIEW_EXPECTED_COLLECTION_INTERVAL", "15s"),
 		)
 	}
 	if cfg.InventoryTTL, err = durationValue(getenv, "INFRAVIEW_INVENTORY_TTL", "60s"); err != nil {

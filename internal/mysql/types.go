@@ -3,6 +3,7 @@ package mysql
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"time"
 )
 
 type Availability string
@@ -36,10 +37,14 @@ type Instance struct {
 	MaxConnections         *float64
 	ThreadsRunning         *float64
 	QPS                    *float64
+	TPS                    *float64
 	SlowQueriesPerSecond   *float64
 	BufferPoolUsagePercent *float64
 	BufferPoolSizeBytes    *float64
 	ReplicationChannels    []ReplicationChannel
+	CollectionTracked      bool
+	Reporting              bool
+	ReportedAt             time.Time
 }
 
 type Snapshot struct {

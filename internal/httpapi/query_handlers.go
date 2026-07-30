@@ -76,6 +76,7 @@ type hostView struct {
 	CPUCores         *int                  `json:"cpu_cores"`
 	MemoryTotalBytes *int64                `json:"memory_total_bytes"`
 	Status           datasource.HostStatus `json:"status"`
+	CollectionLevel  service.Level         `json:"collection_level"`
 	StatusTime       time.Time             `json:"status_time"`
 	UptimeSeconds    int64                 `json:"uptime_seconds"`
 	Metrics          currentMetricsView    `json:"metrics"`
@@ -368,6 +369,7 @@ func summaryView(value service.HostSummary) hostView {
 		CPUCores:         value.CPUCores,
 		MemoryTotalBytes: value.MemoryTotalBytes,
 		Status:           value.Status,
+		CollectionLevel:  value.CollectionLevel,
 		StatusTime:       value.StatusTime,
 		UptimeSeconds:    int64(value.Uptime / time.Second),
 		Metrics:          currentView(value.Metrics),
@@ -383,6 +385,7 @@ func detailView(value service.HostDetail) hostView {
 		CPUCores:         value.CPUCores,
 		MemoryTotalBytes: value.MemoryTotalBytes,
 		Status:           value.Status,
+		CollectionLevel:  value.CollectionLevel,
 		StatusTime:       value.StatusTime,
 		UptimeSeconds:    int64(value.Uptime / time.Second),
 		Metrics:          currentView(value.Metrics),

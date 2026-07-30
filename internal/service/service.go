@@ -18,9 +18,10 @@ const (
 )
 
 type Service struct {
-	provider datasource.Provider
-	store    *cache.Store
-	options  Options
+	provider  datasource.Provider
+	store     *cache.Store
+	options   Options
+	freshness *freshnessTracker
 }
 
 func New(provider datasource.Provider, store *cache.Store, options Options) *Service {
@@ -32,6 +33,9 @@ func New(provider datasource.Provider, store *cache.Store, options Options) *Ser
 	}
 	if options.CurrentMetricsTTL <= 0 {
 		options.CurrentMetricsTTL = 15 * time.Second
+	}
+	if options.CollectionInterval <= 0 {
+		options.CollectionInterval = 15 * time.Second
 	}
 	if options.RangeTTL <= 0 {
 		options.RangeTTL = time.Minute
@@ -57,7 +61,40 @@ func New(provider datasource.Provider, store *cache.Store, options Options) *Ser
 	if store == nil {
 		store = cache.New(options.Clock)
 	}
-	return &Service{provider: provider, store: store, options: options}
+	return &Service{
+		provider:  provider,
+		store:     store,
+		options:   options,
+		freshness: newFreshnessTracker(options.Clock, options.CollectionInterval),
+	}
+}
+
+func collectionLevelAt(now, sampleAt time.Time, interval time.Duration) Level {
+	if sampleAt.IsZero() {
+		return LevelWarning
+	}
+	age := now.Sub(sampleAt.UTC())
+	if age >= 5*interval {
+		return LevelCritical
+	}
+	if age >= 2*interval {
+		return LevelWarning
+	}
+	return LevelNormal
+}
+
+func (s *Service) hostCollectionLevel(id string, metrics datasource.CurrentMetrics) Level {
+	return s.freshness.Level(id, metrics.Timestamp)
+}
+
+func effectiveHostStatus(status datasource.HostStatus, collectionLevel Level) datasource.HostStatus {
+	if status == datasource.StatusOffline || collectionLevel == LevelCritical {
+		return datasource.StatusOffline
+	}
+	if status == datasource.StatusUnknown || collectionLevel == LevelWarning {
+		return datasource.StatusUnknown
+	}
+	return datasource.StatusOnline
 }
 
 func (s *Service) inventory(ctx context.Context) ([]datasource.Host, Meta, error) {
@@ -97,7 +134,16 @@ func (s *Service) currentMetrics(ctx context.Context, ids []string) (map[string]
 	sort.Strings(stableIDs)
 	key := "service:current:" + strings.Join(stableIDs, ",")
 	result, err := s.store.GetOrLoad(ctx, key, s.options.CurrentMetricsTTL, s.options.MaxStale, func(loadCtx context.Context) (any, error) {
-		return s.provider.GetCurrentMetrics(loadCtx, stableIDs)
+		metrics, err := s.provider.GetCurrentMetrics(loadCtx, stableIDs)
+		if err != nil {
+			return nil, err
+		}
+		samples := make(map[string]time.Time, len(metrics))
+		for id, current := range metrics {
+			samples[id] = current.Timestamp
+		}
+		s.freshness.Observe(samples)
+		return metrics, nil
 	})
 	if err != nil {
 		return nil, Meta{}, mapProviderError(err)

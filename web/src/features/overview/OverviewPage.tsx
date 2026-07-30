@@ -243,17 +243,6 @@ function HostStatusCard({ data }: { data: OverviewData }) {
       </div>
 
       <div className="module-status-footer">
-        <div className="module-status-breakdown">
-          <StatusBadge level="normal" label={`在线 ${data.online}`} />
-          <StatusBadge
-            level={data.offline > 0 ? 'critical' : 'normal'}
-            label={data.offline > 0 ? `离线 ${data.offline}` : '无离线'}
-          />
-          <StatusBadge
-            level={data.unknown > 0 ? 'unknown' : 'normal'}
-            label={data.unknown > 0 ? `未知 ${data.unknown}` : '无未知'}
-          />
-        </div>
         <span className="module-status-action">
           查看主机 <span aria-hidden="true">→</span>
         </span>
@@ -367,21 +356,6 @@ function MySQLStatusCard({ data }: { data: MySQLOverviewData }) {
       </div>
 
       <div className="module-status-footer">
-        <div className="module-status-breakdown">
-          <StatusBadge level="normal" label={`正常 ${data.normal}`} />
-          <StatusBadge
-            level={data.warning > 0 ? 'warning' : 'normal'}
-            label={data.warning > 0 ? `警告 ${data.warning}` : '无警告'}
-          />
-          <StatusBadge
-            level={data.critical > 0 ? 'critical' : 'normal'}
-            label={data.critical > 0 ? `严重 ${data.critical}` : '无严重'}
-          />
-          <StatusBadge
-            level={data.unknown > 0 ? 'unknown' : 'normal'}
-            label={data.unknown > 0 ? `未知 ${data.unknown}` : '无未知'}
-          />
-        </div>
         <span className="module-status-action">
           查看 MySQL <span aria-hidden="true">→</span>
         </span>

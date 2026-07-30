@@ -104,11 +104,31 @@ function uptime(seconds: number) {
   return `${hours}小时`
 }
 
-function StatusText({ status }: { status: HostStatus }) {
+function StatusText({
+  status,
+  collectionLevel,
+}: {
+  status: HostStatus
+  collectionLevel: MetricValue['level']
+}) {
+  const text =
+    collectionLevel === 'critical'
+      ? '采集失联'
+      : collectionLevel === 'warning'
+        ? '采集延迟'
+        : statusLabels[status]
+  const effectiveLevel =
+    collectionLevel === 'warning' || collectionLevel === 'critical'
+      ? collectionLevel
+      : status === 'online'
+        ? 'normal'
+        : status === 'offline'
+          ? 'critical'
+          : 'unknown'
   return (
-    <span className="host-status" data-status={status}>
+    <span className="host-status" data-level={effectiveLevel}>
       <span className="host-status-dot" aria-hidden="true" />
-      {statusLabels[status]}
+      {text}
     </span>
   )
 }
@@ -356,7 +376,12 @@ export function HostListPage() {
       header: () => (
         <span className="status-align-header host-status-align-header">状态</span>
       ),
-      cell: ({ row }) => <StatusText status={row.original.status} />,
+      cell: ({ row }) => (
+        <StatusText
+          status={row.original.status}
+          collectionLevel={row.original.collection_level}
+        />
+      ),
     },
   ]
 

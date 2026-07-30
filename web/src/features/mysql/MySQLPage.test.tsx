@@ -85,25 +85,24 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('renders the eleven compact MySQL columns with complete single-line titles and shared sort buttons', async () => {
+it('renders the ten compact MySQL columns with QPS and TPS combined', async () => {
   renderMySQLPage('/mysql')
   expect(
     await screen.findByRole('heading', { name: 'MySQL 实例' }),
   ).toBeVisible()
   const headers = [
     ['实例地址', 'MySQL 实例地址'],
-    ['所属主机', '所属主机'],
     ['版本 / 角色', 'MySQL 版本 / 角色'],
     ['连接', '连接使用'],
     ['线程', '活跃线程'],
-    ['QPS', '每秒查询数'],
+    ['QPS / TPS', '每秒查询数 / 显式事务数（按 QPS 排序）'],
     ['慢查询', '慢查询速率'],
     ['Buffer Pool', 'Buffer Pool 容量 / 使用率'],
     ['复制 / 延迟', '复制状态 / 延迟'],
     ['运行时间', '运行时间'],
     ['状态', '实例状态'],
   ]
-  expect(screen.getAllByRole('columnheader')).toHaveLength(11)
+  expect(screen.getAllByRole('columnheader')).toHaveLength(10)
   for (const [heading, title] of headers) {
     const header = screen.getByRole('columnheader', {
       name: new RegExp(`^${heading}(排序|$)`),
@@ -118,7 +117,7 @@ it('renders the eleven compact MySQL columns with complete single-line titles an
     'MySQL 实例地址',
     '连接使用',
     '活跃线程',
-    '每秒查询数',
+    '每秒查询数 / 显式事务数（按 QPS 排序）',
     '慢查询速率',
     'Buffer Pool 容量 / 使用率',
     '复制状态 / 延迟',
@@ -135,31 +134,30 @@ it('renders the eleven compact MySQL columns with complete single-line titles an
   const instance = (await screen.findByText('192.0.2.101:3306')).closest('tr')
   expect(instance).not.toBeNull()
   const cells = within(instance!).getAllByRole('cell')
-  expect(cells).toHaveLength(11)
+  expect(cells).toHaveLength(10)
   expect(cells[0]).toHaveTextContent('192.0.2.101:3306')
   expect(cells[0]).not.toHaveTextContent('fixture-mysql-a')
   expect(cells[0].querySelector('.host-cell-text')).toHaveAttribute(
     'title',
     '192.0.2.101:3306',
   )
-  expect(cells[1]).toHaveTextContent('fixture-db-host-a')
-  expect(cells[2]).toHaveTextContent('8.4.1 · 读写')
-  expect(cells[3]).toHaveTextContent('32/200 · 16.0%')
-  expect(cells[4]).toHaveTextContent('5')
-  expect(cells[5]).toHaveTextContent('123.46')
-  expect(cells[6]).toHaveTextContent('0.13')
-  expect(cells[7]).toHaveTextContent('8 GiB / 82.3%')
-  expect(cells[8]).toHaveTextContent('正常 · 2s')
-  expect(cells[8].querySelector('.host-metric')).toHaveAttribute(
+  expect(cells[1]).toHaveTextContent('8.4.1 · 读写')
+  expect(cells[2]).toHaveTextContent('32/200 · 16.0%')
+  expect(cells[3]).toHaveTextContent('5')
+  expect(cells[4]).toHaveTextContent('123.46 / 45.25')
+  expect(cells[5]).toHaveTextContent('0.13')
+  expect(cells[6]).toHaveTextContent('8 GiB / 82.3%')
+  expect(cells[7]).toHaveTextContent('正常 · 2s')
+  expect(cells[7].querySelector('.host-metric')).toHaveAttribute(
     'title',
     '正常 · 2s',
   )
-  expect(cells[9]).toHaveTextContent('2天 3小时')
-  expect(cells[9].querySelector('.mysql-uptime')).toHaveAttribute(
+  expect(cells[8]).toHaveTextContent('2天 3小时')
+  expect(cells[8].querySelector('.mysql-uptime')).toHaveAttribute(
     'title',
     '2天 3小时',
   )
-  expect(within(cells[10]).getByText('正常')).toHaveAttribute(
+  expect(within(cells[9]).getByText('正常')).toHaveAttribute(
     'data-level',
     'normal',
   )
@@ -168,11 +166,11 @@ it('renders the eleven compact MySQL columns with complete single-line titles an
   ).not.toBeInTheDocument()
   expect(
     screen
-      .getByRole('searchbox', { name: '搜索实例地址或所属主机' })
+      .getByRole('searchbox', { name: '搜索实例地址' })
       .closest('.mysql-list-controls'),
   ).not.toBeNull()
   const controls = screen
-    .getByRole('searchbox', { name: '搜索实例地址或所属主机' })
+    .getByRole('searchbox', { name: '搜索实例地址' })
     .closest('.mysql-list-controls')
   expect(controls).not.toBeNull()
   if (!(controls instanceof HTMLElement)) {
@@ -200,13 +198,13 @@ it('renders missing and unknown versions as Chinese unknown with the role', asyn
     await screen.findByText('192.0.2.104:3306')
   ).closest('tr')
   expect(missingVersionRow).not.toBeNull()
-  const missingVersionCell = within(missingVersionRow!).getAllByRole('cell')[2]
+  const missingVersionCell = within(missingVersionRow!).getAllByRole('cell')[1]
   expect(missingVersionCell).toHaveTextContent('未知 · 只读')
   expect(missingVersionCell).not.toHaveTextContent(/^\s*·/)
 
   const unknownVersionRow = screen.getByText('192.0.2.105:3306').closest('tr')
   expect(unknownVersionRow).not.toBeNull()
-  expect(within(unknownVersionRow!).getAllByRole('cell')[2]).toHaveTextContent(
+  expect(within(unknownVersionRow!).getAllByRole('cell')[1]).toHaveTextContent(
     '未知 · 只读',
   )
 })
@@ -219,28 +217,33 @@ it('uses only service-valid fixture replication combinations', () => {
     role: 'writable',
     replication: { state: 'normal', level: 'normal' },
     status: 'normal',
+    collection_level: 'normal',
   })
   expect(threadsStopped).toMatchObject({
     role: 'read_only',
     replication: { state: 'threads_stopped', level: 'critical' },
     status: 'critical',
+    collection_level: 'normal',
   })
   expect(notConfigured).toMatchObject({
     role: 'writable',
     replication: { state: 'not_configured', level: 'normal' },
     status: 'normal',
+    collection_level: 'normal',
   })
   expect(missingReadOnly).toMatchObject({
     version: '',
     role: 'read_only',
     replication: { state: 'unknown', level: 'unknown' },
-    status: 'unknown',
+    status: 'critical',
+    collection_level: 'critical',
   })
   expect(warning).toMatchObject({
     version: 'unknown',
     role: 'read_only',
     replication: { state: 'normal', level: 'warning' },
     status: 'warning',
+    collection_level: 'warning',
   })
 })
 
@@ -264,7 +267,11 @@ it('writes filters sort and pagination to the URL', async () => {
     screen.getByRole('combobox', { name: '每页数量' }),
     '50',
   )
-  await user.click(screen.getByRole('button', { name: /^每秒查询数排序/ }))
+  await user.click(
+    screen.getByRole('button', {
+      name: /^每秒查询数 \/ 显式事务数（按 QPS 排序）排序/,
+    }),
+  )
   expect(window.location.search).toContain('status=warning')
   expect(window.location.search).toContain('role=read_only')
   expect(window.location.search).toContain('label=tier-fixture')
@@ -374,7 +381,7 @@ it('debounces search and sends only fixed GET parameters', async () => {
   await act(async () => vi.advanceTimersByTimeAsync(0))
   fireEvent.change(
     screen.getByRole('searchbox', {
-      name: '搜索实例地址或所属主机',
+      name: '搜索实例地址',
     }),
     { target: { value: 'fixture' } },
   )
@@ -398,6 +405,7 @@ it('renders missing metrics as 暂无数据', async () => {
     connection_usage_percent: null,
     threads_running: null,
     qps: null,
+    tps: null,
     slow_queries_per_second: null,
     buffer_pool_size_bytes: null,
     buffer_pool_usage_percent: null,
@@ -408,7 +416,7 @@ it('renders missing metrics as 暂无数据', async () => {
   const row = (await screen.findByText('192.0.2.101:3306')).closest('tr')
   expect(row).not.toBeNull()
   expect(within(row!).getAllByText('暂无数据')).toHaveLength(5)
-  expect(within(row!).getAllByRole('cell')[7]).toHaveTextContent('—')
+  expect(within(row!).getAllByRole('cell')[6]).toHaveTextContent('—')
 })
 
 it('renders all Buffer Pool capacity and usage availability combinations', async () => {
@@ -470,7 +478,7 @@ it('renders all Buffer Pool capacity and usage availability combinations', async
   ]) {
     const row = (await screen.findByText(address)).closest('tr')
     expect(row).not.toBeNull()
-    expect(within(row!).getAllByRole('cell')[7]).toHaveTextContent(value)
+    expect(within(row!).getAllByRole('cell')[6]).toHaveTextContent(value)
   }
 })
 
@@ -486,12 +494,12 @@ it('preserves available connection values without inventing zeroes', async () =>
   renderMySQLPage()
   const row = (await screen.findByText('192.0.2.101:3306')).closest('tr')
   expect(row).not.toBeNull()
-  const connectionCell = within(row!).getAllByRole('cell')[3]
+  const connectionCell = within(row!).getAllByRole('cell')[2]
   expect(connectionCell).toHaveTextContent('7')
   expect(connectionCell).not.toHaveTextContent('0')
 })
 
-it('renders every replication and instance state with text and level', async () => {
+it('renders replication states and explicit collection delay states', async () => {
   const fixture = mysqlInstancePageFixture()
   fixture.data.instances[1] = {
     ...fixture.data.instances[1],
@@ -517,17 +525,17 @@ it('renders every replication and instance state with text and level', async () 
   const unknownRow = screen.getByText('192.0.2.104:3306').closest('tr')
   expect(stoppedRow).not.toBeNull()
   expect(unknownRow).not.toBeNull()
-  expect(within(stoppedRow!).getAllByRole('cell')[8]).toHaveTextContent(
+  expect(within(stoppedRow!).getAllByRole('cell')[7]).toHaveTextContent(
     '线程异常 · 35s',
   )
-  expect(within(unknownRow!).getAllByRole('cell')[8]).toHaveTextContent(
+  expect(within(unknownRow!).getAllByRole('cell')[7]).toHaveTextContent(
     '状态未知 · 7s',
   )
   for (const [label, level] of [
     ['正常', 'normal'],
-    ['警告', 'warning'],
     ['严重', 'critical'],
-    ['未知', 'unknown'],
+    ['采集延迟', 'warning'],
+    ['采集失联', 'critical'],
   ] as const) {
     expect(
       screen

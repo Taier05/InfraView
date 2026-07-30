@@ -1,37 +1,40 @@
 # InfraView 开发交接
 
-最后更新：2026-07-29
+最后更新：2026-07-30
 
-## 当前 MySQL 暂停点恢复入口
+## 当前 main 开发暂停点恢复入口
 
-本暂停点只能在 MySQL 专用工作树恢复；下方历史 `main` 提示不适用于本暂停点，禁止据此切换到仓库根目录或 `main`。
+当前工作目录为仓库根目录，分支为 `main`；工作区含已授权、已部署到既有测试 8080，但尚未提交或推送的采集新鲜度、MySQL TPS、原始样本时间与样本推进修复，禁止清理或重置。
 
 在新账号或新对话中直接粘贴：
 
 ```text
-继续开发 InfraView MySQL 模块。请始终使用简体中文回复。
+继续开发 InfraView。请始终使用简体中文回复。
 
-工作目录：/root/github/InfraView/.worktrees/mysql-module
-分支：feature/mysql-module
+工作目录：/root/github/InfraView
+分支：main
 
 请先完整阅读并遵循：
 1. docs/HANDOFF.md
 2. docs/PROJECT_STATUS.md
 3. docs/TODO.md
 4. docs/datasources/NIGHTINGALE.md
-5. docs/superpowers/specs/2026-07-28-mysql-module-design.md
-6. docs/superpowers/plans/2026-07-29-mysql-table-refinement.md
-7. docs/superpowers/reports/2026-07-29-mysql-table-refinement-verification.md
+5. docs/superpowers/specs/2026-07-29-collector-freshness-and-mysql-tps-design.md
+6. docs/superpowers/plans/2026-07-29-collector-freshness-and-mysql-tps.md
+7. docs/superpowers/specs/2026-07-30-raw-sample-freshness-fix-design.md
+8. docs/superpowers/plans/2026-07-30-raw-sample-freshness-fix.md
+9. docs/superpowers/specs/2026-07-30-sample-progress-freshness-fix-design.md
+10. docs/superpowers/plans/2026-07-30-sample-progress-freshness-fix.md
 
 先只读执行：
 git status --short --branch
 git log -3 --oneline
 git diff --check
 
-InfraView 始终只读。MySQL 表格细化、范围化复审、完整无缓存构建和原 8080 测试 Nightingale Chromium 5/5 验收均已通过；第 5 项是受跟踪的匿名语义与认证后错误审计。当前下一步是等待用户决定是否集成，不得声明已合并或已推送。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/指标值或上游正文。不要自行 push、合并、部署或重启。
+InfraView 始终只读。当前修改实现默认 15 秒采集周期、2/5 周期新鲜度、MySQL 24 小时近期身份、显式事务 TPS、16 条固定单 batch 查询、10 列紧凑表格、地址搜索/自然排序和总览状态去重。2026-07-30 现场确认原始样本约每 15 秒推进，但存在稳定链路时延；直接比较绝对样本年龄会让正常 Linux/MySQL 长期误报采集延迟。当前版本已改为按本地最后观察到样本推进的时刻计算 2/5 周期，并将主机采集延迟/失联统一为黄色/红色。无缓存完整构建已通过，原有仅连接测试 Nightingale 的 8080 已原位重建并健康；脱敏现场观察跨越多个缓存刷新和至少两个采集周期，Linux/MySQL 采集等级持续正常且响应非 stale。当前尚未提交或推送。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/指标值或上游正文。不要自行 push、合并、再次部署或重启。
 ```
 
-## 历史 main 恢复提示（不适用于当前 MySQL 暂停点）
+## 历史 main 恢复提示
 
 以下内容仅保留给仓库根目录的历史 `main` 基线；当前 MySQL 工作必须使用上方专用提示。
 

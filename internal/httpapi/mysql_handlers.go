@@ -45,12 +45,14 @@ type mysqlInstanceView struct {
 	ConnectionUsagePercent *float64             `json:"connection_usage_percent"`
 	ThreadsRunning         *float64             `json:"threads_running"`
 	QPS                    *float64             `json:"qps"`
+	TPS                    *float64             `json:"tps"`
 	SlowQueriesPerSecond   *float64             `json:"slow_queries_per_second"`
 	BufferPoolUsagePercent *float64             `json:"buffer_pool_usage_percent"`
 	BufferPoolSizeBytes    *float64             `json:"buffer_pool_size_bytes"`
 	UptimeSeconds          *float64             `json:"uptime_seconds"`
 	Replication            mysqlReplicationView `json:"replication"`
 	Status                 service.Level        `json:"status"`
+	CollectionLevel        service.Level        `json:"collection_level"`
 }
 
 type mysqlInstancePageView struct {
@@ -180,6 +182,7 @@ func mysqlInstanceViewFrom(value service.MySQLInstanceSummary) mysqlInstanceView
 		ConnectionUsagePercent: value.ConnectionUsagePercent,
 		ThreadsRunning:         value.ThreadsRunning,
 		QPS:                    value.QPS,
+		TPS:                    value.TPS,
 		SlowQueriesPerSecond:   value.SlowQueriesPerSecond,
 		BufferPoolUsagePercent: value.BufferPoolUsagePercent,
 		BufferPoolSizeBytes:    value.BufferPoolSizeBytes,
@@ -189,6 +192,7 @@ func mysqlInstanceViewFrom(value service.MySQLInstanceSummary) mysqlInstanceView
 			LagSeconds: value.Replication.LagSeconds,
 			Level:      value.Replication.Level,
 		},
-		Status: value.Status,
+		Status:          value.Status,
+		CollectionLevel: value.CollectionLevel,
 	}
 }

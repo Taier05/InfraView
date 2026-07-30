@@ -13,8 +13,10 @@ func mysqlPromQL() []string {
 		"rate(mysql_global_status_slow_queries[5m])",
 		"mysql_global_status_buffer_pool_pages_utilization",
 		"mysql_global_variables_innodb_buffer_pool_size",
+		`sum by (ident, instance, address) (rate(mysql_global_status_commands_total{command=~"commit|rollback"}[5m]))`,
 		"mysql_slave_status_seconds_behind_master",
 		"mysql_slave_status_slave_io_running",
 		"mysql_slave_status_slave_sql_running",
+		"tlast_over_time(mysql_up[24h])",
 	}
 }

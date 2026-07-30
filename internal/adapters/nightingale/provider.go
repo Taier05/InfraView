@@ -200,20 +200,19 @@ func (p *Provider) GetCurrentMetrics(ctx context.Context, hostIDs []string) (map
 			if !ok {
 				continue
 			}
-			value, timestamp, ok := parseInstantValue(sample.Value)
+			value, _, ok := parseInstantValue(sample.Value)
 			if !ok {
 				continue
 			}
-			setCurrentMetric(&current, queryIndex, value)
-			if timestamp.After(current.Timestamp) {
-				current.Timestamp = timestamp
+			if queryIndex == currentCollectionTimestampQueryIndex {
+				timestamp, ok := parseUnixTime(sample.Value[1])
+				if ok && timestamp.After(current.Timestamp) {
+					current.Timestamp = timestamp
+				}
+				metrics[hostID] = current
+				continue
 			}
-			metrics[hostID] = current
-		}
-	}
-	for hostID, current := range metrics {
-		if current.Timestamp.IsZero() {
-			current.Timestamp = p.now()
+			setCurrentMetric(&current, queryIndex, value)
 			metrics[hostID] = current
 		}
 	}

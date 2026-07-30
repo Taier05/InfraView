@@ -25,6 +25,7 @@ const (
 type Options struct {
 	InventoryTTL       time.Duration
 	CurrentMetricsTTL  time.Duration
+	CollectionInterval time.Duration
 	RangeTTL           time.Duration
 	HealthTTL          time.Duration
 	MaxStale           time.Duration
@@ -109,6 +110,7 @@ type HostSummary struct {
 	StatusTime       time.Time
 	Uptime           time.Duration
 	Metrics          CurrentMetrics
+	CollectionLevel  Level
 }
 
 type HostPage struct {
@@ -129,6 +131,7 @@ type HostDetail struct {
 	StatusTime       time.Time
 	Uptime           time.Duration
 	Metrics          CurrentMetrics
+	CollectionLevel  Level
 }
 
 type MetricPoint struct {

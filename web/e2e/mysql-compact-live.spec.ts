@@ -104,7 +104,7 @@ test('原 8080 在 1440×900 下显示四列紧凑模块位', async ({ page }) =
   expect(Math.abs(hostBox!.y - mysqlBox!.y)).toBeLessThanOrEqual(1)
 })
 
-test('原 8080 的 MySQL 11 列在 1440×900 下无横向滚动', async ({
+test('原 8080 的 MySQL 10 列在 1440×900 下无横向滚动', async ({
   page,
 }) => {
   test.skip(!username || !password, '需要显式提供测试服务凭据')
@@ -113,14 +113,14 @@ test('原 8080 的 MySQL 11 列在 1440×900 下无横向滚动', async ({
   await expect(page.getByRole('heading', { name: 'MySQL 实例' })).toBeVisible()
 
   const headers = page.getByRole('columnheader')
-  await expect(headers).toHaveCount(11)
+  await expect(headers).toHaveCount(10)
   for (const header of await headers.all()) {
     await expect(header).toBeVisible()
   }
 
   const geometry = await firstRowContentStarts(page, '.mysql-table')
   expectSingleLineHeaders(geometry)
-  expectAlignedContentStarts(geometry, 3, 10)
+  expectAlignedContentStarts(geometry, 2, 9)
 
   const tableViewport = await page.locator('.mysql-table-scroll').evaluate(
     (element) => ({
@@ -318,7 +318,7 @@ test('原 8080 的 MySQL 语义筛选和认证后错误审计保持匿名只读'
 
   expect(
     await page
-      .locator('.mysql-table tbody tr td:nth-child(8)')
+      .locator('.mysql-table tbody tr td:nth-child(7)')
       .evaluateAll(
         (cells) =>
           cells.length > 0 &&

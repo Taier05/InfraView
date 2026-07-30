@@ -171,14 +171,16 @@ func TestMySQLViewsExposeCompleteSchemaAndPreserveNullMetrics(t *testing.T) {
 		"connection_usage_percent",
 		"threads_running",
 		"qps",
+		"tps",
 		"slow_queries_per_second",
 		"buffer_pool_usage_percent",
 		"buffer_pool_size_bytes",
 		"uptime_seconds",
 		"replication",
 		"status",
+		"collection_level",
 	)
-	for _, field := range []string{"id", "name", "address", "host", "version", "role", "status"} {
+	for _, field := range []string{"id", "name", "address", "host", "version", "role", "status", "collection_level"} {
 		path := "data.instances.0." + field
 		if !jsonPathIsString(t, instancesBody, path) {
 			t.Fatalf("JSON path %q is not a string", path)
@@ -190,6 +192,7 @@ func TestMySQLViewsExposeCompleteSchemaAndPreserveNullMetrics(t *testing.T) {
 		"connection_usage_percent",
 		"threads_running",
 		"qps",
+		"tps",
 		"slow_queries_per_second",
 		"buffer_pool_usage_percent",
 		"buffer_pool_size_bytes",
@@ -264,7 +267,7 @@ func TestMySQLInstancesAcceptsLabelAndReturnsAvailableLabelsForEmptyResult(t *te
 	snapshot.Instances = append(snapshot.Instances, duplicate)
 	handler, sessionCookie := newMySQLAPITestHandler(t, snapshot)
 
-	response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances?label=fixture-mysql-b&status=warning&role=read_only&search=fixture-host-b&sort=status&order=desc&page=1&page_size=20", "", sessionCookie)
+	response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances?label=fixture-mysql-b&status=warning&role=read_only&search=192.0.2.13&sort=status&order=desc&page=1&page_size=20", "", sessionCookie)
 	if response.Code != http.StatusOK {
 		t.Fatalf("labelled response status = %d", response.Code)
 	}

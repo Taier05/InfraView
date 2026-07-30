@@ -158,8 +158,8 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
   expect(appCells[8].querySelector('[data-level="warning"]')).not.toBeNull()
   expect(appCells[8].querySelector('[data-level="critical"]')).not.toBeNull()
   expect(within(appRow!).getByText('在线')).toHaveAttribute(
-    'data-status',
-    'online',
+    'data-level',
+    'normal',
   )
   expect(appRow).toHaveTextContent('23.5%')
   expect(appRow).toHaveTextContent('67.0%')
@@ -168,9 +168,9 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
 
   const dbRow = screen.getByText('linux-db-02').closest('tr')
   expect(dbRow).not.toBeNull()
-  expect(within(dbRow!).getByText('离线')).toHaveAttribute(
-    'data-status',
-    'offline',
+  expect(within(dbRow!).getByText('采集失联')).toHaveAttribute(
+    'data-level',
+    'critical',
   )
   expect(within(dbRow!).getAllByText('暂无数据')).toHaveLength(8)
 
@@ -185,6 +185,37 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
     page: '1',
     page_size: '20',
   })
+})
+
+it('主机采集延迟使用 warning 等级而不是灰色 unknown', async () => {
+  const fixture = hostPageFixture()
+  const delayed = {
+    ...fixture.data.hosts[0],
+    id: 'host-delayed',
+    name: 'linux-delayed',
+    status: 'unknown' as const,
+    collection_level: 'warning' as const,
+  }
+  vi.mocked(globalThis.fetch).mockResolvedValue(
+    jsonResponse(
+      hostPageFixture({
+        data: {
+          hosts: [delayed],
+          total: 1,
+          page: 1,
+          page_size: 20,
+          total_pages: 1,
+        },
+      }),
+    ),
+  )
+
+  renderHostList()
+
+  expect(await screen.findByText('采集延迟')).toHaveAttribute(
+    'data-level',
+    'warning',
+  )
 })
 
 it('长主机名保留完整提示并使用列内截断容器', async () => {
