@@ -117,7 +117,7 @@ docker compose ls
 - `npm ci` 仍报告锁定依赖树中 2 个 high severity 审计项；本轮未执行 `npm audit fix --force`，未修改依赖。
 - 经用户单独授权，现有 8080 已原位重建并继续只连接测试 Nightingale；服务 healthy，保持非 root、只读根文件系统、cap drop `ALL`、禁止提权且只发布 8080。脱敏登录态 API 验收仅输出布尔结果：Nightingale、硬盘 GET/non-stale、容量存在、容量升降序实际有序、敏感字段排除、写方法 405、Linux/MySQL 回归和浏览器零错误均为 true。
 - 一次性 Chromium 不发布端口，trace 关闭，所有失败产物定向到容器 `/tmp` 并随容器销毁。硬盘十列用例在 1440×900 下通过，覆盖型号/容量分列、至少一个 IEC 格式容量、容量升降序 URL、页面/表格无横向溢出及无破坏性控件；原 8080 总览四槽位几何用例也通过。最初两次因筛选路径未发现测试，第三次以公开默认 E2E 凭据登录失败，均未形成产品失败；改用不落盘、不输出的应用进程凭据后通过。API 脚本首轮由页面主动请求预期 405，污染 Chrome console；改由共享会话 request API 验证后全部布尔结果为 true，产品代码未因此修改。
-- 任何生产 Nightingale 验证、会创建 18080 的 `scripts/e2e.sh`、提交和推送均未执行。
+- 任何生产 Nightingale 验证和会创建 18080 的 `scripts/e2e.sh` 均未执行；经明确授权，功能提交 `6300413` 已推送到 `origin/main`。
 
 ## 2026-07-30 主机硬盘 SMART 当前工作区验证
 

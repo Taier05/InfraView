@@ -4,9 +4,9 @@
 
 ## 当前 main 恢复入口
 
-已推送功能基线仍为 `4956ea9 feat: add collector freshness and MySQL TPS`。当前 `main` 共享工作树在保留本功能开始前 `docs/HANDOFF.md`、`docs/PROJECT_STATUS.md`、`docs/TODO.md` 用户未提交差异的基础上，正在交付主机硬盘 SMART 模块；源码、测试、设计、计划与文档均未提交或推送，禁止清理、重置或覆盖现有差异。
+当前功能交付基线为 `6300413 feat: add host disk SMART monitoring`，已推送到 `origin/main`。主机硬盘 SMART 模块、2026-08-01 容量增量、测试、规格、计划和交接文档均已纳入版本控制；继续开发前仍须先做 Git 只读检查，禁止清理或回退用户后续差异。
 
-2026-08-01 容量增量已在当前未提交工作树实现并完成全量离线及现有 8080 现场验收：硬盘固定即时 batch 从 17 组增至 18 组，第 17 组 `smart_disk_capacity_bytes` 是容量唯一来源，第 18 组 inventory 继续负责设备发现、型号和原始最后样本时间；旧 inventory `capacity` 标签不再读取或回退。容量从原始文本精确解析为 `int64`，不经过 `float64` 丢失大整数精度。硬盘页由九列改为“型号”“容量”分列的十列，容量支持服务端升降序且缺失值始终最后。前端 8 文件/101 项、typecheck/build、Go 格式/普通/race/编译、Playwright 静态发现和无缓存镜像均通过。经用户单独授权，现有 8080 已原位重建并继续只连接测试 Nightingale；容器安全、脱敏 API、十列 Chromium 和总览四槽位验收均通过。
+2026-08-01 容量增量已实现并完成全量离线及现有 8080 现场验收：硬盘固定即时 batch 从 17 组增至 18 组，第 17 组 `smart_disk_capacity_bytes` 是容量唯一来源，第 18 组 inventory 继续负责设备发现、型号和原始最后样本时间；旧 inventory `capacity` 标签不再读取或回退。容量从原始文本精确解析为 `int64`，不经过 `float64` 丢失大整数精度。硬盘页由九列改为“型号”“容量”分列的十列，容量支持服务端升降序且缺失值始终最后。前端 8 文件/101 项、typecheck/build、Go 格式/普通/race/编译、Playwright 静态发现和无缓存镜像均通过。经用户单独授权，现有 8080 已原位重建并继续只连接测试 Nightingale；容器安全、脱敏 API、十列 Chromium 和总览四槽位验收均通过。
 
 在新账号或新对话中直接粘贴：
 
@@ -39,7 +39,7 @@ git status --short --branch
 git log -3 --oneline
 git diff --check
 
-InfraView 始终只读。已推送基线仍为 4956ea9；当前共享工作树包含未提交的主机硬盘 SMART 模块和 2026-08-01 容量增量，并保留了功能开始前 HANDOFF、PROJECT_STATUS、TODO 三份用户差异，绝不能清理或回退。硬盘功能使用独立领域/Service/API/页面、一次固定 18 查询即时 batch、默认 60 秒快照 TTL 与样本推进 freshness；120/300 秒为警告/严重。第 17 组 smart_disk_capacity_bytes 是容量唯一来源，第 18 组 inventory 负责设备发现、型号和原始最后样本时间；旧 inventory capacity 标签不得读取或回退。硬盘页为型号/容量分列的十列，容量支持服务端排序。status_source 固定为 smart_health、device_warning、attribute_failure、collection、normal、unknown；同级时设备来源优先，只有采集等级严格更高时才显示采集延迟/失联。温度、寿命、错误计数只展示。Nightingale v8.4.1 是主要验证版本，v9.x 仅保留协议兼容。2026-08-01 增量已在现有 8080 完成脱敏现场验收；8080 永远只连接测试 Nightingale，禁止创建其他 InfraView 端口。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/容量值/指标值或上游正文。提交和推送仍各自需要明确授权；任何生产 Nightingale 验证永久禁止。
+InfraView 始终只读。当前功能基线为 6300413，已推送到 origin/main；主机硬盘 SMART 模块和 2026-08-01 容量增量均已提交。硬盘功能使用独立领域/Service/API/页面、一次固定 18 查询即时 batch、默认 60 秒快照 TTL 与样本推进 freshness；120/300 秒为警告/严重。第 17 组 smart_disk_capacity_bytes 是容量唯一来源，第 18 组 inventory 负责设备发现、型号和原始最后样本时间；旧 inventory capacity 标签不得读取或回退。硬盘页为型号/容量分列的十列，容量支持服务端排序。status_source 固定为 smart_health、device_warning、attribute_failure、collection、normal、unknown；同级时设备来源优先，只有采集等级严格更高时才显示采集延迟/失联。温度、寿命、错误计数只展示。Nightingale v8.4.1 是主要验证版本，v9.x 仅保留协议兼容。2026-08-01 增量已在现有 8080 完成脱敏现场验收；8080 永远只连接测试 Nightingale，禁止创建其他 InfraView 端口。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/容量值/指标值或上游正文。任何后续提交、推送或部署仍需按新任务重新授权；任何生产 Nightingale 验证永久禁止。
 
 历史 2026-07-30 展示细化状态：总览已恢复桌面四槽位；当时硬盘“型号 / 容量”改为同列独立两行，unsafe shutdown 显示为“异常断电 N 次”，且仅表示累计展示、不参与状态判断。Docker 离线前端全量回归（8 文件/101 测试、typecheck、build）及无缓存全仓镜像 `infraview:overview-disk-display-verify` 已通过。用户随后授权原位重建仍连接测试 Nightingale 的现有 8080：服务 healthy，保持非 root、只读根文件系统、cap drop、禁止提权且只发布原 8080；脱敏登录态只读 API 与一次性 Chromium 1440×900 验收通过。浏览器确认总览四轨前三格占用、第四格自然空，硬盘九列、型号/容量同列两行、无横向溢出、无破坏性控件和无非预期登录后错误。这些现场证据不覆盖 2026-08-01 的 18 组/十列增量。未读取私密环境文件，未输出凭据、API 正文或现场值，未创建其他 InfraView 端口，也未运行 `scripts/e2e.sh`。提交、推送各自需要明确授权；任何生产 Nightingale 验证永久禁止。
 ```
@@ -49,9 +49,9 @@ InfraView 始终只读。已推送基线仍为 4956ea9；当前共享工作树�
 - Task 1–7 的 RED→GREEN 证据保存在 `.superpowers/sdd/2026-07-30-host-disk-smart-module/task-1-report.md` 至 `task-7-report.md`。
 - Task 8 与终审修复后已完成无端口、无上游连接的静态扫描、Docker Go 普通/race、前端 8 文件/99 测试、typecheck/build 和无缓存镜像构建，全部退出 0；终审的 1 个 Important 和 2 个 Minor 均已修复，范围复审 Approved。持久结果与未执行边界见已跟踪的硬盘实施计划和 `docs/TESTING.md`，当前工作区的本地 SDD report 仅作补充。
 - 测试 Nightingale 现场首次发现兼容重复历史身份导致硬盘 API 503；已按 RED→GREEN 修复归并顺序和冲突边界，范围复审 Approved。修复后无缓存全量构建、现有 8080 原位重建、容器安全、硬盘 API、一次性 Chromium 1440×900 与跨两个 60 秒周期推进验收均通过。
-- 未执行：会创建 18080 的 `scripts/e2e.sh`、任何生产 Nightingale 验证、提交和推送。一次性 Chromium 仅访问现有 8080，未创建其他 InfraView 端口。
+- 未执行：会创建 18080 的 `scripts/e2e.sh` 和任何生产 Nightingale 验证。一次性 Chromium 仅访问现有 8080，未创建其他 InfraView 端口；本功能已提交并推送。
 - 三份交接文档的功能前用户差异已作为基底保留；审阅时比较当前完整 diff，不能用 `git restore`、`git checkout`、`git reset` 或清理命令回退。
-- 2026-08-01 容量增量已完成全量离线与现有 8080 现场验收：服务 healthy，安全配置和唯一 8080 端口符合基线；Nightingale、非 stale、容量存在、容量升降序、敏感字段排除、写方法 405、Linux/MySQL 回归及浏览器零错误均为 true；硬盘十列和总览四槽位 Chromium 用例通过。提交和推送仍未获授权。
+- 2026-08-01 容量增量已完成全量离线与现有 8080 现场验收：服务 healthy，安全配置和唯一 8080 端口符合基线；Nightingale、非 stale、容量存在、容量升降序、敏感字段排除、写方法 405、Linux/MySQL 回归及浏览器零错误均为 true；硬盘十列和总览四槽位 Chromium 用例通过。功能提交 `6300413` 已推送到 `origin/main`。
 
 ## 历史开发记录
 
@@ -142,7 +142,7 @@ Nightingale v8.4.1 兼容功能已经快进合并并推送到 `origin/main`，�
 ## 新对话的第一组任务
 
 1. 先查看 `git status`、`git log -3 --oneline` 和 `git diff --check`，确认当前位于 `main`，并核对与 `origin/main` 的同步状态。
-2. 确认功能基线 `4956ea9` 已在 `origin/main`，并保留本轮三份未提交的交接文档；未经授权不要提交或推送。
+2. 确认功能基线 `6300413` 已在 `origin/main`，工作树无未提交差异；未经新授权不要提交、推送、部署或重启。
 3. 等待用户给出下一项开发需求。生产 Categraf 升级后的 IO 复验仍是开放观察，但开发 8080 永远只连接测试 Nightingale；未经明确授权，不连接生产、不修改 IO 查询、不部署或重启。
 
 ## 安全边界

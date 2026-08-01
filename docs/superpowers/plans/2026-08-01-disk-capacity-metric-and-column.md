@@ -18,7 +18,7 @@
 | Task 4 E2E/文档 | 已完成 | Playwright 静态发现 13 项通过；文档保留历史替代说明，未运行浏览器或创建端口 |
 | Task 5 全量验证 | 离线与现场均完成 | 前端 8 文件/101 项、Go 普通/race/编译、无缓存镜像通过；现有 8080 原位重建、容器安全、脱敏 API、硬盘十列/容量排序及总览四槽位 Chromium 均通过 |
 | 独立代码复审 | Ready；Critical 0、Important 0、Minor 0 | 首轮 2 个 Important 与 1 个 Minor 已修复：容量改为原始文本精确解析并补 `2^53` 边界 RED→GREEN；README/ARCHITECTURE/DESIGN 当前态同步；E2E 补容量降序与脱敏格式布尔断言 |
-| commit / push | 未执行 | 分别需要用户明确授权 |
+| commit / push | 已完成 | 经用户明确授权，功能提交 `6300413` 已推送到 `origin/main` |
 
 ## Global Constraints
 
@@ -32,7 +32,7 @@
 - 型号与容量拆成两个独立列；容量升降序都将缺失值放在最后。
 - 每页数量继续只有 20、50、100；不实现命令超时、失联移除或“全部”分页。
 - 所有开发和验证使用 Docker；不在宿主机安装 Go、Node 或浏览器依赖。
-- 提交和推送分别需要用户明确授权。当前共享工作树中的 SMART 模块尚未提交，因此每个任务完成后只记录验证结果并等待复审，不自动执行 `git add`、commit 或 push。
+- 提交和推送分别需要用户明确授权；开发阶段每个任务只记录验证结果并等待复审，不自动执行 `git add`、commit 或 push。最终授权与执行结果见上方状态表。
 
 ## File Map
 
@@ -521,6 +521,6 @@ git status --short --branch
 
 Expected: 无空白错误，无截图、trace 或 `web/test-results` 临时产物。
 
-- [ ] **Step 9: 提交与推送授权闸门**
+- [x] **Step 9: 提交与推送授权闸门**
 
 未获提交授权时停止并报告未提交。获提交授权后先列出精确文件并确认不含私密/临时产物，再执行授权范围内的 `git add` 和 commit；push 仍需另一项明确授权。
