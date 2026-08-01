@@ -21,6 +21,7 @@
 | `INFRAVIEW_NIGHTINGALE_INTERFACE_EXCLUDE_REGEX` | `lo\|docker.*\|veth.*\|cali.*\|br-.*\|tunl.*` | 有效 RE2 正则；排除回环和常见虚拟接口，作为 PromQL 字符串安全转义，不接受前端覆盖 |
 | `INFRAVIEW_REFRESH_INTERVAL` | `15s` | 不小于 `1s` 的整秒时长；通过数据源状态 API 下发，驱动当前可见页面与左下角数据源状态的自动刷新周期 |
 | `INFRAVIEW_EXPECTED_COLLECTION_INTERVAL` | `15s` | 不小于 `1s` 的整秒时长；原始样本连续 2 个周期未推进标记采集延迟，连续 5 个周期未推进标记采集失联 |
+| `INFRAVIEW_SMART_COLLECTION_INTERVAL` | `60s` | 不小于 `1s` 的整秒时长；独立于 Linux/MySQL 周期，同时作为完整硬盘快照 TTL 与 SMART 样本推进 freshness 周期，2 个周期警告、5 个周期严重 |
 | `INFRAVIEW_INVENTORY_TTL` | `60s` | 正时长，主机清单缓存 |
 | `INFRAVIEW_CURRENT_METRICS_TTL` | `15s` | 正时长，当前指标缓存 |
 | `INFRAVIEW_RANGE_TTL` | `60s` | 正时长，历史范围缓存 |
@@ -34,7 +35,7 @@
 | `TZ` | `Asia/Hong_Kong` | 容器系统时区；API 时间戳仍按 RFC 3339 表达 |
 | `INFRAVIEW_ENV_FILE` | `.env` | Compose 工具变量，可指向专用环境文件；应用本身不读取此变量 |
 
-Go 时长使用 `time.ParseDuration` 语法，例如 `15s`、`5m`、`12h`。错误配置会使进程拒绝启动，错误信息不会输出密码或 Nightingale Token。
+Go 时长使用 `time.ParseDuration` 语法，例如 `15s`、`60s`、`5m`、`12h`。刷新周期、Linux/MySQL 预期采集周期和 SMART 独立采集周期都必须是整秒；错误配置会使进程拒绝启动，错误信息不会输出密码或 Nightingale Token。
 
 ## 验收专用变量
 

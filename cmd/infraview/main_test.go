@@ -17,6 +17,7 @@ import (
 	"github.com/Taier05/InfraView/internal/adapters/nightingale"
 	"github.com/Taier05/InfraView/internal/config"
 	"github.com/Taier05/InfraView/internal/datasource"
+	"github.com/Taier05/InfraView/internal/disk"
 	"github.com/Taier05/InfraView/internal/mysql"
 	"github.com/Taier05/InfraView/internal/mysql/mysqltest"
 )
@@ -168,19 +169,20 @@ func TestHealthcheckReportsNonOKStatusInChinese(t *testing.T) {
 
 func TestBuildHandlerWiresAuthenticatedMockAPI(t *testing.T) {
 	cfg := config.Config{
-		Username:          "admin",
-		Password:          "correct-password",
-		SessionTTL:        12 * time.Hour,
-		DataSource:        "mock",
-		MockHostCount:     3,
-		InventoryTTL:      time.Minute,
-		CurrentMetricsTTL: 20 * time.Second,
-		RangeTTL:          time.Minute,
-		HealthTTL:         15 * time.Second,
-		MaxStale:          5 * time.Minute,
-		UpstreamTimeout:   10 * time.Second,
-		WarningPercent:    80,
-		CriticalPercent:   90,
+		Username:                "admin",
+		Password:                "correct-password",
+		SessionTTL:              12 * time.Hour,
+		DataSource:              "mock",
+		MockHostCount:           3,
+		InventoryTTL:            time.Minute,
+		CurrentMetricsTTL:       20 * time.Second,
+		RangeTTL:                time.Minute,
+		HealthTTL:               15 * time.Second,
+		MaxStale:                5 * time.Minute,
+		UpstreamTimeout:         10 * time.Second,
+		SMARTCollectionInterval: time.Minute,
+		WarningPercent:          80,
+		CriticalPercent:         90,
 	}
 	handler := buildHandler(cfg, time.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
@@ -205,6 +207,22 @@ func TestBuildHandlerWiresAuthenticatedMockAPI(t *testing.T) {
 	handler.ServeHTTP(mysqlOverview, mysqlOverviewRequest)
 	if mysqlOverview.Code != http.StatusOK || !strings.Contains(mysqlOverview.Body.String(), `"total":7`) {
 		t.Fatalf("MySQL overview status = %d", mysqlOverview.Code)
+	}
+
+	diskOverviewRequest := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/disks/overview", nil)
+	diskOverviewRequest.AddCookie(login.Result().Cookies()[0])
+	diskOverview := httptest.NewRecorder()
+	handler.ServeHTTP(diskOverview, diskOverviewRequest)
+	if diskOverview.Code != http.StatusOK || !strings.Contains(diskOverview.Body.String(), `"total":6`) {
+		t.Fatalf("disk overview response = %d %s", diskOverview.Code, diskOverview.Body.String())
+	}
+
+	diskDevicesRequest := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/disks/devices", nil)
+	diskDevicesRequest.AddCookie(login.Result().Cookies()[0])
+	diskDevices := httptest.NewRecorder()
+	handler.ServeHTTP(diskDevices, diskDevicesRequest)
+	if diskDevices.Code != http.StatusOK || !strings.Contains(diskDevices.Body.String(), `"total":6`) {
+		t.Fatalf("disk devices response = %d %s", diskDevices.Code, diskDevices.Body.String())
 	}
 }
 
@@ -241,14 +259,17 @@ func TestDataSourceProvidersWiresNightingaleConfiguration(t *testing.T) {
 	}
 }
 
-func TestProviderSetUsesMockForHostsAndMySQL(t *testing.T) {
+func TestProviderSetUsesMockForHostsMySQLAndDisk(t *testing.T) {
 	providers := dataSourceProviders(config.Config{
 		DataSource: "mock", MockHostCount: 8,
 	}, time.Now)
-	if providers.Hosts == nil || providers.MySQL == nil {
+	if providers.Hosts == nil || providers.MySQL == nil || providers.Disks == nil {
 		t.Fatalf("providers = %#v", providers)
 	}
 	mysqltest.RunContract(t, providers.MySQL)
+	if _, err := providers.Disks.SMARTSnapshot(context.Background()); err != nil {
+		t.Fatalf("SMARTSnapshot() error = %v", err)
+	}
 }
 
 func TestProviderSetSharesOneNightingaleProvider(t *testing.T) {
@@ -259,8 +280,22 @@ func TestProviderSetSharesOneNightingaleProvider(t *testing.T) {
 	}, time.Now)
 	hostProvider, hostOK := providers.Hosts.(*nightingale.Provider)
 	mysqlProvider, mysqlOK := providers.MySQL.(*nightingale.Provider)
-	if !hostOK || !mysqlOK || hostProvider != mysqlProvider {
+	diskProvider, diskOK := providers.Disks.(*nightingale.Provider)
+	if !hostOK || !mysqlOK || !diskOK || hostProvider != mysqlProvider || hostProvider != diskProvider {
 		t.Fatalf("providers do not share one Nightingale client")
+	}
+}
+
+func TestProviderSetUsesSafeUnavailableProvidersForUnknownMode(t *testing.T) {
+	providers := dataSourceProviders(config.Config{DataSource: "unknown"}, time.Now)
+	if _, err := providers.Hosts.Health(context.Background()); !errors.Is(err, datasource.ErrNotConfigured) {
+		t.Fatalf("host error = %v", err)
+	}
+	if _, err := providers.MySQL.MySQLSnapshot(context.Background()); !errors.Is(err, datasource.ErrNotConfigured) {
+		t.Fatalf("MySQL error = %v", err)
+	}
+	if _, err := providers.Disks.SMARTSnapshot(context.Background()); !errors.Is(err, disk.ErrUnavailable) {
+		t.Fatalf("disk error = %v", err)
 	}
 }
 
@@ -268,6 +303,22 @@ func TestMySQLTimeoutProviderCancelsSlowSnapshot(t *testing.T) {
 	provider := withMySQLUpstreamTimeout(blockingMySQLProvider{}, 10*time.Millisecond)
 	start := time.Now()
 	_, err := provider.MySQLSnapshot(context.Background())
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > time.Second {
+		t.Fatalf("error = %v, elapsed = %s", err, time.Since(start))
+	}
+}
+
+func TestDiskTimeoutProviderAddsDeadlineToSnapshot(t *testing.T) {
+	provider := &deadlineCheckingDiskProvider{t: t}
+	if _, err := withDiskUpstreamTimeout(provider, time.Hour).SMARTSnapshot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDiskTimeoutProviderCancelsSlowSnapshot(t *testing.T) {
+	provider := withDiskUpstreamTimeout(blockingDiskProvider{}, 10*time.Millisecond)
+	start := time.Now()
+	_, err := provider.SMARTSnapshot(context.Background())
 	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > time.Second {
 		t.Fatalf("error = %v, elapsed = %s", err, time.Since(start))
 	}
@@ -382,6 +433,33 @@ func (blockingMySQLProvider) MySQLSnapshot(ctx context.Context) (mysql.Snapshot,
 	<-ctx.Done()
 	return mysql.Snapshot{}, ctx.Err()
 }
+
+type deadlineCheckingDiskProvider struct {
+	t *testing.T
+}
+
+func (p *deadlineCheckingDiskProvider) SMARTSnapshot(ctx context.Context) (disk.Snapshot, error) {
+	p.t.Helper()
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		p.t.Fatal("disk provider context has no deadline")
+	}
+	remaining := time.Until(deadline)
+	if remaining < 59*time.Minute || remaining > time.Hour {
+		p.t.Fatalf("disk provider deadline remaining = %s", remaining)
+	}
+	return disk.Snapshot{}, nil
+}
+
+type blockingDiskProvider struct{}
+
+func (blockingDiskProvider) SMARTSnapshot(ctx context.Context) (disk.Snapshot, error) {
+	<-ctx.Done()
+	return disk.Snapshot{}, ctx.Err()
+}
+
+var _ disk.Provider = (*deadlineCheckingDiskProvider)(nil)
+var _ disk.Provider = blockingDiskProvider{}
 
 func (p *deadlineCheckingProvider) check(ctx context.Context) {
 	p.t.Helper()

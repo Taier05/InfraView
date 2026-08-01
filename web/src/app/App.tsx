@@ -8,6 +8,7 @@ import {
 
 import { AuthProvider, useAuth } from '../auth/AuthProvider'
 import { LoginPage } from '../auth/LoginPage'
+import { DiskPage } from '../features/disks/DiskPage'
 import { HostListPage } from '../features/hosts/HostListPage'
 import { MySQLPage } from '../features/mysql/MySQLPage'
 import { OverviewPage } from '../features/overview/OverviewPage'
@@ -64,6 +65,7 @@ export function App() {
             <Route element={<ProtectedShell />}>
               <Route index element={<OverviewPage />} />
               <Route path="hosts" element={<HostListPage />} />
+              <Route path="disks" element={<DiskPage />} />
               <Route path="mysql" element={<MySQLPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

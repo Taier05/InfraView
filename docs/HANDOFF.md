@@ -1,10 +1,12 @@
 # InfraView 开发交接
 
-最后更新：2026-07-30
+最后更新：2026-08-01
 
-## 当前 main 开发暂停点恢复入口
+## 当前 main 恢复入口
 
-当前工作目录为仓库根目录，分支为 `main`；工作区含已授权、已部署到既有测试 8080，但尚未提交或推送的采集新鲜度、MySQL TPS、原始样本时间与样本推进修复，禁止清理或重置。
+已推送功能基线仍为 `4956ea9 feat: add collector freshness and MySQL TPS`。当前 `main` 共享工作树在保留本功能开始前 `docs/HANDOFF.md`、`docs/PROJECT_STATUS.md`、`docs/TODO.md` 用户未提交差异的基础上，正在交付主机硬盘 SMART 模块；源码、测试、设计、计划与文档均未提交或推送，禁止清理、重置或覆盖现有差异。
+
+2026-08-01 容量增量已在当前未提交工作树实现并完成全量离线及现有 8080 现场验收：硬盘固定即时 batch 从 17 组增至 18 组，第 17 组 `smart_disk_capacity_bytes` 是容量唯一来源，第 18 组 inventory 继续负责设备发现、型号和原始最后样本时间；旧 inventory `capacity` 标签不再读取或回退。容量从原始文本精确解析为 `int64`，不经过 `float64` 丢失大整数精度。硬盘页由九列改为“型号”“容量”分列的十列，容量支持服务端升降序且缺失值始终最后。前端 8 文件/101 项、typecheck/build、Go 格式/普通/race/编译、Playwright 静态发现和无缓存镜像均通过。经用户单独授权，现有 8080 已原位重建并继续只连接测试 Nightingale；容器安全、脱敏 API、十列 Chromium 和总览四槽位验收均通过。
 
 在新账号或新对话中直接粘贴：
 
@@ -25,50 +27,39 @@
 8. docs/superpowers/plans/2026-07-30-raw-sample-freshness-fix.md
 9. docs/superpowers/specs/2026-07-30-sample-progress-freshness-fix-design.md
 10. docs/superpowers/plans/2026-07-30-sample-progress-freshness-fix.md
+11. docs/superpowers/specs/2026-07-30-host-disk-smart-module-design.md
+12. docs/superpowers/plans/2026-07-30-host-disk-smart-module.md
+13. docs/superpowers/specs/2026-07-30-overview-four-slot-and-disk-display-refinement-design.md
+14. docs/superpowers/plans/2026-07-30-overview-four-slot-and-disk-display-refinement.md
+15. docs/superpowers/specs/2026-08-01-disk-capacity-metric-and-column-design.md
+16. docs/superpowers/plans/2026-08-01-disk-capacity-metric-and-column.md
 
 先只读执行：
 git status --short --branch
 git log -3 --oneline
 git diff --check
 
-InfraView 始终只读。当前修改实现默认 15 秒采集周期、2/5 周期新鲜度、MySQL 24 小时近期身份、显式事务 TPS、16 条固定单 batch 查询、10 列紧凑表格、地址搜索/自然排序和总览状态去重。2026-07-30 现场确认原始样本约每 15 秒推进，但存在稳定链路时延；直接比较绝对样本年龄会让正常 Linux/MySQL 长期误报采集延迟。当前版本已改为按本地最后观察到样本推进的时刻计算 2/5 周期，并将主机采集延迟/失联统一为黄色/红色。无缓存完整构建已通过，原有仅连接测试 Nightingale 的 8080 已原位重建并健康；脱敏现场观察跨越多个缓存刷新和至少两个采集周期，Linux/MySQL 采集等级持续正常且响应非 stale。当前尚未提交或推送。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/指标值或上游正文。不要自行 push、合并、再次部署或重启。
+InfraView 始终只读。已推送基线仍为 4956ea9；当前共享工作树包含未提交的主机硬盘 SMART 模块和 2026-08-01 容量增量，并保留了功能开始前 HANDOFF、PROJECT_STATUS、TODO 三份用户差异，绝不能清理或回退。硬盘功能使用独立领域/Service/API/页面、一次固定 18 查询即时 batch、默认 60 秒快照 TTL 与样本推进 freshness；120/300 秒为警告/严重。第 17 组 smart_disk_capacity_bytes 是容量唯一来源，第 18 组 inventory 负责设备发现、型号和原始最后样本时间；旧 inventory capacity 标签不得读取或回退。硬盘页为型号/容量分列的十列，容量支持服务端排序。status_source 固定为 smart_health、device_warning、attribute_failure、collection、normal、unknown；同级时设备来源优先，只有采集等级严格更高时才显示采集延迟/失联。温度、寿命、错误计数只展示。Nightingale v8.4.1 是主要验证版本，v9.x 仅保留协议兼容。2026-08-01 增量已在现有 8080 完成脱敏现场验收；8080 永远只连接测试 Nightingale，禁止创建其他 InfraView 端口。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/容量值/指标值或上游正文。提交和推送仍各自需要明确授权；任何生产 Nightingale 验证永久禁止。
+
+历史 2026-07-30 展示细化状态：总览已恢复桌面四槽位；当时硬盘“型号 / 容量”改为同列独立两行，unsafe shutdown 显示为“异常断电 N 次”，且仅表示累计展示、不参与状态判断。Docker 离线前端全量回归（8 文件/101 测试、typecheck、build）及无缓存全仓镜像 `infraview:overview-disk-display-verify` 已通过。用户随后授权原位重建仍连接测试 Nightingale 的现有 8080：服务 healthy，保持非 root、只读根文件系统、cap drop、禁止提权且只发布原 8080；脱敏登录态只读 API 与一次性 Chromium 1440×900 验收通过。浏览器确认总览四轨前三格占用、第四格自然空，硬盘九列、型号/容量同列两行、无横向溢出、无破坏性控件和无非预期登录后错误。这些现场证据不覆盖 2026-08-01 的 18 组/十列增量。未读取私密环境文件，未输出凭据、API 正文或现场值，未创建其他 InfraView 端口，也未运行 `scripts/e2e.sh`。提交、推送各自需要明确授权；任何生产 Nightingale 验证永久禁止。
 ```
 
-## 历史 main 恢复提示
+## 主机硬盘 SMART 当前暂停点
 
-以下内容仅保留给仓库根目录的历史 `main` 基线；当前 MySQL 工作必须使用上方专用提示。
+- Task 1–7 的 RED→GREEN 证据保存在 `.superpowers/sdd/2026-07-30-host-disk-smart-module/task-1-report.md` 至 `task-7-report.md`。
+- Task 8 与终审修复后已完成无端口、无上游连接的静态扫描、Docker Go 普通/race、前端 8 文件/99 测试、typecheck/build 和无缓存镜像构建，全部退出 0；终审的 1 个 Important 和 2 个 Minor 均已修复，范围复审 Approved。持久结果与未执行边界见已跟踪的硬盘实施计划和 `docs/TESTING.md`，当前工作区的本地 SDD report 仅作补充。
+- 测试 Nightingale 现场首次发现兼容重复历史身份导致硬盘 API 503；已按 RED→GREEN 修复归并顺序和冲突边界，范围复审 Approved。修复后无缓存全量构建、现有 8080 原位重建、容器安全、硬盘 API、一次性 Chromium 1440×900 与跨两个 60 秒周期推进验收均通过。
+- 未执行：会创建 18080 的 `scripts/e2e.sh`、任何生产 Nightingale 验证、提交和推送。一次性 Chromium 仅访问现有 8080，未创建其他 InfraView 端口。
+- 三份交接文档的功能前用户差异已作为基底保留；审阅时比较当前完整 diff，不能用 `git restore`、`git checkout`、`git reset` 或清理命令回退。
+- 2026-08-01 容量增量已完成全量离线与现有 8080 现场验收：服务 healthy，安全配置和唯一 8080 端口符合基线；Nightingale、非 stale、容量存在、容量升降序、敏感字段排除、写方法 405、Linux/MySQL 回归及浏览器零错误均为 true；硬盘十列和总览四槽位 Chromium 用例通过。提交和推送仍未获授权。
 
-```text
-继续开发 InfraView。请始终使用简体中文回复。
+## 历史开发记录
 
-工作目录：<仓库根目录>
-分支：main
-
-请先完整阅读并遵循：
-1. <仓库根目录>/docs/HANDOFF.md
-2. <仓库根目录>/docs/PROJECT_STATUS.md
-3. <仓库根目录>/docs/TODO.md
-4. <仓库根目录>/docs/datasources/NIGHTINGALE.md
-5. Nightingale v8.4.1 兼容历史规格与计划：
-   - docs/superpowers/specs/2026-07-28-nightingale-v8-compat-design.md
-   - docs/superpowers/plans/2026-07-28-nightingale-v8-compat.md
-
-Nightingale v8.4.1 兼容功能交付基线为 18d26a6，已合并并推送到 origin/main；原 feature/nightingale-v8-compat 分支及 worktree 已清理。本交接文档提交位于该功能基线之后，实际 HEAD 以 git log -1 为准。Nightingale v8.4.1 是主要开发与真实验证版本，v9.x 保留协议兼容。InfraView 始终只读，不增加任意 PromQL、任意代理、SSH、远程命令或写接口。
-
-生产试运行反馈：除 IO 忙碌度外，已有板块指标正常；生产环境可查询 diskio_io_time 派生利用率，但 InfraView 当前固定读取 diskio_io_util。用户决定暂不修改 InfraView，先升级生产 Categraf；升级后至少等待两个采集周期，再验证 diskio_io_util，不能主动猜测或提前替换 IO PromQL。
-
-绝对不要输出私密环境文件内容、Nightingale Token、Cookie、认证头、真实主机标识、IP、资源数量、指标值或上游响应正文。
-
-先只读执行 git status、git log -3 --oneline、git diff --check，确认 main 与 origin/main 状态。除非我明确授权，不要修改代码或文档、提交、推送、合并、重启服务或更改部署。
-
-持续维护设计、架构、开发进度、TODO、部署、测试、安全和 HANDOFF 文档，确保后续新对话仍可从仓库恢复完整上下文。
-```
-
-## 当前暂停点
+以下段落用于追溯设计演进，其中的分支、列数、查询数和“未提交”描述只代表当时状态；当前状态一律以上方恢复入口和 `git` 只读检查为准。
 
 ### 2026-07-29 MySQL 表格细化收口
 
-当前授权工作树为 `<仓库根目录>/.worktrees/mysql-module`，分支 `feature/mysql-module`。MySQL 模块已完成独立领域/Service、Mock、Nightingale 受限适配、`GET /api/v1/mysql/overview`、`GET /api/v1/mysql/instances`、总览卡及 11 列实例页；复用 Nightingale 安全客户端，以固定 14 条查询构成一次即时 batch，禁止按实例 N+1。新增的第 14 条固定查询是 `mysql_global_variables_innodb_buffer_pool_size`，通过可空 `BufferPoolSizeBytes` / `buffer_pool_size_bytes` 契约只读下发。没有 MySQL 历史、详情、写入、数据库连接、任意 PromQL 或代理能力。
+当时授权工作树为仓库内的 MySQL 功能 worktree，分支为 `feature/mysql-module`。MySQL 模块已完成独立领域/Service、Mock、Nightingale 受限适配、`GET /api/v1/mysql/overview`、`GET /api/v1/mysql/instances`、总览卡及 11 列实例页；复用 Nightingale 安全客户端，以固定 14 条查询构成一次即时 batch，禁止按实例 N+1。新增的第 14 条固定查询是 `mysql_global_variables_innodb_buffer_pool_size`，通过可空 `BufferPoolSizeBytes` / `buffer_pool_size_bytes` 契约只读下发。没有 MySQL 历史、详情、写入、数据库连接、任意 PromQL 或代理能力。
 
 复制线程任一明确停止为严重；最大有效复制延迟 5 秒为警告、30 秒为严重。缺失值不伪造成零：仅可写且零复制通道为“未配置复制/正常”，只读或角色未知且零通道时复制线程与实例状态均为未知并纳入警告风险。任意复制状态只要存在有效延迟都显示秒数；总览警告徽标使用 `warning_instances` 并明确显示“警告风险”。
 
@@ -151,8 +142,8 @@ Nightingale v8.4.1 兼容功能已经快进合并并推送到 `origin/main`，�
 ## 新对话的第一组任务
 
 1. 先查看 `git status`、`git log -3 --oneline` 和 `git diff --check`，确认当前位于 `main`，并核对与 `origin/main` 的同步状态。
-2. 等待用户完成生产 Categraf 升级后的反馈；只读确认 `diskio_io_util` 是否在至少两个采集周期后出现。未经用户明确授权，不修改 InfraView 的 IO 查询。
-3. 后续事项：每个私有部署落实专用最小只读 Token；按真实证据补充磁盘容量和磁盘读写历史指标。
+2. 确认功能基线 `4956ea9` 已在 `origin/main`，并保留本轮三份未提交的交接文档；未经授权不要提交或推送。
+3. 等待用户给出下一项开发需求。生产 Categraf 升级后的 IO 复验仍是开放观察，但开发 8080 永远只连接测试 Nightingale；未经明确授权，不连接生产、不修改 IO 查询、不部署或重启。
 
 ## 安全边界
 

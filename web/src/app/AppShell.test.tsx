@@ -126,10 +126,22 @@ it('健康连接默认显示紧凑汇总并可展开 Nightingale 详情', async 
 it('增加 MySQL 导航但不改变数据连接数量', async () => {
   renderShell()
 
-  expect(screen.getByRole('link', { name: 'MySQL' })).toHaveAttribute(
-    'href',
+  const navigation = screen.getByRole('navigation', { name: '主导航' })
+  const links = within(navigation).getAllByRole('link')
+  expect(links.map((link) => link.textContent)).toEqual([
+    '总览',
+    '主机',
+    '硬盘',
+    'MySQL',
+  ])
+  expect(links.map((link) => link.getAttribute('href'))).toEqual([
+    '/',
+    '/hosts',
+    '/disks',
     '/mysql',
-  )
+  ])
+  expect(within(navigation).queryByRole('button')).not.toBeInTheDocument()
+  expect(within(navigation).queryByText(/详情|操作/)).not.toBeInTheDocument()
   const connection = screen.getByLabelText('数据连接汇总')
   expect(await within(connection).findByText('1/1 正常')).toBeVisible()
   expect(within(connection).queryByText('MySQL')).not.toBeInTheDocument()

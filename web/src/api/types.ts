@@ -172,6 +172,71 @@ export interface MySQLInstancePageData {
 
 export type MySQLInstancePageResponse = ApiResponse<MySQLInstancePageData>
 
+export type DiskSMARTHealth = 'healthy' | 'failed' | 'unknown'
+
+export type DiskStatusSource =
+  | 'smart_health'
+  | 'device_warning'
+  | 'attribute_failure'
+  | 'collection'
+  | 'unknown'
+  | 'normal'
+
+export interface DiskErrorCounters {
+  pending_sectors: number | null
+  reallocated_sectors: number | null
+  uncorrectable_sectors: number | null
+  udma_crc_errors: number | null
+  media_integrity_errors: number | null
+  error_log_entries: number | null
+  unsafe_shutdowns: number | null
+}
+
+export interface DiskDevice {
+  id: string
+  host: string
+  device: string
+  model: string
+  capacity_bytes: number | null
+  smart_health: DiskSMARTHealth
+  temperature_celsius: number | null
+  lifetime_used_percent: number | null
+  power_on_hours: number | null
+  errors: DiskErrorCounters
+  status: MetricLevel
+  status_source: DiskStatusSource
+  collection_level: MetricLevel
+}
+
+export interface DiskDevicePageData {
+  devices: DiskDevice[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export type DiskDevicePageResponse = ApiResponse<DiskDevicePageData>
+
+export interface DiskOverviewData {
+  total: number
+  normal: number
+  warning: number
+  critical: number
+  unknown: number
+  affected_devices: number
+  warning_devices: number
+  critical_devices: number
+  alerts: {
+    smart_health: AlertCount
+    device_warning: AlertCount
+    attribute_failure: AlertCount
+    collection: AlertCount
+  }
+}
+
+export type DiskOverviewResponse = ApiResponse<DiskOverviewData>
+
 export interface DataSourceStatusData {
   type: 'mock' | 'nightingale'
   healthy: boolean

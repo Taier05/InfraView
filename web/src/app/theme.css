@@ -1073,6 +1073,91 @@ h1 {
 .mysql-table-compact th:nth-child(9) { width: 7%; }
 .mysql-table-compact th:nth-child(10) { width: 8%; }
 
+.disk-table-scroll {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.host-table.disk-table {
+  width: 100%;
+  min-width: 0;
+}
+
+.host-table.disk-table th,
+.host-table.disk-table td {
+  padding: 0.32rem 0.3rem;
+}
+
+.host-table.disk-table th {
+  font-size: 0.68rem;
+  line-height: 1.1;
+}
+
+.host-table.disk-table td {
+  font-size: 0.72rem;
+  line-height: 1.15;
+}
+
+.host-table.disk-table th:nth-child(1) { width: 11%; }
+.host-table.disk-table th:nth-child(2) { width: 8%; }
+.host-table.disk-table th:nth-child(3) { width: 15%; }
+.host-table.disk-table th:nth-child(4) { width: 9%; }
+.host-table.disk-table th:nth-child(5) { width: 10%; }
+.host-table.disk-table th:nth-child(6) { width: 7%; }
+.host-table.disk-table th:nth-child(7) { width: 8%; }
+.host-table.disk-table th:nth-child(8) { width: 9%; }
+.host-table.disk-table th:nth-child(9) { width: 14%; }
+.host-table.disk-table th:nth-child(10) { width: 9%; }
+
+.disk-table .host-sort-button {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.disk-table .host-sort-button > span:first-child,
+.disk-cell-text,
+.disk-cell-value,
+.disk-error-summary,
+.disk-badge-value {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.disk-model {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.disk-capacity {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.disk-table .host-sort-indicator {
+  flex: 0 0 auto;
+}
+
+.disk-table .status-badge {
+  max-width: 100%;
+  padding-inline: 0.3rem;
+}
+
+.disk-table .status-badge-dot {
+  flex: 0 0 auto;
+}
+
 .host-table th:nth-child(1) .host-sort-button,
 .host-table th:nth-child(n + 5):nth-child(-n + 10) .host-sort-button {
   width: 100%;

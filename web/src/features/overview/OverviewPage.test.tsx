@@ -11,8 +11,10 @@ import {
 } from 'vitest'
 
 import {
+  diskOverviewFixture,
   mysqlOverviewFixture,
   overviewFixture,
+  type DiskOverviewFixture,
   type ErrorFixture,
   type MySQLOverviewFixture,
   type OverviewFixture,
@@ -64,19 +66,29 @@ function requestedPath(input: RequestInfo | URL) {
 
 function mockOverviewRequests({
   host = overviewFixture(),
+  disk = diskOverviewFixture(),
   mysql = mysqlOverviewFixture(),
   hostError,
+  diskError,
   mysqlError,
 }: {
   host?: OverviewFixture
+  disk?: DiskOverviewFixture
   mysql?: MySQLOverviewFixture
   hostError?: ErrorFixture
+  diskError?: ErrorFixture
   mysqlError?: ErrorFixture
 } = {}) {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
-    if (requestedPath(input) === '/api/v1/mysql/overview') {
+    const path = requestedPath(input)
+    if (path === '/api/v1/mysql/overview') {
       return Promise.resolve(
         jsonResponse(mysqlError ?? mysql, mysqlError === undefined ? 200 : 503),
+      )
+    }
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(
+        jsonResponse(diskError ?? disk, diskError === undefined ? 200 : 503),
       )
     }
     return Promise.resolve(
@@ -95,7 +107,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('总览展示可进入 Linux 主机和 MySQL 板块的告警摘要卡', async () => {
+it('总览展示可进入 Linux 主机、主机硬盘和 MySQL 板块的告警摘要卡', async () => {
   renderOverview()
 
   const hostCard = await screen.findByRole('link', {
@@ -103,6 +115,9 @@ it('总览展示可进入 Linux 主机和 MySQL 板块的告警摘要卡', async
   })
   const mysqlCard = screen.getByRole('link', {
     name: '查看 MySQL 板块',
+  })
+  const diskCard = screen.getByRole('link', {
+    name: '查看主机硬盘板块',
   })
   const moduleGrid = screen.getByRole('group', { name: '基础设施模块' })
   expect(moduleGrid).toHaveClass(
@@ -113,9 +128,36 @@ it('总览展示可进入 Linux 主机和 MySQL 板块的告警摘要卡', async
     within(moduleGrid).getByRole('link', { name: '查看 Linux 主机板块' }),
   ).toBeVisible()
   expect(
+    within(moduleGrid).getByRole('link', { name: '查看主机硬盘板块' }),
+  ).toBeVisible()
+  expect(
     within(moduleGrid).getByRole('link', { name: '查看 MySQL 板块' }),
   ).toBeVisible()
   expect(screen.queryAllByRole('article')).toHaveLength(0)
+  expect(diskCard).toHaveAttribute('href', '/disks')
+  expect(diskCard).toHaveAttribute('data-level', 'critical')
+  expect(within(diskCard).getByText('主机硬盘')).toBeVisible()
+  expect(within(diskCard).getByText('异常设备')).toBeVisible()
+  expect(within(diskCard).getByText('5')).toBeVisible()
+  expect(within(diskCard).getByText('/ 6')).toBeVisible()
+  expect(within(diskCard).getByText('严重 2')).toBeVisible()
+  expect(within(diskCard).getByText('警告风险 3')).toBeVisible()
+  for (const [label, total, details] of [
+    ['SMART 自检', '1', '严重 1 · 警告 0'],
+    ['设备警告', '1', '严重 1 · 警告 0'],
+    ['属性失败', '1', '严重 0 · 警告 1'],
+    ['采集状态', '1', '严重 0 · 警告 1'],
+  ]) {
+    const metric = within(diskCard).getByText(label).closest('div')?.parentElement
+    expect(metric).not.toBeNull()
+    expect(within(metric as HTMLElement).getByText(total)).toBeInTheDocument()
+    expect(within(metric as HTMLElement).getByText(details)).toBeInTheDocument()
+  }
+  const diskFooter = diskCard.querySelector('.module-status-footer')
+  expect(diskFooter).not.toBeNull()
+  expect(within(diskFooter as HTMLElement).getByText(/查看硬盘/)).toBeVisible()
+  expect(diskFooter?.querySelector('.module-status-level')).toBeNull()
+  expect(within(diskFooter as HTMLElement).queryByText(/全部正常|存在/)).not.toBeInTheDocument()
   expect(hostCard).toHaveAttribute('href', '/hosts')
   expect(hostCard).toHaveAttribute('data-level', 'critical')
   expect(within(hostCard).getByText('Linux 主机')).toBeInTheDocument()
@@ -194,6 +236,24 @@ it('全正常时用绿色无异常文案展示所有零值状态', async () => {
         },
       },
     }),
+    disk: diskOverviewFixture({
+      data: {
+        total: 4,
+        normal: 4,
+        warning: 0,
+        critical: 0,
+        unknown: 0,
+        affected_devices: 0,
+        warning_devices: 0,
+        critical_devices: 0,
+        alerts: {
+          smart_health: { warning: 0, critical: 0 },
+          device_warning: { warning: 0, critical: 0 },
+          attribute_failure: { warning: 0, critical: 0 },
+          collection: { warning: 0, critical: 0 },
+        },
+      },
+    }),
   })
   renderOverview()
 
@@ -222,6 +282,304 @@ it('全正常时用绿色无异常文案展示所有零值状态', async () => {
   expect(within(mysqlCard).getAllByText('无异常')).toHaveLength(4)
   expect(within(mysqlCard).getByText('无警告风险')).toBeVisible()
   expect(mysqlCard.querySelector('.module-status-breakdown')).toBeNull()
+
+  const diskCard = screen.getByRole('link', { name: '查看主机硬盘板块' })
+  expect(diskCard).toHaveAttribute('data-level', 'normal')
+  expect(within(diskCard).getByText('全部正常')).toBeVisible()
+  expect(within(diskCard).getAllByText('无异常')).toHaveLength(4)
+})
+
+it('硬盘无设备时显示中性空状态', async () => {
+  mockOverviewRequests({
+    disk: diskOverviewFixture({
+      data: {
+        total: 0,
+        normal: 0,
+        warning: 0,
+        critical: 0,
+        unknown: 0,
+        affected_devices: 0,
+        warning_devices: 0,
+        critical_devices: 0,
+        alerts: {
+          smart_health: { warning: 0, critical: 0 },
+          device_warning: { warning: 0, critical: 0 },
+          attribute_failure: { warning: 0, critical: 0 },
+          collection: { warning: 0, critical: 0 },
+        },
+      },
+    }),
+  })
+  renderOverview()
+
+  const card = await screen.findByRole('link', { name: '查看主机硬盘板块' })
+  expect(card).toHaveAttribute('data-level', 'empty')
+  expect(within(card).getByText('暂无硬盘设备')).toBeVisible()
+  expect(within(card).queryByText('全部正常')).not.toBeInTheDocument()
+  expect(within(card).queryByText('无异常')).not.toBeInTheDocument()
+})
+
+it('硬盘 unknown 直接使用后端 warning_devices 归入警告风险', async () => {
+  mockOverviewRequests({
+    disk: diskOverviewFixture({
+      data: {
+        total: 8,
+        normal: 5,
+        warning: 1,
+        critical: 0,
+        unknown: 2,
+        affected_devices: 3,
+        warning_devices: 3,
+        critical_devices: 0,
+        alerts: {
+          smart_health: { warning: 1, critical: 0 },
+          device_warning: { warning: 0, critical: 0 },
+          attribute_failure: { warning: 0, critical: 0 },
+          collection: { warning: 0, critical: 0 },
+        },
+      },
+    }),
+  })
+  renderOverview()
+
+  const card = await screen.findByRole('link', { name: '查看主机硬盘板块' })
+  expect(card).toHaveAttribute('data-level', 'warning')
+  expect(within(card).getByText('存在警告或未知')).toBeVisible()
+  expect(within(card).getByText('异常设备')).toBeVisible()
+  expect(within(card).getByText('3')).toBeVisible()
+  expect(within(card).getByText('警告风险 3')).toBeVisible()
+  expect(within(card).queryByText('警告风险 1')).not.toBeInTheDocument()
+})
+
+it('Linux 和 MySQL 已加载时独立显示硬盘加载状态', async () => {
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const path = requestedPath(input)
+    if (path === '/api/v1/disks/overview') {
+      return new Promise<Response>(() => undefined)
+    }
+    if (path === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    return Promise.resolve(jsonResponse(overviewFixture()))
+  })
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Linux 主机板块' }),
+  ).toBeVisible()
+  expect(screen.getByRole('link', { name: '查看 MySQL 板块' })).toBeVisible()
+  expect(
+    screen.getByRole('status', { name: '主机硬盘板块加载中' }),
+  ).toBeVisible()
+})
+
+it('硬盘首次请求失败不阻塞 Linux 和 MySQL 且可独立重试', async () => {
+  let diskAttempts = 0
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const path = requestedPath(input)
+    if (path === '/api/v1/disks/overview') {
+      diskAttempts += 1
+      return Promise.resolve(
+        diskAttempts === 1
+          ? jsonResponse(
+              {
+                code: 'datasource_unavailable',
+                message: '硬盘数据源暂时不可用',
+                request_id: 'req-fixture-disk-overview-error',
+                retryable: true,
+              },
+              503,
+            )
+          : jsonResponse(diskOverviewFixture()),
+      )
+    }
+    if (path === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    return Promise.resolve(jsonResponse(overviewFixture()))
+  })
+  const user = userEvent.setup()
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Linux 主机板块' }),
+  ).toBeVisible()
+  expect(screen.getByRole('link', { name: '查看 MySQL 板块' })).toBeVisible()
+  const error = screen.getByRole('alert', { name: '主机硬盘板块加载失败' })
+  expect(error).toHaveTextContent('硬盘数据源暂时不可用')
+  await user.click(within(error).getByRole('button', { name: '重试' }))
+
+  expect(
+    await screen.findByRole('link', { name: '查看主机硬盘板块' }),
+  ).toBeVisible()
+  expect(diskAttempts).toBe(2)
+})
+
+it('硬盘成功响应结构无效时独立报错而不使总览崩溃', async () => {
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const path = requestedPath(input)
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(
+        jsonResponse({
+          data: { authenticated: true, username: 'admin' },
+          meta: { request_id: 'req-malformed-disk-overview', stale: false },
+        }),
+      )
+    }
+    if (path === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    return Promise.resolve(jsonResponse(overviewFixture()))
+  })
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Linux 主机板块' }),
+  ).toBeVisible()
+  expect(screen.getByRole('link', { name: '查看 MySQL 板块' })).toBeVisible()
+  expect(
+    screen.getByRole('alert', { name: '主机硬盘板块加载失败' }),
+  ).toHaveTextContent('服务器响应格式无效')
+})
+
+const inconsistentDiskOverviewCases = [
+  {
+    name: '负数计数',
+    mutate: (fixture: DiskOverviewFixture) => {
+      fixture.data.normal = -1
+    },
+  },
+  {
+    name: '小数计数',
+    mutate: (fixture: DiskOverviewFixture) => {
+      fixture.data.alerts.smart_health.warning = 0.5
+    },
+  },
+  {
+    name: '状态桶总和不等于 total',
+    mutate: (fixture: DiskOverviewFixture) => {
+      fixture.data.total = 7
+    },
+  },
+  {
+    name: 'affected_devices 不等于风险状态去重数',
+    mutate: (fixture: DiskOverviewFixture) => {
+      fixture.data.affected_devices = 4
+    },
+  },
+  {
+    name: 'warning_devices 不等于 warning 加 unknown',
+    mutate: (fixture: DiskOverviewFixture) => {
+      fixture.data.warning_devices = 2
+    },
+  },
+  {
+    name: 'critical_devices 不等于 critical',
+    mutate: (fixture: DiskOverviewFixture) => {
+      fixture.data.critical_devices = 1
+    },
+  },
+  {
+    name: '单项 alert 计数大于 total',
+    mutate: (fixture: DiskOverviewFixture) => {
+      fixture.data.alerts.collection.critical = 7
+    },
+  },
+  {
+    name: '同一 alert 分类风险数之和大于 total',
+    mutate: (fixture: DiskOverviewFixture) => {
+      fixture.data.alerts.smart_health.warning = 4
+      fixture.data.alerts.smart_health.critical = 3
+    },
+  },
+] satisfies Array<{
+  name: string
+  mutate: (fixture: DiskOverviewFixture) => void
+}>
+
+it.each(inconsistentDiskOverviewCases)(
+  '硬盘成功响应拒绝$name并保持其他模块可用',
+  async ({ mutate }) => {
+    const disk = diskOverviewFixture()
+    mutate(disk)
+    mockOverviewRequests({ disk })
+    renderOverview()
+
+    expect(
+      await screen.findByRole('link', { name: '查看 Linux 主机板块' }),
+    ).toBeVisible()
+    expect(screen.getByRole('link', { name: '查看 MySQL 板块' })).toBeVisible()
+    expect(
+      screen.getByRole('alert', { name: '主机硬盘板块加载失败' }),
+    ).toHaveTextContent('服务器响应格式无效')
+    expect(
+      screen.queryByRole('link', { name: '查看主机硬盘板块' }),
+    ).not.toBeInTheDocument()
+  },
+)
+
+it('硬盘过期数据保持可见并显示精确采集时间', async () => {
+  mockOverviewRequests({
+    disk: diskOverviewFixture({
+      meta: {
+        stale: true,
+        collected_at: '2026-07-30T09:45:00.000Z',
+      },
+    }),
+  })
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看主机硬盘板块' }),
+  ).toBeVisible()
+  const banner = screen.getByRole('alert', { name: '主机硬盘数据已过期' })
+  expect(within(banner).getByRole('time')).toHaveAttribute(
+    'dateTime',
+    '2026-07-30T09:45:00.000Z',
+  )
+})
+
+it('硬盘刷新失败时保留旧卡并显示独立重试状态', async () => {
+  let diskAttempts = 0
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const path = requestedPath(input)
+    if (path === '/api/v1/disks/overview') {
+      diskAttempts += 1
+      return Promise.resolve(
+        diskAttempts === 1
+          ? jsonResponse(diskOverviewFixture())
+          : jsonResponse(
+              {
+                code: 'datasource_unavailable',
+                message: '硬盘数据刷新失败',
+                request_id: 'req-fixture-disk-overview-refresh-error',
+                retryable: true,
+              },
+              503,
+            ),
+      )
+    }
+    if (path === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    return Promise.resolve(jsonResponse(overviewFixture()))
+  })
+  const user = userEvent.setup()
+  renderOverview()
+
+  const card = await screen.findByRole('link', {
+    name: '查看主机硬盘板块',
+  })
+  await user.click(screen.getByRole('button', { name: '刷新' }))
+
+  expect(card).toBeVisible()
+  const error = await screen.findByRole('alert', {
+    name: '主机硬盘板块刷新失败',
+  })
+  expect(error).toHaveTextContent('硬盘数据刷新失败')
+  expect(
+    within(error).getByRole('button', { name: '重试 主机硬盘板块' }),
+  ).toBeVisible()
 })
 
 it('把未知实例作为 warning 风险但保留未知文案', async () => {
@@ -374,8 +732,12 @@ it('MySQL 无实例时显示空状态而不是异常', async () => {
 
 it('Linux 已加载时独立显示 MySQL 加载状态', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
-    if (requestedPath(input) === '/api/v1/mysql/overview') {
+    const path = requestedPath(input)
+    if (path === '/api/v1/mysql/overview') {
       return new Promise<Response>(() => undefined)
+    }
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(jsonResponse(diskOverviewFixture()))
     }
     return Promise.resolve(jsonResponse(overviewFixture()))
   })
@@ -412,7 +774,11 @@ it('Linux 和 MySQL 卡片失败互不影响', async () => {
 it('MySQL 刷新失败时保留旧卡并显示独立重试状态', async () => {
   let mysqlAttempts = 0
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
-    if (requestedPath(input) !== '/api/v1/mysql/overview') {
+    const path = requestedPath(input)
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(jsonResponse(diskOverviewFixture()))
+    }
+    if (path === '/api/v1/overview') {
       return Promise.resolve(jsonResponse(overviewFixture()))
     }
     mysqlAttempts += 1
@@ -470,8 +836,12 @@ it('MySQL 过期数据保持可见并显示精确采集时间', async () => {
 it('使用固定查询范围且不显示总览时间范围控件', async () => {
   const requestedRanges: string[] = []
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
-    if (requestedPath(input) === '/api/v1/mysql/overview') {
+    const path = requestedPath(input)
+    if (path === '/api/v1/mysql/overview') {
       return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(jsonResponse(diskOverviewFixture()))
     }
     requestedRanges.push(requestedRange(input))
     return Promise.resolve(jsonResponse(overviewFixture()))
@@ -486,19 +856,21 @@ it('使用固定查询范围且不显示总览时间范围控件', async () => {
   expect(screen.queryByRole('button', { name: '7天' })).not.toBeInTheDocument()
 })
 
-it('手动刷新会同时重新请求 Linux 和 MySQL 总览', async () => {
+it('手动刷新会同时重新请求 Linux、硬盘和 MySQL 总览', async () => {
   const user = userEvent.setup()
   renderOverview()
 
   await screen.findByRole('link', { name: '查看 Linux 主机板块' })
-  expect(globalThis.fetch).toHaveBeenCalledTimes(2)
+  await screen.findByRole('link', { name: '查看主机硬盘板块' })
+  expect(globalThis.fetch).toHaveBeenCalledTimes(3)
   await user.click(screen.getByRole('button', { name: '刷新' }))
 
-  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(4))
+  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(6))
   const calls = vi.mocked(globalThis.fetch).mock.calls
   expect(calls.map(([input]) => requestedPath(input))).toEqual(
     expect.arrayContaining([
       '/api/v1/overview',
+      '/api/v1/disks/overview',
       '/api/v1/mysql/overview',
     ]),
   )
@@ -514,8 +886,12 @@ it('每 15 秒刷新且前一请求未完成时不发起重叠请求', async () 
   let hostRequestCount = 0
   let resolveRefresh!: (response: Response) => void
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
-    if (requestedPath(input) === '/api/v1/mysql/overview') {
+    const path = requestedPath(input)
+    if (path === '/api/v1/mysql/overview') {
       return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(jsonResponse(diskOverviewFixture()))
     }
     hostRequestCount += 1
     if (hostRequestCount === 1) {
@@ -569,8 +945,12 @@ it('过期数据提示显示服务端给出的精确采集时间', async () => {
 it('可重试错误显示中文信息并可重试成功', async () => {
   let attempts = 0
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
-    if (requestedPath(input) === '/api/v1/mysql/overview') {
+    const path = requestedPath(input)
+    if (path === '/api/v1/mysql/overview') {
       return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(jsonResponse(diskOverviewFixture()))
     }
     attempts += 1
     if (attempts === 1) {

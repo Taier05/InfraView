@@ -1,6 +1,6 @@
 # Nightingale 数据源接入
 
-状态：真实只读适配器已实现。当前主要开发与真实验证版本为 Nightingale v8.4.1，v9.x 保留协议兼容；当前 8080 服务已使用更新后的私密环境文件重建并通过最终只读验收。`INFRAVIEW_DATA_SOURCE` 接受 `mock` 或 `nightingale`。
+状态：真实只读适配器已实现。当前主要开发与验证版本为 Nightingale v8.4.1，v9.x 仅保留协议兼容；开发 8080 永远只连接测试 Nightingale。本轮已获授权原位重建现有 8080 并完成硬盘 API、Chromium 和跨两个采集周期的脱敏现场验收；未创建其他 InfraView 端口，未连接生产。`INFRAVIEW_DATA_SOURCE` 接受 `mock` 或 `nightingale`。
 
 最后采集：2026-07-29
 
@@ -63,6 +63,15 @@ CPU 核数、内存总量和网络接口映射已通过脱敏夹具验证。公�
 - 历史 MySQL 版本已通过无缓存生产镜像、Go 普通/race、E2E 隔离安全测试和原 8080 Chromium 验收。原始样本新鲜度修复已通过无缓存生产镜像、Go 普通/race 与原有测试 8080 的脱敏登录态现场验收；停采对象在 Linux、MySQL 和两张总览卡均为严重，响应非 stale。
 - 样本推进修复已通过无缓存生产镜像、Go 普通/race、前端状态颜色测试及原有测试 8080 脱敏验收；持续采集对象跨越多个缓存刷新和至少两个采集周期保持正常且非 stale。冻结升级由自动化测试验证，本轮未再次停止采集器。
 
+## 主机硬盘 SMART 只读映射
+
+- 硬盘是独立领域与 Service；共享 Nightingale `*Provider` 额外实现 `disk.Provider`，但沿用相同受限 HTTP Client、数据源发现、认证、超时、Content-Type、`dat`/`err` envelope、8 MiB 上限和安全错误清洗。
+- 每个硬盘快照精确发送一次 `POST /api/n9e/query-instant-batch`，固定 18 条代码内置即时查询。前 16 组覆盖 SMART 健康、两个温度来源、寿命、通电时间、NVMe 设备警告/备用空间、ATA 属性失败及七类错误计数；第 17 组固定为 `smart_disk_capacity_bytes`，第 18 组固定为 `tlast_over_time(smart_device_health_ok[24h])` 近期设备 inventory 与原始最后样本时间。不发送硬盘范围查询，不按主机或设备 N+1。
+- 原始身份在 Provider 内按同一主机归并，稳定 ID 的优先级固定为 WWN、`serial_no`、设备名，并将主机身份和身份类型一起纳入不可逆哈希。第 18 组同一 `ident + device` 的兼容 24 小时历史序列先归并，`ReportedAt` 取最大的原始样本时间，非空型号不因较新序列缺失而丢失；`serial_no` 或 WWN 只有双方都非空且值不同时才判冲突，任一侧缺失仍允许补齐。第 17 组容量只归并到已由 inventory 建立的已知设备，取最新非负整数值；缺失、非法、越界或同一最新时间冲突保持 `null`。旧 inventory `capacity` 标签不读取、不校验也不回退，容量不改变设备发现、`ReportedAt` 或 freshness。辅助序列沿用相同身份规则。Provider 输出、HTTP API 与前端不包含序列号、WWN、原始标签、PromQL、数据源 ID 或上游请求信息。
+- `INFRAVIEW_SMART_COLLECTION_INTERVAL` 默认 `60s`，同时作为独立快照 TTL 与 freshness 周期。Service 记录 InfraView 本地最后观察到原始样本时间推进的时刻；业务值变化、即时查询外层时间和原始样本绝对年龄都不参与。默认 120 秒未推进为警告，300 秒为严重，缓存命中不伪造推进，stale 回退继续老化。
+- 温度、寿命和错误计数仅展示，不套用 InfraView 通用阈值。API 显式返回六值 `status_source`；最终等级同级时设备来源优先于采集来源，设备来源内部为 `smart_health`、`device_warning`、`attribute_failure`，仅采集等级严格更高时使用 `collection`，其余为 `normal` 或 `unknown`。
+- 当前主要验证版本仍为 Nightingale v8.4.1，v9.x 仅保留脱敏协议兼容。2026-08-01 的 18 组容量增量已完成脱敏契约、完整离线测试及现有 8080 现场验收；现场只连接测试 Nightingale，硬盘 API 非 stale、容量存在、容量升降序、十列 Chromium 与总览四槽位均通过。未输出私密环境、真实标识、数量、容量值、指标值或上游正文，任何生产 Nightingale 验证均未执行。
+
 Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能只依赖 HTTP 状态，还必须检查 `err`。错误路径会被 SPA 接管并返回 HTML，因此适配器必须同时校验 Content-Type 和 JSON 结构。
 
 ## 已确认适配策略
@@ -109,7 +118,7 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 
 ## 目标映射
 
-共享的 `*Provider` 同时实现 Linux 主机 `internal/datasource.Provider`（`Health`、`ListHosts`、`GetHost`、`GetCurrentMetrics`、`QueryRange`、`QueryAggregateRange`）与 MySQL `internal/mysql.Provider`（`MySQLSnapshot`）。前端和服务层不接收 Nightingale 原始请求体、任意 URL 或任意查询表达式。
+共享的 `*Provider` 同时实现 Linux 主机 `internal/datasource.Provider`（`Health`、`ListHosts`、`GetHost`、`GetCurrentMetrics`、`QueryRange`、`QueryAggregateRange`）、MySQL `internal/mysql.Provider`（`MySQLSnapshot`）与硬盘 `internal/disk.Provider`（`SMARTSnapshot`）。前端和服务层不接收 Nightingale 原始请求体、任意 URL 或任意查询表达式。
 
 ## 实施顺序
 

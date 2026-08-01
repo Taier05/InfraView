@@ -17,12 +17,12 @@ async function login(page: Page) {
 async function expectNoDestructiveControls(page: Page) {
   await expect(
     page.getByRole('button', {
-      name: /重启|删除|执行|远程命令|切换|修改|发布|配置/,
+      name: /重启|删除|执行|远程命令|切换|修改|发布|配置|扫描|自检|修复|启停|擦除/,
     }),
   ).toHaveCount(0)
   await expect(
     page.getByRole('link', {
-      name: /重启|删除|执行|远程命令|切换|修改|发布|配置/,
+      name: /重启|删除|执行|远程命令|切换|修改|发布|配置|扫描|自检|修复|启停|擦除/,
     }),
   ).toHaveCount(0)
 }
@@ -30,6 +30,7 @@ async function expectNoDestructiveControls(page: Page) {
 test('未登录会重定向，登录后可完成总览和主机列表关键路径', async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/hosts')
   await expect(page).toHaveURL(/\/login$/)
 
@@ -40,6 +41,31 @@ test('未登录会重定向，登录后可完成总览和主机列表关键路�
   await expect(
     page.getByRole('heading', { name: '基础设施总览' }),
   ).toBeVisible()
+  const overviewGrid = page.locator('.overview-compact-grid')
+  const overviewCards = overviewGrid.locator('.module-status-card')
+  await expect(overviewCards).toHaveCount(3)
+
+  const geometry = await overviewGrid.evaluate((grid) => {
+    const cards = Array.from(
+      grid.querySelectorAll<HTMLElement>('.module-status-card'),
+    )
+    const gridBox = grid.getBoundingClientRect()
+    const cardBoxes = cards.map((card) => card.getBoundingClientRect())
+    return {
+      columns: getComputedStyle(grid).gridTemplateColumns.split(/\s+/).length,
+      gridWidth: gridBox.width,
+      cardWidths: cardBoxes.map((box) => box.width),
+      cardTops: cardBoxes.map((box) => box.top),
+    }
+  })
+
+  expect(geometry.columns).toBe(4)
+  expect(new Set(geometry.cardTops)).toHaveLength(1)
+  for (const width of geometry.cardWidths) {
+    expect(width).toBeGreaterThan(geometry.gridWidth * 0.2)
+    expect(width).toBeLessThan(geometry.gridWidth * 0.27)
+  }
+
   const linuxCard = page.getByRole('link', { name: '查看 Linux 主机板块' })
   await expect(linuxCard.getByText('异常主机')).toBeVisible()
   await expect(
@@ -150,6 +176,126 @@ test('超长主机名限制在自身列内且保留完整提示', async ({ page 
   expect(ipCellBox).not.toBeNull()
   expect(nameCellBox!.x + nameCellBox!.width).toBeLessThanOrEqual(ipCellBox!.x)
   await expect(row.getByRole('cell').nth(1)).toContainText('192.0.2.1')
+})
+
+test('侧边栏和总览硬盘卡都可进入只读硬盘页', async ({ page }) => {
+  await login(page)
+
+  const navigation = page.getByRole('navigation', { name: '主导航' })
+  await navigation.getByRole('link', { name: '硬盘', exact: true }).click()
+  await expect(page).toHaveURL(/\/disks/)
+  await expect(page.getByRole('heading', { name: '硬盘设备' })).toBeVisible()
+
+  await navigation.getByRole('link', { name: '总览', exact: true }).click()
+  const diskCard = page.getByRole('link', { name: '查看主机硬盘板块' })
+  await expect(diskCard).toBeVisible()
+  await diskCard.click()
+  await expect(page).toHaveURL(/\/disks/)
+  await expect(page.getByRole('heading', { name: '硬盘设备' })).toBeVisible()
+  await expectNoDestructiveControls(page)
+})
+
+test('硬盘页保留十列和 URL 状态且桌面视口无横向溢出', async ({
+  page,
+}) => {
+  await login(page)
+  const fixture = await page.evaluate(async () => {
+    const response = await fetch(
+      '/api/v1/disks/devices?sort=host&order=asc&page=1&page_size=20',
+    )
+    return response.json()
+  })
+  await page.route('**/api/v1/disks/devices?**', async (route) => {
+    const url = new URL(route.request().url())
+    const requestedPage = Number(url.searchParams.get('page') ?? '1')
+    const requestedPageSize = Number(url.searchParams.get('page_size') ?? '20')
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...fixture,
+        data: {
+          ...fixture.data,
+          total: 45,
+          page: requestedPage,
+          page_size: requestedPageSize,
+          total_pages: Math.ceil(45 / requestedPageSize),
+        },
+      }),
+    })
+  })
+
+  await page
+    .getByRole('navigation', { name: '主导航' })
+    .getByRole('link', { name: '硬盘', exact: true })
+    .click()
+  await expect(page.getByRole('heading', { name: '硬盘设备' })).toBeVisible()
+
+  const headers = page.getByRole('columnheader')
+  await expect(headers).toHaveCount(10)
+  for (const heading of [
+    '主机',
+    '设备',
+    '型号',
+    '容量',
+    'SMART 健康',
+    '温度',
+    '寿命',
+    '通电时间',
+    '错误摘要',
+    '状态',
+  ]) {
+    await expect(headers.filter({ hasText: heading })).toHaveCount(1)
+  }
+
+  const firstDataRow = page.getByRole('row').nth(1)
+  await expect(firstDataRow.locator('.disk-capacity')).toBeVisible()
+  await expect(firstDataRow.locator('.disk-model')).toBeVisible()
+  const hasFormattedCapacity = await page
+    .locator('.disk-capacity')
+    .evaluateAll((elements) =>
+      elements.some((element) =>
+        /^\d+(?:\.\d)? (?:B|KiB|MiB|GiB|TiB|PiB)$/.test(
+          element.textContent?.trim() ?? '',
+        ),
+      ),
+    )
+  expect(hasFormattedCapacity).toBe(true)
+
+  await page.getByRole('button', { name: '下一页' }).click()
+  await expect(page).toHaveURL(/page=2/)
+  await page
+    .getByRole('searchbox', { name: '搜索主机、设备或型号' })
+    .fill('fixture')
+  await expect(page).toHaveURL(/search=fixture/)
+  await expect(page).toHaveURL(/page=1/)
+  await page.getByRole('combobox', { name: '设备状态' }).selectOption('warning')
+  await expect(page).toHaveURL(/status=warning/)
+  await page.getByRole('button', { name: '容量' }).click()
+  await expect(page).toHaveURL(/sort=capacity/)
+  await expect(page).toHaveURL(/order=asc/)
+  await page.getByRole('button', { name: '容量' }).click()
+  await expect(page).toHaveURL(/sort=capacity/)
+  await expect(page).toHaveURL(/order=desc/)
+  await page.getByRole('button', { name: '温度' }).click()
+  await expect(page).toHaveURL(/sort=temperature/)
+  await expect(page).toHaveURL(/order=asc/)
+  await page.getByRole('combobox', { name: '每页数量' }).selectOption('50')
+  await expect(page).toHaveURL(/page_size=50/)
+
+  await expectNoDestructiveControls(page)
+  const viewport = await page.locator('html').evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }))
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth)
+  const tableRegion = await page.locator('.disk-table-scroll').evaluate(
+    (element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }),
+  )
+  expect(tableRegion.scrollWidth).toBeLessThanOrEqual(tableRegion.clientWidth)
 })
 
 test('可控旧数据响应会显示过期提示', async ({ page }) => {

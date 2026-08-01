@@ -20,6 +20,7 @@ type Dependencies struct {
 	Limiter      *auth.Limiter
 	Service      *service.Service
 	MySQLService *service.MySQLService
+	DiskService  *service.DiskService
 	Logger       *slog.Logger
 }
 
@@ -29,6 +30,7 @@ type api struct {
 	limiter      *auth.Limiter
 	service      *service.Service
 	mysqlService *service.MySQLService
+	diskService  *service.DiskService
 	logger       *slog.Logger
 	verifyLogin  func(string, string) (auth.Session, bool)
 }
@@ -55,6 +57,7 @@ func New(dependencies Dependencies) http.Handler {
 		limiter:      dependencies.Limiter,
 		service:      dependencies.Service,
 		mysqlService: dependencies.MySQLService,
+		diskService:  dependencies.DiskService,
 		logger:       dependencies.Logger,
 		verifyLogin:  dependencies.Auth.Login,
 	}
@@ -71,6 +74,8 @@ func New(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/datasource/status", server.requireAuthentication(http.HandlerFunc(server.datasourceStatus)))
 	mux.Handle("GET /api/v1/mysql/overview", server.requireAuthentication(http.HandlerFunc(server.mysqlOverview)))
 	mux.Handle("GET /api/v1/mysql/instances", server.requireAuthentication(http.HandlerFunc(server.mysqlInstances)))
+	mux.Handle("GET /api/v1/disks/overview", server.requireAuthentication(http.HandlerFunc(server.diskOverview)))
+	mux.Handle("GET /api/v1/disks/devices", server.requireAuthentication(http.HandlerFunc(server.diskDevices)))
 
 	mux.HandleFunc("/api/v1/session", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/overview", server.methodNotAllowed)
@@ -79,6 +84,8 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/datasource/status", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/mysql/overview", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/mysql/instances", server.methodNotAllowed)
+	mux.HandleFunc("/api/v1/disks/overview", server.methodNotAllowed)
+	mux.HandleFunc("/api/v1/disks/devices", server.methodNotAllowed)
 	mux.HandleFunc("/api", server.notFound)
 	mux.HandleFunc("/api/", server.notFound)
 

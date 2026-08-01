@@ -1,0 +1,229 @@
+{
+  "dat": [
+    [
+      {
+        "metric": {"__name__":"smart_device_health_ok","ident":"fixture-host-a","device":"/dev/fixture-a","model":"Fixture Disk A","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a","capacity":"1000000000"},
+        "value": [1785123100, "1"]
+      },
+      {
+        "metric": {"__name__":"smart_device_health_ok","ident":"fixture-host-a","device":"/dev/fixture-b","model":"Fixture Disk B","serial_no":"fixture-serial-b","capacity":"-1"},
+        "value": [1785123100, "2"]
+      },
+      {
+        "metric": {"__name__":"smart_device_health_ok","ident":"fixture-host-a","device":"/dev/fixture-b","model":"Fixture Disk B","serial_no":"fixture-serial-b","capacity":"-1"},
+        "value": [1785123110, "-1"]
+      },
+      {
+        "metric": {"__name__":"smart_device_health_ok","ident":"fixture-host-a","device":"/dev/fixture-b","model":"Fixture Disk B","serial_no":"fixture-serial-b","capacity":"-1"},
+        "value": [1785123120, "NaN"]
+      },
+      {
+        "metric": {"__name__":"smart_device_health_ok","ident":"fixture-host-a","device":"/dev/fixture-b","model":"Fixture Disk B","serial_no":"fixture-serial-b","capacity":"-1"},
+        "value": [1785123130, "Inf"]
+      },
+      {
+        "metric": {"__name__":"smart_device_health_ok","ident":"fixture-host-c","device":"/dev/fixture-d","model":"Fixture Disk D","capacity":"4000000000"},
+        "value": [1785123140, "1"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "36"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123210, "37"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123200, "25"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123190, "34"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123210, "38"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123210, "37"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123210, "30"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123220, "Inf"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "40"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "41"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "41"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123200, "-1"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "1200"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123200, "NaN"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "1.5"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123200, "1"]
+      },
+      {
+        "metric": {"ident":"fixture-host-b","device":"/dev/fixture-c","serial_no":"fixture-serial-c"},
+        "value": [1785123200, "-1"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123200, "90"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123210, "101"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "Inf"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123200, "10"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123210, "-1"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a","fail":"In_the_past"},
+        "value": [1785123210, "7"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a","fail":"FAILING_NOW"},
+        "value": [1785123200, "8"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b","fail":"In_the_past"},
+        "value": [1785123200, "9"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "3"]
+      },
+      {
+        "metric": {"ident":"fixture-host-z","device":"/dev/fixture-z","serial_no":"fixture-serial-z"},
+        "value": [1785123300, "999"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "1"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "2"]
+      },
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "2"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "0"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123200, "-1"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123200, "2"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123200, "4"]
+      }
+    ],
+    [
+      {
+        "metric": {"ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123200, "6"]
+      }
+    ],
+    [
+      {
+        "metric": {"__name__":"smart_disk_capacity_bytes","ident":"fixture-host-a","device":"/dev/fixture-a","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a"},
+        "value": [1785123900, "1000000000"]
+      },
+      {
+        "metric": {"__name__":"smart_disk_capacity_bytes","ident":"fixture-host-a","device":"/dev/fixture-b","serial_no":"fixture-serial-b"},
+        "value": [1785123900, "-1"]
+      }
+    ],
+    [
+      {
+        "metric": {"__name__":"smart_device_health_ok","ident":"fixture-host-a","device":"/dev/fixture-a","model":"Fixture Disk A","serial_no":"fixture-serial-a","wwn":"fixture-wwn-a","capacity":"999999999"},
+        "value": [1785124000, "1785123000.25"]
+      },
+      {
+        "metric": {"__name__":"smart_device_health_ok","ident":"fixture-host-a","device":"/dev/fixture-b","model":"Fixture Disk B","serial_no":"fixture-serial-b","capacity":"-1"},
+        "value": [1785124000, "1785123010.5"]
+      },
+      {
+        "metric": {"__name__":"smart_device_health_ok","ident":"fixture-host-b","device":"/dev/fixture-c","model":"Fixture Disk C","serial_no":"fixture-serial-c","capacity":"999999999999999999999999"},
+        "value": [1785124000, "1785123020"]
+      },
+      {
+        "metric": {"__name__":"smart_device_health_ok","ident":"fixture-host-c","device":"/dev/fixture-d","model":"Fixture Disk D","capacity":"4000000000"},
+        "value": [1785124000, "1785123030"]
+      }
+    ]
+  ],
+  "err": ""
+}

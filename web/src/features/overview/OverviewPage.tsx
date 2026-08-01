@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom'
 import { APIError, apiRequest } from '../../api/client'
 import type {
   AlertCount,
+  DiskOverviewData,
+  DiskOverviewResponse,
   MetricLevel,
   MySQLOverviewData,
   MySQLOverviewResponse,
@@ -13,6 +15,103 @@ import type {
 import { RefreshControl } from '../../components/RefreshControl'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useRefreshIntervalMs } from '../../app/runtime'
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isNaturalCount(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value >= 0
+  )
+}
+
+function isAlertCount(value: unknown): value is AlertCount {
+  return (
+    isRecord(value) &&
+    isNaturalCount(value.warning) &&
+    isNaturalCount(value.critical)
+  )
+}
+
+function isDiskOverviewResponse(
+  value: unknown,
+): value is DiskOverviewResponse {
+  if (!isRecord(value) || !isRecord(value.data) || !isRecord(value.meta)) {
+    return false
+  }
+  const { data, meta } = value
+  const {
+    total,
+    normal,
+    warning,
+    critical,
+    unknown,
+    affected_devices: affectedDevices,
+    warning_devices: warningDevices,
+    critical_devices: criticalDevices,
+    alerts,
+  } = data
+
+  if (
+    !isNaturalCount(total) ||
+    !isNaturalCount(normal) ||
+    !isNaturalCount(warning) ||
+    !isNaturalCount(critical) ||
+    !isNaturalCount(unknown) ||
+    !isNaturalCount(affectedDevices) ||
+    !isNaturalCount(warningDevices) ||
+    !isNaturalCount(criticalDevices) ||
+    !isRecord(alerts) ||
+    !isAlertCount(alerts.smart_health) ||
+    !isAlertCount(alerts.device_warning) ||
+    !isAlertCount(alerts.attribute_failure) ||
+    !isAlertCount(alerts.collection)
+  ) {
+    return false
+  }
+
+  const alertCounts = [
+    alerts.smart_health,
+    alerts.device_warning,
+    alerts.attribute_failure,
+    alerts.collection,
+  ]
+
+  return (
+    total === normal + warning + critical + unknown &&
+    affectedDevices === warning + critical + unknown &&
+    warningDevices === warning + unknown &&
+    criticalDevices === critical &&
+    alertCounts.every(
+      (count) =>
+        count.warning <= total &&
+        count.critical <= total &&
+        count.warning + count.critical <= total,
+    ) &&
+    typeof meta.request_id === 'string' &&
+    typeof meta.stale === 'boolean' &&
+    (meta.collected_at === undefined || typeof meta.collected_at === 'string')
+  )
+}
+
+async function requestDiskOverview(signal: AbortSignal) {
+  const response = await apiRequest<unknown>('/api/v1/disks/overview', {
+    signal,
+  })
+  if (!isDiskOverviewResponse(response)) {
+    throw new APIError(
+      200,
+      'invalid_response',
+      '服务器响应格式无效',
+      '',
+      false,
+    )
+  }
+  return response
+}
 
 function alertLevel(alerts: AlertCount): MetricLevel {
   if (alerts.critical > 0) return 'critical'
@@ -38,10 +137,12 @@ function MetricAlert({ label, alerts }: { label: string; alerts: AlertCount }) {
   )
 }
 
-type ModuleLabel = 'Linux 主机' | 'MySQL'
+type ModuleLabel = 'Linux 主机' | '主机硬盘' | 'MySQL'
 
 function moduleName(label: ModuleLabel) {
-  return label === 'MySQL' ? 'MySQL 板块' : 'Linux 主机板块'
+  if (label === 'MySQL') return 'MySQL 板块'
+  if (label === '主机硬盘') return '主机硬盘板块'
+  return 'Linux 主机板块'
 }
 
 function ModuleLoading({ label }: { label: ModuleLabel }) {
@@ -77,6 +178,8 @@ function ModuleError({
         <strong>
           {label === 'Linux 主机'
             ? '无法加载总览数据'
+            : label === '主机硬盘'
+              ? '无法加载主机硬盘板块'
             : '无法加载 MySQL 板块'}
         </strong>
         <p>{apiError?.message ?? '服务暂时无法处理请求'}</p>
@@ -128,7 +231,11 @@ function ModuleStaleBanner({
   collectedAt: string
 }) {
   const staleLabel =
-    label === 'MySQL' ? 'MySQL 数据已过期' : 'Linux 主机数据已过期'
+    label === 'MySQL'
+      ? 'MySQL 数据已过期'
+      : label === '主机硬盘'
+        ? '主机硬盘数据已过期'
+        : 'Linux 主机数据已过期'
 
   return (
     <div
@@ -364,6 +471,113 @@ function MySQLStatusCard({ data }: { data: MySQLOverviewData }) {
   )
 }
 
+function DiskStatusCard({ data }: { data: DiskOverviewData }) {
+  if (data.total === 0) {
+    return (
+      <Link
+        className="module-status-card disk-overview-card"
+        data-level="empty"
+        to="/disks"
+        aria-label="查看主机硬盘板块"
+      >
+        <div className="module-status-heading">
+          <div>
+            <span>存储板块</span>
+            <h2>主机硬盘</h2>
+          </div>
+          <span className="module-status-level" data-level="empty">
+            暂无设备
+          </span>
+        </div>
+        <div className="module-overview-empty-state">
+          <strong>暂无硬盘设备</strong>
+          <span>尚无可展示的硬盘健康数据</span>
+        </div>
+        <div className="module-status-footer">
+          <span className="module-status-action">
+            查看硬盘 <span aria-hidden="true">→</span>
+          </span>
+        </div>
+      </Link>
+    )
+  }
+
+  const level: MetricLevel =
+    data.critical_devices > 0
+      ? 'critical'
+      : data.warning_devices > 0
+        ? 'warning'
+        : 'normal'
+  const levelLabel =
+    level === 'critical'
+      ? '存在严重异常'
+      : level === 'warning'
+        ? data.unknown > 0
+          ? '存在警告或未知'
+          : '存在警告'
+        : '全部正常'
+
+  return (
+    <Link
+      className="module-status-card disk-overview-card"
+      data-level={level}
+      to="/disks"
+      aria-label="查看主机硬盘板块"
+    >
+      <div className="module-status-heading">
+        <div>
+          <span>存储板块</span>
+          <h2>主机硬盘</h2>
+        </div>
+        <span className="module-status-level" data-level={level}>
+          {levelLabel}
+        </span>
+      </div>
+
+      <div className="module-alert-summary">
+        <div className="module-alert-total">
+          <span>异常设备</span>
+          <strong>
+            {data.affected_devices}
+            <small> / {data.total}</small>
+          </strong>
+        </div>
+        <div className="module-alert-levels">
+          <StatusBadge
+            level={data.critical_devices > 0 ? 'critical' : 'normal'}
+            label={
+              data.critical_devices > 0
+                ? `严重 ${data.critical_devices}`
+                : '无严重'
+            }
+          />
+          <StatusBadge
+            level={data.warning_devices > 0 ? 'warning' : 'normal'}
+            label={
+              data.warning_devices > 0
+                ? `警告风险 ${data.warning_devices}`
+                : '无警告风险'
+            }
+          />
+        </div>
+      </div>
+
+      <div className="module-metric-alert-grid">
+        <MetricAlert label="SMART 自检" alerts={data.alerts.smart_health} />
+        <MetricAlert label="设备警告" alerts={data.alerts.device_warning} />
+        <MetricAlert label="属性失败" alerts={data.alerts.attribute_failure} />
+        <MetricAlert label="采集状态" alerts={data.alerts.collection} />
+      </div>
+
+      <div className="module-status-footer">
+        <span className="module-status-action">
+          查看硬盘 <span aria-hidden="true">→</span>
+        </span>
+      </div>
+    </Link>
+  )
+}
+
 export function OverviewPage() {
   const refreshIntervalMs = useRefreshIntervalMs()
   const hostOverview = useQuery({
@@ -382,9 +596,21 @@ export function OverviewPage() {
     refetchInterval: refreshIntervalMs,
     refetchIntervalInBackground: false,
   })
+  const diskOverview = useQuery({
+    queryKey: ['disk-overview'],
+    queryFn: ({ signal }) => requestDiskOverview(signal),
+    refetchInterval: refreshIntervalMs,
+    refetchIntervalInBackground: false,
+  })
   const allDataUpdatedAt =
-    hostOverview.data !== undefined && mysqlOverview.data !== undefined
-      ? Math.min(hostOverview.dataUpdatedAt, mysqlOverview.dataUpdatedAt)
+    hostOverview.data !== undefined &&
+    diskOverview.data !== undefined &&
+    mysqlOverview.data !== undefined
+      ? Math.min(
+          hostOverview.dataUpdatedAt,
+          diskOverview.dataUpdatedAt,
+          mysqlOverview.dataUpdatedAt,
+        )
       : 0
 
   return (
@@ -400,11 +626,16 @@ export function OverviewPage() {
         </div>
         <div className="overview-controls" role="group" aria-label="总览控制">
           <RefreshControl
-            isFetching={hostOverview.isFetching || mysqlOverview.isFetching}
+            isFetching={
+              hostOverview.isFetching ||
+              diskOverview.isFetching ||
+              mysqlOverview.isFetching
+            }
             dataUpdatedAt={allDataUpdatedAt}
             onRefresh={() => {
               void Promise.all([
                 hostOverview.refetch(),
+                diskOverview.refetch(),
                 mysqlOverview.refetch(),
               ])
             }}
@@ -427,6 +658,13 @@ export function OverviewPage() {
             collectedAt={mysqlOverview.data.meta.collected_at}
           />
         )}
+      {diskOverview.data?.meta.stale === true &&
+        diskOverview.data.meta.collected_at !== undefined && (
+          <ModuleStaleBanner
+            label="主机硬盘"
+            collectedAt={diskOverview.data.meta.collected_at}
+          />
+        )}
       {hostOverview.data !== undefined && hostOverview.isError && (
         <ModuleRefreshError
           label="Linux 主机"
@@ -439,6 +677,13 @@ export function OverviewPage() {
           label="MySQL"
           error={mysqlOverview.error}
           onRetry={() => void mysqlOverview.refetch()}
+        />
+      )}
+      {diskOverview.data !== undefined && diskOverview.isError && (
+        <ModuleRefreshError
+          label="主机硬盘"
+          error={diskOverview.error}
+          onRetry={() => void diskOverview.refetch()}
         />
       )}
 
@@ -459,6 +704,20 @@ export function OverviewPage() {
           )
         ) : (
           <HostStatusCard data={hostOverview.data.data} />
+        )}
+
+        {diskOverview.data === undefined ? (
+          diskOverview.isPending ? (
+            <ModuleLoading label="主机硬盘" />
+          ) : (
+            <ModuleError
+              label="主机硬盘"
+              error={diskOverview.error}
+              onRetry={() => void diskOverview.refetch()}
+            />
+          )
+        ) : (
+          <DiskStatusCard data={diskOverview.data.data} />
         )}
 
         {mysqlOverview.data === undefined ? (

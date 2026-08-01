@@ -229,9 +229,9 @@ it('注销失败时保留应用壳和查询缓存并显示可重试错误', asyn
   ).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: '退出登录' }))
 
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    '退出登录失败，请稍后重试',
-  )
+  expect(
+    await screen.findByText('退出登录失败，请稍后重试', { exact: true }),
+  ).toHaveAttribute('role', 'alert')
   expect(
     screen.getByRole('heading', { name: '基础设施总览' }),
   ).toBeInTheDocument()

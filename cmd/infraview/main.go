@@ -18,6 +18,7 @@ import (
 	"github.com/Taier05/InfraView/internal/cache"
 	"github.com/Taier05/InfraView/internal/config"
 	"github.com/Taier05/InfraView/internal/datasource"
+	"github.com/Taier05/InfraView/internal/disk"
 	"github.com/Taier05/InfraView/internal/httpapi"
 	"github.com/Taier05/InfraView/internal/mysql"
 	"github.com/Taier05/InfraView/internal/service"
@@ -86,6 +87,7 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 	providers := dataSourceProviders(cfg, clock)
 	hostProvider := withUpstreamTimeout(providers.Hosts, cfg.UpstreamTimeout)
 	mysqlProvider := withMySQLUpstreamTimeout(providers.MySQL, cfg.UpstreamTimeout)
+	diskProvider := withDiskUpstreamTimeout(providers.Disks, cfg.UpstreamTimeout)
 	store := cache.New(clock)
 	queryService := service.New(hostProvider, store, service.Options{
 		InventoryTTL:       cfg.InventoryTTL,
@@ -106,12 +108,19 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 		MaxStale:           cfg.MaxStale,
 		Clock:              clock,
 	})
+	diskService := service.NewDisk(diskProvider, store, service.DiskOptions{
+		SnapshotTTL:        cfg.SMARTCollectionInterval,
+		CollectionInterval: cfg.SMARTCollectionInterval,
+		MaxStale:           cfg.MaxStale,
+		Clock:              clock,
+	})
 	return httpapi.New(httpapi.Dependencies{
 		Config:       cfg,
 		Auth:         auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, clock),
 		Limiter:      auth.NewLimiter(5, time.Minute, clock),
 		Service:      queryService,
 		MySQLService: mysqlService,
+		DiskService:  diskService,
 		Logger:       logger,
 	})
 }
@@ -119,6 +128,7 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 type providerSet struct {
 	Hosts datasource.Provider
 	MySQL mysql.Provider
+	Disks disk.Provider
 }
 
 func dataSourceProviders(cfg config.Config, clock func() time.Time) providerSet {
@@ -127,6 +137,7 @@ func dataSourceProviders(cfg config.Config, clock func() time.Time) providerSet 
 		return providerSet{
 			Hosts: mock.New(cfg.MockHostCount, clock),
 			MySQL: mock.NewMySQL(),
+			Disks: mock.NewDisk(clock),
 		}
 	case "nightingale":
 		provider := nightingale.New(nightingale.Options{
@@ -136,12 +147,29 @@ func dataSourceProviders(cfg config.Config, clock func() time.Time) providerSet 
 			Clock:                clock,
 			AllowInsecureHTTP:    cfg.NightingaleAllowInsecureHTTP,
 		})
-		return providerSet{Hosts: provider, MySQL: provider}
+		return providerSet{Hosts: provider, MySQL: provider, Disks: provider}
 	default:
 		provider := nightingale.New(nightingale.Options{})
-		return providerSet{Hosts: provider, MySQL: provider}
+		return providerSet{Hosts: provider, MySQL: provider, Disks: provider}
 	}
 }
+
+type diskTimeoutProvider struct {
+	provider disk.Provider
+	timeout  time.Duration
+}
+
+func withDiskUpstreamTimeout(provider disk.Provider, timeout time.Duration) disk.Provider {
+	return &diskTimeoutProvider{provider: provider, timeout: timeout}
+}
+
+func (p *diskTimeoutProvider) SMARTSnapshot(ctx context.Context) (disk.Snapshot, error) {
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+	return p.provider.SMARTSnapshot(ctx)
+}
+
+var _ disk.Provider = (*diskTimeoutProvider)(nil)
 
 type mysqlTimeoutProvider struct {
 	provider mysql.Provider

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Taier05/InfraView/internal/datasource"
+	"github.com/Taier05/InfraView/internal/disk"
 	"github.com/Taier05/InfraView/internal/mysql"
 	"github.com/Taier05/InfraView/internal/service"
 )
@@ -284,6 +285,8 @@ func (a *api) writeServiceError(w http.ResponseWriter, r *http.Request, err erro
 		writeError(w, r, http.StatusNotFound, "host_not_found", "该主机当前不在数据源中", false)
 	case errors.Is(err, mysql.ErrUnavailable):
 		writeError(w, r, http.StatusServiceUnavailable, "mysql_unavailable", "数据源暂时不可用，请稍后重试", true)
+	case errors.Is(err, disk.ErrUnavailable):
+		writeError(w, r, http.StatusServiceUnavailable, "disk_unavailable", "数据源暂时不可用，请稍后重试", true)
 	case errors.Is(err, datasource.ErrUnavailable), errors.Is(err, datasource.ErrNotConfigured), errors.Is(err, context.DeadlineExceeded):
 		writeError(w, r, http.StatusServiceUnavailable, "datasource_unavailable", "数据源暂时不可用，请稍后重试", true)
 	default:

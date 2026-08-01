@@ -21,6 +21,15 @@ make verify
 - Mock smoke 在登录前断言两个 MySQL GET API 返回 401；登录后用 `jq` 校验总览与实例 envelope，再确认写方法精确返回 405 且拒绝前后业务数据不变。脚本不打印响应正文、数量或指标值。
 - Chromium 从总览 MySQL 卡进入实例页，验证 10 列、复制与实例状态、无破坏性控件和页面无横向溢出；另验证角色、状态、排序与每页数量在刷新后由 URL 恢复。
 
+## 主机硬盘 SMART 覆盖矩阵
+
+- 领域与 Mock 覆盖包含主机身份的不可逆稳定 ID、WWN/序列号/设备名回退、原始身份字段排除、ATA/NVMe、正常/警告/严重/未知、可空字段和错误计数形态。
+- Nightingale Provider 使用完全脱敏 `httptest` 夹具，精确断言一次固定 18 查询 `query-instant-batch`、第 17 组容量唯一来源、第 18 组近期 inventory、无主机/设备 N+1、容量及其他指标最新有效样本/冲突规则、24 小时近期身份、401/403/重定向/Content-Type/envelope/8 MiB/超时安全错误和无敏感信息泄漏。
+- DiskService 覆盖独立默认 60 秒 TTL/freshness、120/300 秒边界、稳定绝对时间差、冻结升级、恢复/回退、stale 老化、并发、状态聚合/去重、搜索、自然排序、精确容量排序、缺失值置后和分页。
+- 状态来源契约覆盖六值 `smart_health|device_warning|attribute_failure|collection|normal|unknown`；同级时设备来源优先，设备来源内部依次为 SMART 健康、设备警告、属性失败，采集来源只有严格更高时生效。
+- HTTP 测试覆盖两个 GET API 的认证、参数白名单、方法 405、安全 503、stale、schema 与序列号/WWN/原始标签排除。
+- Vitest 覆盖 10 列硬盘页、型号/容量独立单元格、容量格式化与排序、错误摘要、URL 状态、后台刷新错误，以及总览硬盘卡的独立加载/失败/stale/重试和三板块隔离；Playwright 规格已加入导航、布局与无破坏性控件断言，但是否实际运行见本轮验证记录。
+
 ## 浏览器覆盖
 
 `web/e2e/infraview.spec.ts` 覆盖：
@@ -31,6 +40,7 @@ make verify
 - 主机清单 9 个单行列、IO 忙碌度、网络出入速率及指标等级着色。
 - MySQL 总览导航、实例清单 10 列、复制/实例状态和紧凑布局。
 - MySQL 角色/状态筛选、排序和每页数量的 URL 刷新恢复。
+- 主机硬盘总览导航、10 列清单、型号/容量分列、容量排序、状态来源文案、URL 恢复和无序列号/WWN/破坏性控件。
 - 可控 stale 与 503 error 展示。
 - 页面不存在重启、删除、执行、切换、修改、发布或配置下发控件。
 
@@ -96,3 +106,41 @@ docker compose ls
 - 最终修复后由主控重新运行格式检查、全仓普通测试和独立 `go test -race ./...`，全部通过；`docker build --tag infraview:nightingale-review-fixes-verify .` 成功，镜像 SHA 为 `<不记录>`。
 - 最终整分支审查发现的 2 个 Important 和 1 个 Minor 已全部修复，唯一范围复审结论为 PASS。
 - 简报中的 `sh -lc` 在该镜像登录 shell 中丢失 `/usr/local/go/bin`，因此无法找到 `go`/`gofmt`；使用非登录 `sh -c` 执行相同格式和普通测试语义，并另行运行独立 race 命令取得 PASS 证据。
+
+## 2026-08-01 硬盘容量独立指标与分列离线验收
+
+- Provider 与 Service/API 均完成真实 RED→GREEN。交付前独立复审发现容量在严格校验前先经过 `float64`，可在 `2^53` 边界误接收小数、改变合法整数或漏判同时间冲突；新增 `2^53+1`、`MaxInt64`、大整数小数和大整数同时间冲突测试均先得到 RED，随后改为从原始 JSON 数值文本精确解析到专用 `int64` 状态并转为 GREEN。adapter 普通/race、容量白名单、精确可空 `int64` 排序及 HTTP 参数契约测试均通过。
+- 修复后由同一独立审查者定向复核容量精度、当前态文档和 E2E 契约，最终结论为 Ready，Critical 0、Important 0、Minor 0；复核全程只读，未连接 8080 或 Nightingale。
+- 前端硬盘页 14 项定向测试通过；全量 Vitest 为 8 个文件、101 项测试通过，TypeScript 检查与 production build 均退出 0。Vite 仍仅报告既有第三方 `"use client"` 非阻断提示。
+- `npx playwright test --list` 退出 0，共静态发现 13 项规格，其中硬盘规格已锁定十列表头、型号/容量独立单元格、至少一个 IEC 格式容量、容量升降序 URL 和无横向溢出要求；布尔断言不输出现场容量值。未运行浏览器，也未启动或创建端口。
+- Go 格式检查无输出，全仓普通测试、race 测试和主程序编译均退出 0。`docker build --no-cache --tag infraview:disk-capacity-column-verify .` 退出 0，并在干净上下文内再次通过前端 101 项、typecheck/build、Go 普通/race 和最终二进制编译；镜像只构建未运行，未映射端口、未连接上游。
+- `npm ci` 仍报告锁定依赖树中 2 个 high severity 审计项；本轮未执行 `npm audit fix --force`，未修改依赖。
+- 经用户单独授权，现有 8080 已原位重建并继续只连接测试 Nightingale；服务 healthy，保持非 root、只读根文件系统、cap drop `ALL`、禁止提权且只发布 8080。脱敏登录态 API 验收仅输出布尔结果：Nightingale、硬盘 GET/non-stale、容量存在、容量升降序实际有序、敏感字段排除、写方法 405、Linux/MySQL 回归和浏览器零错误均为 true。
+- 一次性 Chromium 不发布端口，trace 关闭，所有失败产物定向到容器 `/tmp` 并随容器销毁。硬盘十列用例在 1440×900 下通过，覆盖型号/容量分列、至少一个 IEC 格式容量、容量升降序 URL、页面/表格无横向溢出及无破坏性控件；原 8080 总览四槽位几何用例也通过。最初两次因筛选路径未发现测试，第三次以公开默认 E2E 凭据登录失败，均未形成产品失败；改用不落盘、不输出的应用进程凭据后通过。API 脚本首轮由页面主动请求预期 405，污染 Chrome console；改由共享会话 request API 验证后全部布尔结果为 true，产品代码未因此修改。
+- 任何生产 Nightingale 验证、会创建 18080 的 `scripts/e2e.sh`、提交和推送均未执行。
+
+## 2026-07-30 主机硬盘 SMART 当前工作区验证
+
+本轮先完成无端口、无上游连接的 Docker 验证；后续经用户单独授权，仅原位重建仍连接测试 Nightingale 的现有 8080，并执行不发布新端口的一次性 Chromium 与脱敏现场验收。以下 fresh 结果和未执行边界是受 Git 跟踪的持久记录。
+
+本轮最终 fresh 结果：静态扫描未发现命令执行能力，排除测试后的 HTTP View/前端生产类型没有 `serial_no`/`wwn`；前端 8 个测试文件、99 个测试通过，typecheck 与 production build 退出 0；Go 普通与 race 全仓均退出 0；终审修复后的无缓存镜像构建退出 0，并在 Dockerfile 内再次完成同一组前端/Go 测试与编译。整功能终审发现的默认硬盘排序、Service 极端页码防溢出和磁盘总览 alert 合计约束均完成 RED→GREEN，范围复审 Approved。构建未运行镜像、未映射端口、未连接上游。
+
+测试 Nightingale 现场首次返回同一 `ident + device` 的兼容第 17 组历史序列，原始最后样本时间不同，旧实现安全返回 503。新增测试先复现 RED；修复按主键归并、对称补齐可选身份、取最大原始时间并保持非空元数据，覆盖两种输入顺序、跨设备 serial/WWN 冲突和同时间型号/容量冲突。Nightingale adapter 普通/race、范围复审及后续无缓存全量镜像均通过。
+
+修复后的现有 8080 保持 healthy、Nightingale 模式、非 root、只读根文件系统、capabilities 全删、禁止提权且唯一发布原 8080。登录态硬盘总览/设备 API 非空且非 stale，schema、六值来源、敏感字段排除和 POST/PUT/PATCH/DELETE 405 均通过；Linux、主机与 MySQL 回归通过。一次性 Chromium 在 1440×900 下确认总览入口、九列表头、数据行、无破坏性控件、无页面或表格横向溢出及登录后无浏览器错误。跨两个 60 秒周期后设备集合稳定、响应非 stale 且采集推进状态正常。
+
+`npm ci` 报告现有 2 个 high severity 依赖审计项，且 Vite 输出依赖包 `"use client"` 指令被忽略的非阻断警告；本轮未执行 `npm audit fix --force` 或修改依赖。
+
+未执行会创建 18080 的 `scripts/e2e.sh`；浏览器验收改用不发布端口的一次性 Playwright 容器访问现有 8080。任何生产 Nightingale 验证、提交和推送均未执行。
+
+## 2026-07-30 总览四槽位与硬盘展示细化离线及现有 8080 验收
+
+- Docker 前端全量命令使用绑定 `web` 源码目录和匿名 `/src/node_modules` 卷，`npm ci --ignore-scripts` 后 Vitest 为 8 个文件、101 项测试通过，typecheck 与 production build 均退出 0。
+- `npm ci` 仍报告 2 个 high severity 依赖审计项；Vite 仍报告依赖包 `"use client"` 指令被忽略。两者均为既有非阻断项，本轮未修改依赖或执行审计修复。
+- `docker build --no-cache --tag infraview:overview-disk-display-verify .` 退出 0；Dockerfile 内再次通过前端全量测试、typecheck、production build、Go `go test ./...`、`go test -race ./...` 和二进制编译。镜像仅被构建，未运行、未映射端口、未连接上游。
+- Playwright 规格新增首个硬盘数据行的 `.disk-capacity` 和 `.disk-model` 可见断言。授权前曾以代码内公开默认 E2E 登录凭据向既有 8080 发起一次 Chromium 尝试；登录阶段超时，未进入总览，也未形成现场 GREEN。
+- 用户随后明确授权现有 8080 原位重建和现场验收。`INFRAVIEW_ENV_FILE=/root/github/InfraView/.env docker compose --project-name infraview up -d --build --force-recreate infraview` 退出 0；服务达到 healthy，仍只有原 8080，且保持 `10001:10001`、只读根文件系统、cap drop `ALL`、`no-new-privileges`。命令只让 Compose 读取既有配置，未显示其内容。
+- 登录态只读 API 验收不输出正文或现场值：数据源类型为 Nightingale，Linux、MySQL、硬盘响应均为合法 JSON 且非 stale；硬盘列表非空、`status_source` 限定六值、不含 `serial_no`/`wwn`，POST/PUT/PATCH/DELETE 均返回 405。
+- 一次性 Playwright 容器使用 host network 访问原 8080，不发布端口、不截图、不保留 trace。最终 1440×900 验收确认总览四轨等宽、三卡宽度分别匹配前三轨且第四轨自然空白；硬盘九列表头、数据行、型号/容量独立两行及各自完整 title 可见；页面和表格无横向溢出、无破坏性控件，登录后无非预期 console/page/request 错误。
+- 首轮现场脚本因使用错误的主机/MySQL 排序参数失败；修正为页面真实白名单后，错误收集又捕获了脚本主动 405 检查和导航取消。按系统化诊断将 405 改由共享登录会话的 request API 验证，并把错误监听提前到首次导航前。预认证会话 GET 401 只有在固定会话路径的响应与同来源标准 Chrome console 文本同时出现且各恰好一次时才视为预期；登录提交阶段只精确豁免成功路由切换产生的 `fetch + net::ERR_ABORTED`。除此之外所有 console/page/request 错误仍阻断。同一完整路径退出 0，产品代码未因这些脚本问题修改。
+- 未运行会创建 18080 的 `scripts/e2e.sh`，未创建额外 InfraView 端口，未连接、切换或探测生产 Nightingale，未输出凭据、Cookie、认证头、Base URL、API 正文或现场标识/数量/指标值。

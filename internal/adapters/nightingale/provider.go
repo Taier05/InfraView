@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Taier05/InfraView/internal/datasource"
+	"github.com/Taier05/InfraView/internal/disk"
 	"github.com/Taier05/InfraView/internal/mysql"
 )
 
@@ -459,6 +460,7 @@ func unavailableError() error {
 }
 
 var _ datasource.Provider = (*Provider)(nil)
+var _ disk.Provider = (*Provider)(nil)
 var _ mysql.Provider = (*Provider)(nil)
 
 func sortDatasourceRecords(records []datasourceRecord) {

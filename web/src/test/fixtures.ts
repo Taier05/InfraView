@@ -4,6 +4,8 @@ export const SESSION_PATH = '/api/v1/session'
 export const OVERVIEW_PATH = '*/api/v1/overview'
 export const MYSQL_OVERVIEW_PATH = '*/api/v1/mysql/overview'
 export const MYSQL_INSTANCES_PATH = '*/api/v1/mysql/instances'
+export const DISK_OVERVIEW_PATH = '*/api/v1/disks/overview'
+export const DISK_DEVICES_PATH = '*/api/v1/disks/devices'
 
 export interface SessionFixture {
   data: {
@@ -189,6 +191,73 @@ export interface MySQLOverviewFixture {
       replication_threads: { warning: number; critical: number }
       replication_lag: { warning: number; critical: number }
       replication_data: { warning: number; critical: number }
+    }
+  }
+  meta: {
+    request_id: string
+    stale: boolean
+    collected_at: string
+  }
+}
+
+export interface DiskDevicePageFixture {
+  data: {
+    devices: Array<{
+      id: string
+      host: string
+      device: string
+      model: string
+      capacity_bytes: number | null
+      smart_health: 'healthy' | 'failed' | 'unknown'
+      temperature_celsius: number | null
+      lifetime_used_percent: number | null
+      power_on_hours: number | null
+      errors: {
+        pending_sectors: number | null
+        reallocated_sectors: number | null
+        uncorrectable_sectors: number | null
+        udma_crc_errors: number | null
+        media_integrity_errors: number | null
+        error_log_entries: number | null
+        unsafe_shutdowns: number | null
+      }
+      status: MetricLevelFixture
+      status_source:
+        | 'smart_health'
+        | 'device_warning'
+        | 'attribute_failure'
+        | 'collection'
+        | 'unknown'
+        | 'normal'
+      collection_level: MetricLevelFixture
+    }>
+    total: number
+    page: number
+    page_size: number
+    total_pages: number
+  }
+  meta: {
+    request_id: string
+    stale: boolean
+    collected_at: string
+  }
+}
+
+export interface DiskOverviewFixture {
+  data: {
+    total: number
+    normal: number
+    warning: number
+    critical: number
+    unknown: number
+    affected_devices: number
+    warning_devices: number
+    critical_devices: number
+    alerts: {
+      smart_health: { warning: number; critical: number }
+      device_warning: { warning: number; critical: number }
+      attribute_failure: { warning: number; critical: number }
+      collection: { warning: number; critical: number }
     }
   }
   meta: {
@@ -537,6 +606,202 @@ export function mysqlOverviewFixture(
   }
 }
 
+export function diskDevicePageFixture(
+  overrides: {
+    data?: Partial<DiskDevicePageFixture['data']>
+    meta?: Partial<DiskDevicePageFixture['meta']>
+  } = {},
+): DiskDevicePageFixture {
+  return {
+    data: {
+      devices: [
+        {
+          id: 'disk-fixture-001',
+          host: 'node-alpha',
+          device: '/dev/nvme0n1',
+          model: 'Atlas NVMe 2TB',
+          capacity_bytes: 2 * 1024 ** 4,
+          smart_health: 'healthy',
+          temperature_celsius: 42.5,
+          lifetime_used_percent: 17.4,
+          power_on_hours: 50,
+          errors: {
+            pending_sectors: 2,
+            reallocated_sectors: 1,
+            uncorrectable_sectors: 0,
+            udma_crc_errors: 7,
+            media_integrity_errors: 0,
+            error_log_entries: 0,
+            unsafe_shutdowns: 0,
+          },
+          status: 'critical',
+          status_source: 'device_warning',
+          collection_level: 'critical',
+        },
+        {
+          id: 'disk-fixture-002',
+          host: 'node-beta',
+          device: '/dev/sda',
+          model: 'Boreal SATA 960GB',
+          capacity_bytes: 960 * 1024 ** 3,
+          smart_health: 'failed',
+          temperature_celsius: 51,
+          lifetime_used_percent: 86,
+          power_on_hours: 24_600,
+          errors: {
+            pending_sectors: 0,
+            reallocated_sectors: 0,
+            uncorrectable_sectors: 0,
+            udma_crc_errors: 0,
+            media_integrity_errors: 0,
+            error_log_entries: 0,
+            unsafe_shutdowns: 0,
+          },
+          status: 'critical',
+          status_source: 'smart_health',
+          collection_level: 'critical',
+        },
+        {
+          id: 'disk-fixture-003',
+          host: 'node-gamma',
+          device: '/dev/vda',
+          model: 'Cirrus Virtual Disk',
+          capacity_bytes: null,
+          smart_health: 'unknown',
+          temperature_celsius: null,
+          lifetime_used_percent: null,
+          power_on_hours: null,
+          errors: {
+            pending_sectors: null,
+            reallocated_sectors: null,
+            uncorrectable_sectors: null,
+            udma_crc_errors: null,
+            media_integrity_errors: null,
+            error_log_entries: null,
+            unsafe_shutdowns: null,
+          },
+          status: 'unknown',
+          status_source: 'smart_health',
+          collection_level: 'normal',
+        },
+        {
+          id: 'disk-fixture-004',
+          host: 'node-delta',
+          device: '/dev/nvme1n1',
+          model: 'Dawn NVMe 4TB',
+          capacity_bytes: 4 * 1024 ** 4,
+          smart_health: 'healthy',
+          temperature_celsius: 39,
+          lifetime_used_percent: 4,
+          power_on_hours: 730,
+          errors: {
+            pending_sectors: 0,
+            reallocated_sectors: null,
+            uncorrectable_sectors: 0,
+            udma_crc_errors: null,
+            media_integrity_errors: 0,
+            error_log_entries: null,
+            unsafe_shutdowns: 0,
+          },
+          status: 'warning',
+          status_source: 'collection',
+          collection_level: 'warning',
+        },
+        {
+          id: 'disk-fixture-005',
+          host: 'node-epsilon',
+          device: '/dev/sdb',
+          model: 'Ember Archive 8TB',
+          capacity_bytes: 8 * 1024 ** 4,
+          smart_health: 'healthy',
+          temperature_celsius: 36,
+          lifetime_used_percent: 11,
+          power_on_hours: 12_345,
+          errors: {
+            pending_sectors: 0,
+            reallocated_sectors: 0,
+            uncorrectable_sectors: 0,
+            udma_crc_errors: 0,
+            media_integrity_errors: 0,
+            error_log_entries: 0,
+            unsafe_shutdowns: 0,
+          },
+          status: 'critical',
+          status_source: 'collection',
+          collection_level: 'critical',
+        },
+        {
+          id: 'disk-fixture-006',
+          host: 'node-zeta',
+          device: '/dev/sdc',
+          model: 'Fable SATA 1TB',
+          capacity_bytes: 1024 ** 4,
+          smart_health: 'healthy',
+          temperature_celsius: 34,
+          lifetime_used_percent: 22,
+          power_on_hours: 900,
+          errors: {
+            pending_sectors: 0,
+            reallocated_sectors: 0,
+            uncorrectable_sectors: 0,
+            udma_crc_errors: 0,
+            media_integrity_errors: 0,
+            error_log_entries: 0,
+            unsafe_shutdowns: 0,
+          },
+          status: 'warning',
+          status_source: 'attribute_failure',
+          collection_level: 'warning',
+        },
+      ],
+      total: 45,
+      page: 1,
+      page_size: 20,
+      total_pages: 3,
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-fixture-disk-devices-001',
+      stale: false,
+      collected_at: '2026-07-30T08:30:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
+export function diskOverviewFixture(
+  overrides: {
+    data?: Partial<DiskOverviewFixture['data']>
+    meta?: Partial<DiskOverviewFixture['meta']>
+  } = {},
+): DiskOverviewFixture {
+  return {
+    data: {
+      total: 6,
+      normal: 1,
+      warning: 2,
+      critical: 2,
+      unknown: 1,
+      affected_devices: 5,
+      warning_devices: 3,
+      critical_devices: 2,
+      alerts: {
+        smart_health: { warning: 0, critical: 1 },
+        device_warning: { warning: 0, critical: 1 },
+        attribute_failure: { warning: 1, critical: 0 },
+        collection: { warning: 1, critical: 0 },
+      },
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-fixture-disk-overview-001',
+      stale: false,
+      collected_at: '2026-07-30T08:30:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
 export function resetFixtureState() {
   authenticatedUsername = null
 }
@@ -578,7 +843,13 @@ export const handlers = [
     authenticatedUsername = null
     return new HttpResponse(null, { status: 204 })
   }),
+  http.get(DISK_OVERVIEW_PATH, () =>
+    HttpResponse.json(diskOverviewFixture()),
+  ),
   http.get(OVERVIEW_PATH, () => HttpResponse.json(overviewFixture())),
+  http.get(DISK_DEVICES_PATH, () =>
+    HttpResponse.json(diskDevicePageFixture()),
+  ),
   http.get('/api/v1/datasource/status', () =>
     HttpResponse.json({
       data: {

@@ -1,6 +1,6 @@
 # InfraView TODO
 
-最后更新：2026-07-29
+最后更新：2026-08-01
 
 ## Mock MVP
 
@@ -54,6 +54,43 @@
 - SSH、远程命令、脚本执行或自动化变更。
 - 用户/RBAC、告警事件页面、任意查询/代理和监控历史持久化。
 - MySQL 历史、实例详情、写接口、数据库连接或运维操作。
+- 硬盘详情/历史、SMART 扫描/自检、修复、启停、擦除、块设备访问、`smartctl`、`nvme-cli` 或任何远程控制。
+
+## 主机硬盘 SMART 模块
+
+> 2026-08-01：下列 17 组/九列项目是初始模块的历史完成记录；当前容量增量见后续独立小节。
+
+- [x] 以 RED→GREEN 实现独立硬盘领域/Mock、稳定不可逆 ID 和原始 WWN/序列号字段排除。
+- [x] 以 RED→GREEN 实现 Nightingale 一次固定 17 查询即时 batch、脱敏归并、安全错误和无主机/设备 N+1。
+- [x] 以 RED→GREEN 实现 DiskService 独立默认 60 秒 TTL/freshness、120/300 秒边界、恢复/回退/stale、状态聚合与列表查询。
+- [x] 固化六值 `status_source` 和同级设备来源优先规则；前端不通过等级相等猜测采集来源。
+- [x] 以 RED→GREEN 实现两条受认证 GET API、9 列 `/disks` 页面、侧边栏入口和独立总览卡。
+- [x] Task 8 与终审修复后的无端口 Docker 静态扫描、Go 普通/race、前端 8 文件/99 测试、typecheck/build 与无缓存最终镜像构建均退出 0；持久结果见硬盘实施计划与 `docs/TESTING.md`。
+- [x] 整功能终审的 1 个 Important 和 2 个 Minor 均已完成 RED→GREEN，唯一范围复审 Approved。
+- [x] 修复测试 Nightingale 第 17 组兼容重复历史身份导致的 503；顺序无关归并、可选身份冲突和元数据冲突均完成 RED→GREEN及范围复审。
+- [x] 经授权原位重建仅连接测试 Nightingale 的现有 8080，完成容器安全、脱敏 API、一次性 Chromium 1440×900 和跨两个 60 秒周期推进验收；未创建其他 InfraView 端口。
+- [ ] 会创建 18080 的 `scripts/e2e.sh` 未执行；本轮已用不发布端口的一次性 Chromium 覆盖现有 8080。
+- [ ] 提交、推送均需分别取得明确授权；任何生产 Nightingale 验证永久禁止。
+
+## 总览四槽位与硬盘展示细化
+
+- [x] 恢复桌面四个固定总览槽位，并保持中屏两列、窄屏一列的既有响应式规则。
+- [x] 将硬盘型号与容量拆为独立两行，并把 unsafe shutdown 文案收紧为“异常断电 N 次”的累计展示语义。
+- [x] 完成 Docker 离线前端全量验证（8 文件/101 测试、typecheck、production build）和无缓存镜像 `infraview:overview-disk-display-verify`；镜像内 Go 普通/race 与编译也已通过。
+- [x] 在 Playwright 硬盘规格中加入首行 `.disk-model` 与 `.disk-capacity` 可见性断言，并在授权后的现有 8080 一次性 Chromium 中完成现场验证。
+- [x] 经单独授权原位重建仍连接测试 Nightingale 的既有 8080，完成 healthz、非 root、只读根文件系统、cap drop、禁止提权和唯一 8080 端口检查；未读取或输出私密环境文件。
+- [x] 使用安全进程凭据在现有 8080 完成不发布端口的 Chromium 验收；未创建额外端口、截图或保留 trace。
+
+## 硬盘容量独立指标与分列
+
+- [x] 以 RED→GREEN 将固定即时 batch 扩展为 18 组；第 17 组 `smart_disk_capacity_bytes` 是容量唯一来源，第 18 组 inventory 负责设备发现、型号与原始最后样本时间，仍只有一次 batch、无 N+1。
+- [x] 覆盖容量缺失、负数、小数、NaN、Inf、越界、最新值、同时间冲突、未知设备与身份冲突；旧 inventory `capacity` 标签不读取或回退，容量不影响 `ReportedAt`/freshness/状态。
+- [x] 为 Service/API 增加精确 `int64` 容量排序；升降序缺失值始终最后，稳定 ID 收口。
+- [x] 将硬盘页拆成型号、容量独立十列，容量可升降序；分页仍为 20/50/100，未增加命令超时、失联移除或“全部”。
+- [x] 定向 Go 普通/race、前端硬盘页 14 项、typecheck/build 和 Playwright 静态发现已通过。
+- [x] 完成全量离线测试、race、生产构建、无缓存镜像与最终差异检查：前端 8 文件/101 项，Go 普通/race 与编译、Playwright 13 项静态发现均退出 0。
+- [x] 经单独授权原位重建仍只连接测试 Nightingale 的现有 8080，完成容器安全、脱敏 API、硬盘十列/容量排序 Chromium 和总览四槽位验收；未创建其他端口，任何生产 Nightingale 验证永久禁止。
+- [ ] 提交和推送分别需要明确授权。
 
 ## MySQL 后续验收
 
@@ -66,5 +103,5 @@
 - [x] 修复采集新鲜度时间口径：Linux/MySQL 均使用 `tlast_over_time` 的原始最后样本时间，Target 更新时间和即时查询外层时间不再掩盖停采。
 - [x] 消除稳定链路时延误报：Linux/MySQL 按原始样本是否推进计算 2/5 周期等级，并统一主机采集延迟黄色、采集失联红色。
 - [x] 增加显式事务 TPS，并将 MySQL 清单收紧为 10 列、地址专用搜索和 IP/端口自然排序；固定 16 条查询仍为一次 batch、无 N+1。
-- [ ] 在获得单独授权后，仅重建连接测试 Nightingale 的原 8080，并进行本轮匿名 Chromium 验收。
+- [x] 经单独授权，仅原位重建连接测试 Nightingale 的原 8080，并完成本轮匿名 Chromium 验收；未连接生产或创建额外 InfraView 端口。
 - [ ] 按真实契约证据再决定是否扩展 MySQL 指标；当前固定 16 条查询、一次 batch 和无 N+1 设计不接受前端自定义查询。
