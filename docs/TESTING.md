@@ -173,7 +173,7 @@ docker compose ls
 - 用户验收确认 Redis 应与主机/MySQL 一致显示天/小时，而非累计纯小时。测试先将 `90000` 秒的期望由 `25小时` 改为 `1天 1小时`，得到 1 项预期失败、其余 6 项通过。
 - 最小修复复制主机/MySQL 的既有日/小时分支；同一 Redis 页面测试随后 7/7 通过，并额外锁定 `null` 为“暂无数据”、`3600` 秒为“1小时”、`1800` 秒为“0小时”。
 - 修复后前端全量 Vitest 11 文件/112 项、typecheck、production build 和 Playwright 2 文件/14 项静态发现均退出 0。构建仅生成离线产物，未启动服务或连接上游。
-- 本次纠错随后按用户长期授权原位重建现有 8080。Dockerfile 内前端 11 文件/112 项、typecheck/build、Go 普通/race/编译全部退出 0；容器 healthy、仍只发布原 8080，并保持非 root、只读根文件系统、cap drop `ALL` 与禁止提权。部署页面引用的资源文件与本地最新 production build 完全一致；未创建其他端口、未连接生产 Nightingale、未提交或推送。
+- 本次纠错随后按用户长期授权原位重建现有 8080。Dockerfile 内前端 11 文件/112 项、typecheck/build、Go 普通/race/编译全部退出 0；容器 healthy、仍只发布原 8080，并保持非 root、只读根文件系统、cap drop `ALL` 与禁止提权。部署页面引用的资源文件与本地最新 production build 完全一致；未创建其他端口、未连接生产 Nightingale。Redis 功能提交 `c3b5c7d` 已推送到 `origin/main`。
 - 后续流程：每次已授权修复通过验证后自动原位重建同一测试 8080，不再逐次询问。该规则不允许读取或输出私密环境内容，不允许创建额外端口或连接生产 Nightingale。
 - 提交前范围审查发现 Redis 极端合法正页码可能使 `(page-1)*page_size` 溢出并触发切片 panic。新增 `math.MaxInt` 回归先稳定复现 RED；随后在查询规范化阶段加入与硬盘模块相同的偏移溢出保护，定向 Redis Service 测试转为 GREEN。该修复不改变正常分页、查询白名单或 API 成功响应。
 - 审查修复后的 Compose 重建退出 0：Dockerfile 内前端 11 文件/112 项、typecheck/build、Go 普通/race/编译全部通过；Playwright 2 文件/14 项静态发现通过。现有 8080 healthy、仅发布原端口，并保持非 root、只读根文件系统、cap drop `ALL` 和禁止提权；部署页面引用最新构建资源。
