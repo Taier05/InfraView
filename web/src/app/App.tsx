@@ -12,6 +12,7 @@ import { DiskPage } from '../features/disks/DiskPage'
 import { HostListPage } from '../features/hosts/HostListPage'
 import { MySQLPage } from '../features/mysql/MySQLPage'
 import { OverviewPage } from '../features/overview/OverviewPage'
+import { RedisPage } from '../features/redis/RedisPage'
 import { AppShell } from './AppShell'
 import './theme.css'
 
@@ -67,6 +68,7 @@ export function App() {
               <Route path="hosts" element={<HostListPage />} />
               <Route path="disks" element={<DiskPage />} />
               <Route path="mysql" element={<MySQLPage />} />
+              <Route path="redis" element={<RedisPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

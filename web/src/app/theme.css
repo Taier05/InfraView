@@ -1001,6 +1001,37 @@ h1 {
   overflow-x: hidden;
 }
 
+.redis-list-controls {
+  grid-template-columns:
+    minmax(14rem, 1fr) minmax(7.5rem, 9rem) minmax(7.5rem, 9rem)
+    minmax(6rem, 7rem) auto;
+}
+
+.redis-table {
+  width: 100%;
+  min-width: 72rem;
+  table-layout: fixed;
+}
+
+.redis-table th,
+.redis-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.host-table.redis-table th:nth-child(1) { width: 9.5rem; }
+.host-table.redis-table th:nth-child(2) { width: 4rem; }
+.host-table.redis-table th:nth-child(3) { width: 7rem; }
+.host-table.redis-table th:nth-child(4) { width: 7rem; }
+.host-table.redis-table th:nth-child(5) { width: 7.5rem; }
+.host-table.redis-table th:nth-child(6) { width: 7.5rem; }
+.host-table.redis-table th:nth-child(7) { width: 5.5rem; }
+.host-table.redis-table th:nth-child(8) { width: 6rem; }
+.host-table.redis-table th:nth-child(9) { width: 5.5rem; }
+.host-table.redis-table th:nth-child(10) { width: 6.5rem; }
+.host-table.redis-table th:nth-child(11) { width: 5rem; }
+
 .mysql-table-compact {
   width: 100%;
   min-width: 0;
@@ -1376,6 +1407,7 @@ h1 {
   .overview-compact-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
 }
 
 @media (max-width: 760px) {
@@ -1449,7 +1481,6 @@ h1 {
   .overview-compact-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
 }
 
 @media (max-width: 480px) {

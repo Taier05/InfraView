@@ -21,6 +21,7 @@ import (
 	"github.com/Taier05/InfraView/internal/disk"
 	"github.com/Taier05/InfraView/internal/httpapi"
 	"github.com/Taier05/InfraView/internal/mysql"
+	"github.com/Taier05/InfraView/internal/redis"
 	"github.com/Taier05/InfraView/internal/service"
 )
 
@@ -88,6 +89,7 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 	hostProvider := withUpstreamTimeout(providers.Hosts, cfg.UpstreamTimeout)
 	mysqlProvider := withMySQLUpstreamTimeout(providers.MySQL, cfg.UpstreamTimeout)
 	diskProvider := withDiskUpstreamTimeout(providers.Disks, cfg.UpstreamTimeout)
+	redisProvider := withRedisUpstreamTimeout(providers.Redis, cfg.UpstreamTimeout)
 	store := cache.New(clock)
 	queryService := service.New(hostProvider, store, service.Options{
 		InventoryTTL:       cfg.InventoryTTL,
@@ -114,6 +116,12 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 		MaxStale:           cfg.MaxStale,
 		Clock:              clock,
 	})
+	redisService := service.NewRedis(redisProvider, store, service.RedisOptions{
+		SnapshotTTL:        cfg.ExpectedCollectionInterval,
+		CollectionInterval: cfg.ExpectedCollectionInterval,
+		MaxStale:           cfg.MaxStale,
+		Clock:              clock,
+	})
 	return httpapi.New(httpapi.Dependencies{
 		Config:       cfg,
 		Auth:         auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, clock),
@@ -121,6 +129,7 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 		Service:      queryService,
 		MySQLService: mysqlService,
 		DiskService:  diskService,
+		RedisService: redisService,
 		Logger:       logger,
 	})
 }
@@ -129,6 +138,7 @@ type providerSet struct {
 	Hosts datasource.Provider
 	MySQL mysql.Provider
 	Disks disk.Provider
+	Redis redis.Provider
 }
 
 func dataSourceProviders(cfg config.Config, clock func() time.Time) providerSet {
@@ -138,6 +148,7 @@ func dataSourceProviders(cfg config.Config, clock func() time.Time) providerSet 
 			Hosts: mock.New(cfg.MockHostCount, clock),
 			MySQL: mock.NewMySQL(),
 			Disks: mock.NewDisk(clock),
+			Redis: mock.NewRedis(clock),
 		}
 	case "nightingale":
 		provider := nightingale.New(nightingale.Options{
@@ -147,10 +158,10 @@ func dataSourceProviders(cfg config.Config, clock func() time.Time) providerSet 
 			Clock:                clock,
 			AllowInsecureHTTP:    cfg.NightingaleAllowInsecureHTTP,
 		})
-		return providerSet{Hosts: provider, MySQL: provider, Disks: provider}
+		return providerSet{Hosts: provider, MySQL: provider, Disks: provider, Redis: provider}
 	default:
 		provider := nightingale.New(nightingale.Options{})
-		return providerSet{Hosts: provider, MySQL: provider, Disks: provider}
+		return providerSet{Hosts: provider, MySQL: provider, Disks: provider, Redis: provider}
 	}
 }
 
@@ -187,6 +198,23 @@ func (p *mysqlTimeoutProvider) MySQLSnapshot(ctx context.Context) (mysql.Snapsho
 }
 
 var _ mysql.Provider = (*mysqlTimeoutProvider)(nil)
+
+type redisTimeoutProvider struct {
+	provider redis.Provider
+	timeout  time.Duration
+}
+
+func withRedisUpstreamTimeout(provider redis.Provider, timeout time.Duration) redis.Provider {
+	return &redisTimeoutProvider{provider: provider, timeout: timeout}
+}
+
+func (provider *redisTimeoutProvider) RedisSnapshot(ctx context.Context) (redis.Snapshot, error) {
+	ctx, cancel := context.WithTimeout(ctx, provider.timeout)
+	defer cancel()
+	return provider.provider.RedisSnapshot(ctx)
+}
+
+var _ redis.Provider = (*redisTimeoutProvider)(nil)
 
 type timeoutProvider struct {
 	provider datasource.Provider

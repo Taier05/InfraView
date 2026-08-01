@@ -1,0 +1,26 @@
+{
+  "dat": [
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379"},"value":[1785200100,"1"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"3600"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"1"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"64"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"128"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"12"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"100"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"0"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"25"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"0.75"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"7"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"0.2"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"0"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"0"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"0"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"1"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"1"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"0"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"2"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379"},"value":[1785200100,"1785200000"]}],
+    [{"metric":{"ident":"fixture-ident-a","instance":"fixture-instance-a","address":"192.0.2.40:6379","replica_role":"slave"},"value":[1785200100,"1785200000"]}]
+  ],
+  "err": ""
+}

@@ -21,6 +21,7 @@ type Dependencies struct {
 	Service      *service.Service
 	MySQLService *service.MySQLService
 	DiskService  *service.DiskService
+	RedisService *service.RedisService
 	Logger       *slog.Logger
 }
 
@@ -31,6 +32,7 @@ type api struct {
 	service      *service.Service
 	mysqlService *service.MySQLService
 	diskService  *service.DiskService
+	redisService *service.RedisService
 	logger       *slog.Logger
 	verifyLogin  func(string, string) (auth.Session, bool)
 }
@@ -58,6 +60,7 @@ func New(dependencies Dependencies) http.Handler {
 		service:      dependencies.Service,
 		mysqlService: dependencies.MySQLService,
 		diskService:  dependencies.DiskService,
+		redisService: dependencies.RedisService,
 		logger:       dependencies.Logger,
 		verifyLogin:  dependencies.Auth.Login,
 	}
@@ -76,6 +79,8 @@ func New(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/mysql/instances", server.requireAuthentication(http.HandlerFunc(server.mysqlInstances)))
 	mux.Handle("GET /api/v1/disks/overview", server.requireAuthentication(http.HandlerFunc(server.diskOverview)))
 	mux.Handle("GET /api/v1/disks/devices", server.requireAuthentication(http.HandlerFunc(server.diskDevices)))
+	mux.Handle("GET /api/v1/redis/overview", server.requireAuthentication(http.HandlerFunc(server.redisOverview)))
+	mux.Handle("GET /api/v1/redis/instances", server.requireAuthentication(http.HandlerFunc(server.redisInstances)))
 
 	mux.HandleFunc("/api/v1/session", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/overview", server.methodNotAllowed)
@@ -86,6 +91,8 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/mysql/instances", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/disks/overview", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/disks/devices", server.methodNotAllowed)
+	mux.HandleFunc("/api/v1/redis/overview", server.methodNotAllowed)
+	mux.HandleFunc("/api/v1/redis/instances", server.methodNotAllowed)
 	mux.HandleFunc("/api", server.notFound)
 	mux.HandleFunc("/api/", server.notFound)
 

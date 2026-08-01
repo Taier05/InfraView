@@ -14,10 +14,12 @@ import {
   diskOverviewFixture,
   mysqlOverviewFixture,
   overviewFixture,
+  redisOverviewFixture,
   type DiskOverviewFixture,
   type ErrorFixture,
   type MySQLOverviewFixture,
   type OverviewFixture,
+  type RedisOverviewFixture,
 } from '../../test/fixtures'
 import { OverviewPage } from './OverviewPage'
 
@@ -68,16 +70,20 @@ function mockOverviewRequests({
   host = overviewFixture(),
   disk = diskOverviewFixture(),
   mysql = mysqlOverviewFixture(),
+  redis = redisOverviewFixture(),
   hostError,
   diskError,
   mysqlError,
+  redisError,
 }: {
   host?: OverviewFixture
   disk?: DiskOverviewFixture
   mysql?: MySQLOverviewFixture
+  redis?: RedisOverviewFixture
   hostError?: ErrorFixture
   diskError?: ErrorFixture
   mysqlError?: ErrorFixture
+  redisError?: ErrorFixture
 } = {}) {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
@@ -89,6 +95,14 @@ function mockOverviewRequests({
     if (path === '/api/v1/disks/overview') {
       return Promise.resolve(
         jsonResponse(diskError ?? disk, diskError === undefined ? 200 : 503),
+      )
+    }
+    if (path === '/api/v1/redis/overview') {
+      return Promise.resolve(
+        jsonResponse(
+          redisError ?? redis,
+          redisError === undefined ? 200 : 503,
+        ),
       )
     }
     return Promise.resolve(
@@ -107,7 +121,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('总览展示可进入 Linux 主机、主机硬盘和 MySQL 板块的告警摘要卡', async () => {
+it('总览按顺序展示 Linux 主机主机硬盘MySQL和Redis告警摘要卡', async () => {
   renderOverview()
 
   const hostCard = await screen.findByRole('link', {
@@ -119,6 +133,7 @@ it('总览展示可进入 Linux 主机、主机硬盘和 MySQL 板块的告警�
   const diskCard = screen.getByRole('link', {
     name: '查看主机硬盘板块',
   })
+  const redisCard = screen.getByRole('link', { name: '查看 Redis 板块' })
   const moduleGrid = screen.getByRole('group', { name: '基础设施模块' })
   expect(moduleGrid).toHaveClass(
     'overview-status-grid',
@@ -133,6 +148,12 @@ it('总览展示可进入 Linux 主机、主机硬盘和 MySQL 板块的告警�
   expect(
     within(moduleGrid).getByRole('link', { name: '查看 MySQL 板块' }),
   ).toBeVisible()
+  expect(redisCard).toHaveAttribute('href', '/redis')
+  expect(within(redisCard).getByText('Redis')).toBeVisible()
+  for (const label of ['可用性', '内存', '连接', '复制']) {
+    expect(within(redisCard).getByText(label)).toBeVisible()
+  }
+  expect(within(moduleGrid).getAllByRole('link')).toHaveLength(4)
   expect(screen.queryAllByRole('article')).toHaveLength(0)
   expect(diskCard).toHaveAttribute('href', '/disks')
   expect(diskCard).toHaveAttribute('data-level', 'critical')
@@ -843,6 +864,9 @@ it('使用固定查询范围且不显示总览时间范围控件', async () => {
     if (path === '/api/v1/disks/overview') {
       return Promise.resolve(jsonResponse(diskOverviewFixture()))
     }
+    if (path === '/api/v1/redis/overview') {
+      return Promise.resolve(jsonResponse(redisOverviewFixture()))
+    }
     requestedRanges.push(requestedRange(input))
     return Promise.resolve(jsonResponse(overviewFixture()))
   })
@@ -856,22 +880,23 @@ it('使用固定查询范围且不显示总览时间范围控件', async () => {
   expect(screen.queryByRole('button', { name: '7天' })).not.toBeInTheDocument()
 })
 
-it('手动刷新会同时重新请求 Linux、硬盘和 MySQL 总览', async () => {
+it('手动刷新会同时重新请求四个总览模块', async () => {
   const user = userEvent.setup()
   renderOverview()
 
   await screen.findByRole('link', { name: '查看 Linux 主机板块' })
   await screen.findByRole('link', { name: '查看主机硬盘板块' })
-  expect(globalThis.fetch).toHaveBeenCalledTimes(3)
+  expect(globalThis.fetch).toHaveBeenCalledTimes(4)
   await user.click(screen.getByRole('button', { name: '刷新' }))
 
-  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(6))
+  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(8))
   const calls = vi.mocked(globalThis.fetch).mock.calls
   expect(calls.map(([input]) => requestedPath(input))).toEqual(
     expect.arrayContaining([
       '/api/v1/overview',
       '/api/v1/disks/overview',
       '/api/v1/mysql/overview',
+      '/api/v1/redis/overview',
     ]),
   )
   const hostCalls = calls.filter(
@@ -892,6 +917,9 @@ it('每 15 秒刷新且前一请求未完成时不发起重叠请求', async () 
     }
     if (path === '/api/v1/disks/overview') {
       return Promise.resolve(jsonResponse(diskOverviewFixture()))
+    }
+    if (path === '/api/v1/redis/overview') {
+      return Promise.resolve(jsonResponse(redisOverviewFixture()))
     }
     hostRequestCount += 1
     if (hostRequestCount === 1) {
@@ -951,6 +979,9 @@ it('可重试错误显示中文信息并可重试成功', async () => {
     }
     if (path === '/api/v1/disks/overview') {
       return Promise.resolve(jsonResponse(diskOverviewFixture()))
+    }
+    if (path === '/api/v1/redis/overview') {
+      return Promise.resolve(jsonResponse(redisOverviewFixture()))
     }
     attempts += 1
     if (attempts === 1) {

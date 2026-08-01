@@ -4,7 +4,9 @@
 
 ## 当前 main 恢复入口
 
-当前功能交付基线为 `6300413 feat: add host disk SMART monitoring`，已推送到 `origin/main`。主机硬盘 SMART 模块、2026-08-01 容量增量、测试、规格、计划和交接文档均已纳入版本控制；继续开发前仍须先做 Git 只读检查，禁止清理或回退用户后续差异。
+当前仓库交接基线为 `cfe4a40 docs: record disk SMART delivery`，SMART 功能提交为 `6300413 feat: add host disk SMART monitoring`，两者均已推送到 `origin/main`。主机硬盘 SMART 模块、2026-08-01 容量增量、测试、规格、计划和上一轮交接文档均已纳入版本控制；本次仅为新对话恢复而更新 `docs/HANDOFF.md`，该差异有意保持未提交。继续开发前仍须先做 Git 只读检查，禁止清理或回退这项差异及用户后续差异。
+
+2026-08-01 当前工作区在用户明确授权后继续于 `main` 实现 Redis Cluster 首期模块与共享观测模块模板；除原有 HANDOFF 差异外，现有 Redis/共享组件源码、测试、规格、计划与文档均是本轮有意保留的未提交修改。不得把上一段“仅 HANDOFF 修改”的恢复快照误当成当前 `git status`，不得清理、回退或覆盖这些差异。本次十一列/共享模板尚未提交、推送、部署、重启或连接任何 Nightingale。
 
 2026-08-01 容量增量已实现并完成全量离线及现有 8080 现场验收：硬盘固定即时 batch 从 17 组增至 18 组，第 17 组 `smart_disk_capacity_bytes` 是容量唯一来源，第 18 组 inventory 继续负责设备发现、型号和原始最后样本时间；旧 inventory `capacity` 标签不再读取或回退。容量从原始文本精确解析为 `int64`，不经过 `float64` 丢失大整数精度。硬盘页由九列改为“型号”“容量”分列的十列，容量支持服务端升降序且缺失值始终最后。前端 8 文件/101 项、typecheck/build、Go 格式/普通/race/编译、Playwright 静态发现和无缓存镜像均通过。经用户单独授权，现有 8080 已原位重建并继续只连接测试 Nightingale；容器安全、脱敏 API、十列 Chromium 和总览四槽位验收均通过。
 
@@ -33,16 +35,30 @@
 14. docs/superpowers/plans/2026-07-30-overview-four-slot-and-disk-display-refinement.md
 15. docs/superpowers/specs/2026-08-01-disk-capacity-metric-and-column-design.md
 16. docs/superpowers/plans/2026-08-01-disk-capacity-metric-and-column.md
+17. docs/superpowers/specs/2026-08-01-redis-cluster-module-design.md
+18. docs/superpowers/plans/2026-08-01-redis-cluster-module.md
 
 先只读执行：
 git status --short --branch
 git log -3 --oneline
 git diff --check
 
-InfraView 始终只读。当前功能基线为 6300413，已推送到 origin/main；主机硬盘 SMART 模块和 2026-08-01 容量增量均已提交。硬盘功能使用独立领域/Service/API/页面、一次固定 18 查询即时 batch、默认 60 秒快照 TTL 与样本推进 freshness；120/300 秒为警告/严重。第 17 组 smart_disk_capacity_bytes 是容量唯一来源，第 18 组 inventory 负责设备发现、型号和原始最后样本时间；旧 inventory capacity 标签不得读取或回退。硬盘页为型号/容量分列的十列，容量支持服务端排序。status_source 固定为 smart_health、device_warning、attribute_failure、collection、normal、unknown；同级时设备来源优先，只有采集等级严格更高时才显示采集延迟/失联。温度、寿命、错误计数只展示。Nightingale v8.4.1 是主要验证版本，v9.x 仅保留协议兼容。2026-08-01 增量已在现有 8080 完成脱敏现场验收；8080 永远只连接测试 Nightingale，禁止创建其他 InfraView 端口。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/容量值/指标值或上游正文。任何后续提交、推送或部署仍需按新任务重新授权；任何生产 Nightingale 验证永久禁止。
+InfraView 始终只读。当前仓库交接基线为 cfe4a40，SMART 功能提交为 6300413，均已推送到 origin/main；本次仅 docs/HANDOFF.md 存在有意保留的未提交交接更新，请先核对且不要清理或回退。主机硬盘 SMART 模块和 2026-08-01 容量增量均已提交。硬盘功能使用独立领域/Service/API/页面、一次固定 18 查询即时 batch、默认 60 秒快照 TTL 与样本推进 freshness；120/300 秒为警告/严重。第 17 组 smart_disk_capacity_bytes 是容量唯一来源，第 18 组 inventory 负责设备发现、型号和原始最后样本时间；旧 inventory capacity 标签不得读取或回退。硬盘页为型号/容量分列的十列，容量支持服务端排序。status_source 固定为 smart_health、device_warning、attribute_failure、collection、normal、unknown；同级时设备来源优先，只有采集等级严格更高时才显示采集延迟/失联。温度、寿命、错误计数只展示。Nightingale v8.4.1 是主要验证版本，v9.x 仅保留协议兼容。2026-08-01 增量已在现有 8080 完成脱敏现场验收；8080 永远只连接测试 Nightingale，禁止创建其他 InfraView 端口。不得读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/容量值/指标值或上游正文。新开发或文件修改仍需用户授权；但用户已长期授权：每次已授权修复通过验证后，直接原位重建现有测试 8080，无需再次询问。提交、推送、其他部署或重启仍需明确授权；任何生产 Nightingale 验证永久禁止。先汇报仓库状态，再等待下一项开发需求。
+
+当前 Redis 状态覆盖上方提示中“仅 docs/HANDOFF.md 有差异”的旧恢复快照：main 工作区现包含有意保留的未提交 Redis/共享组件源码、测试、规格、计划和文档，禁止清理或回退。Redis 为独立垂直模块，固定 21 查询一次 batch、无 N+1，15 秒预期周期与 2/5 周期 freshness。共享 `ListPage` 与 `ModuleStatusCardShell`、Redis 首个接入和最终十一列已完成全量离线验证并原位重建至现有 8080。运行时间随后纠正为主机/MySQL 的天/小时格式；Dockerfile 内前端/Go 全量验证、容器健康、唯一 8080、安全基线和部署资源匹配均通过。未提交、未推送，也未连接生产 Nightingale。
 
 历史 2026-07-30 展示细化状态：总览已恢复桌面四槽位；当时硬盘“型号 / 容量”改为同列独立两行，unsafe shutdown 显示为“异常断电 N 次”，且仅表示累计展示、不参与状态判断。Docker 离线前端全量回归（8 文件/101 测试、typecheck、build）及无缓存全仓镜像 `infraview:overview-disk-display-verify` 已通过。用户随后授权原位重建仍连接测试 Nightingale 的现有 8080：服务 healthy，保持非 root、只读根文件系统、cap drop、禁止提权且只发布原 8080；脱敏登录态只读 API 与一次性 Chromium 1440×900 验收通过。浏览器确认总览四轨前三格占用、第四格自然空，硬盘九列、型号/容量同列两行、无横向溢出、无破坏性控件和无非预期登录后错误。这些现场证据不覆盖 2026-08-01 的 18 组/十列增量。未读取私密环境文件，未输出凭据、API 正文或现场值，未创建其他 InfraView 端口，也未运行 `scripts/e2e.sh`。提交、推送各自需要明确授权；任何生产 Nightingale 验证永久禁止。
 ```
+
+## Redis Cluster 当前暂停点
+
+- 独立 Redis 垂直模块已实现：固定 21 查询、一次即时 batch、无 N+1，独立缓存与 15 秒预期采集周期，2/5 周期采集警告/严重。
+- 状态等级为 `critical > warning > unknown > normal`；同级来源优先为 availability、replication、memory、connection、collection。Cluster master 零已连接副本、slave 上游断链、复制延迟、有效 maxmemory 使用率与拒绝连接速率均按已批准阈值处理。
+- API 仅有两个认证 GET；前端为总览第四卡、侧边栏第五项和固定十一列 Redis 实例页，最终列名为“实例地址、角色、内存上限、内存使用率、连接、QPS/命中率、key总数、复制链路、延迟、运行时间、状态”。内存上限为 maxmemory；复制链路主节点显示 `—`，从节点显示正常/断开/未知；延迟只使用真实 lag，缺失显示 `—`。运行时间与主机/MySQL 相同：同时有天和小时显示“x天 x小时”，整天显示“x天”，不足一天显示“x小时”。过期/淘汰仅从页面删除，后端字段、21 查询与 `sort=evicted` 兼容保留。首期无拓扑、slot、详情、历史、故障转移、Redis 直连或命令执行。
+- 共享 `ListPage` 统一列表标题、标签控件、搜索框、刷新状态、表格/空状态/分页；`ModuleStatusCardShell` 统一总览卡结构。Redis 是首个接入者；新增模块必须复用，Linux/硬盘/MySQL 后续触及时渐进迁移且不主动改变行为或布局。业务阈值与状态仍由各模块计算。
+- 全量前端 11 文件/112 项、typecheck/build、Playwright 2 文件/14 项静态发现、Go 格式/普通/race/编译和无缓存生产镜像均通过。十一列/共享模板已原位重建至现有 8080；未创建其他端口或项目，未读取私密环境，未连接生产 Nightingale。
+- 十一列/共享模板及后续运行时间纠错均已原位重建至现有 8080；运行时间 RED 为 1 项失败/6 项通过，GREEN 为 7/7，修复后前端全量 11 文件/112 项、typecheck/build、Playwright 14 项静态发现以及镜像内 Go 普通/race/编译均通过。容器健康、唯一 8080、安全基线和部署资源匹配通过；未提交或推送。
+- 提交前范围审查新增 Redis 极端页码溢出回归：`math.MaxInt` 页码旧实现会在切片处 panic，现已在查询规范化阶段安全返回 `ErrInvalidQuery`，定向 Redis Service 测试完成 RED→GREEN。修复后镜像内前端 112 项、typecheck/build、Go 普通/race/编译和 Playwright 14 项静态发现通过，并已按长期授权原位重建同一测试 8080；健康、唯一端口、安全基线和部署资源匹配通过。
 
 ## 主机硬盘 SMART 当前暂停点
 
@@ -142,8 +158,8 @@ Nightingale v8.4.1 兼容功能已经快进合并并推送到 `origin/main`，�
 ## 新对话的第一组任务
 
 1. 先查看 `git status`、`git log -3 --oneline` 和 `git diff --check`，确认当前位于 `main`，并核对与 `origin/main` 的同步状态。
-2. 确认功能基线 `6300413` 已在 `origin/main`，工作树无未提交差异；未经新授权不要提交、推送、部署或重启。
-3. 等待用户给出下一项开发需求。生产 Categraf 升级后的 IO 复验仍是开放观察，但开发 8080 永远只连接测试 Nightingale；未经明确授权，不连接生产、不修改 IO 查询、不部署或重启。
+2. 确认仓库交接基线 `cfe4a40` 和 SMART 功能提交 `6300413` 已在 `origin/main`；上方“仅 HANDOFF 有差异”是 Redis 开发前的历史快照，当前有意保留完整 Redis/模板/文档差异，不要清理或回退。未经新开发授权不要修改文件、提交或推送。
+3. 用户已长期授权：每次已授权修复通过验证后，直接原位重建现有 8080，无需再次询问；只能复用测试 Nightingale 和原 8080，不得创建其他端口。生产 Categraf 升级后的 IO 复验仍是开放观察；禁止连接、切换或探测生产 Nightingale，其他部署或重启仍需明确授权。
 
 ## 安全边界
 

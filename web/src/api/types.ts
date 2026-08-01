@@ -172,6 +172,82 @@ export interface MySQLInstancePageData {
 
 export type MySQLInstancePageResponse = ApiResponse<MySQLInstancePageData>
 
+export type RedisRole = 'master' | 'slave' | 'unknown'
+export type RedisStatusSource =
+  | 'availability'
+  | 'replication'
+  | 'memory'
+  | 'connection'
+  | 'collection'
+  | 'normal'
+  | 'unknown'
+
+export interface RedisReplication {
+  connected_replicas: number | null
+  master_link_up: boolean | null
+  master_last_io_seconds_ago: number | null
+  master_sync_in_progress: boolean | null
+  worst_replica_lag_seconds: number | null
+}
+
+export interface RedisInstance {
+  id: string
+  address: string
+  availability: 'up' | 'down' | 'unknown'
+  role: RedisRole
+  cluster_enabled: boolean | null
+  used_memory_bytes: number | null
+  max_memory_bytes: number | null
+  memory_usage_percent: number | null
+  connected_clients: number | null
+  max_clients: number | null
+  connection_usage_percent: number | null
+  blocked_clients: number | null
+  qps: number | null
+  hit_rate: number | null
+  keys: number | null
+  expired_keys_per_second: number | null
+  evicted_keys_per_second: number | null
+  rejected_connections_rate: number | null
+  replication: RedisReplication
+  uptime_seconds: number | null
+  status: MetricLevel
+  status_source: RedisStatusSource
+  collection_level: MetricLevel
+}
+
+export interface RedisInstancePageData {
+  instances: RedisInstance[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+export type RedisInstancePageResponse = ApiResponse<RedisInstancePageData>
+
+export interface RedisOverviewData {
+  total: number
+  normal: number
+  warning: number
+  critical: number
+  unknown: number
+  affected_instances: number
+  warning_instances: number
+  critical_instances: number
+  roles: {
+    master: number
+    slave: number
+    unknown: number
+  }
+  alerts: {
+    availability: AlertCount
+    memory: AlertCount
+    connection: AlertCount
+    replication: AlertCount
+  }
+}
+export type RedisOverviewResponse = ApiResponse<RedisOverviewData>
+
 export type DiskSMARTHealth = 'healthy' | 'failed' | 'unknown'
 
 export type DiskStatusSource =

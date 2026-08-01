@@ -4,6 +4,8 @@ export const SESSION_PATH = '/api/v1/session'
 export const OVERVIEW_PATH = '*/api/v1/overview'
 export const MYSQL_OVERVIEW_PATH = '*/api/v1/mysql/overview'
 export const MYSQL_INSTANCES_PATH = '*/api/v1/mysql/instances'
+export const REDIS_OVERVIEW_PATH = '*/api/v1/redis/overview'
+export const REDIS_INSTANCES_PATH = '*/api/v1/redis/instances'
 export const DISK_OVERVIEW_PATH = '*/api/v1/disks/overview'
 export const DISK_DEVICES_PATH = '*/api/v1/disks/devices'
 
@@ -192,6 +194,79 @@ export interface MySQLOverviewFixture {
       replication_lag: { warning: number; critical: number }
       replication_data: { warning: number; critical: number }
     }
+  }
+  meta: {
+    request_id: string
+    stale: boolean
+    collected_at: string
+  }
+}
+
+export interface RedisOverviewFixture {
+  data: {
+    total: number
+    normal: number
+    warning: number
+    critical: number
+    unknown: number
+    affected_instances: number
+    warning_instances: number
+    critical_instances: number
+    roles: { master: number; slave: number; unknown: number }
+    alerts: {
+      availability: { warning: number; critical: number }
+      memory: { warning: number; critical: number }
+      connection: { warning: number; critical: number }
+      replication: { warning: number; critical: number }
+    }
+  }
+  meta: { request_id: string; stale: boolean; collected_at: string }
+}
+
+export interface RedisInstancePageFixture {
+  data: {
+    instances: Array<{
+      id: string
+      address: string
+      availability: 'up' | 'down' | 'unknown'
+      role: 'master' | 'slave' | 'unknown'
+      cluster_enabled: boolean | null
+      used_memory_bytes: number | null
+      max_memory_bytes: number | null
+      memory_usage_percent: number | null
+      connected_clients: number | null
+      max_clients: number | null
+      connection_usage_percent: number | null
+      blocked_clients: number | null
+      qps: number | null
+      hit_rate: number | null
+      keys: number | null
+      expired_keys_per_second: number | null
+      evicted_keys_per_second: number | null
+      rejected_connections_rate: number | null
+      replication: {
+        connected_replicas: number | null
+        master_link_up: boolean | null
+        master_last_io_seconds_ago: number | null
+        master_sync_in_progress: boolean | null
+        worst_replica_lag_seconds: number | null
+      }
+      uptime_seconds: number | null
+      status: MetricLevelFixture
+      status_source:
+        | 'availability'
+        | 'replication'
+        | 'memory'
+        | 'connection'
+        | 'collection'
+        | 'normal'
+        | 'unknown'
+      collection_level: MetricLevelFixture
+    }>
+    total: number
+    page: number
+    page_size: number
+    total_pages: number
   }
   meta: {
     request_id: string
@@ -606,6 +681,127 @@ export function mysqlOverviewFixture(
   }
 }
 
+export function redisOverviewFixture(
+  overrides: {
+    data?: Partial<RedisOverviewFixture['data']>
+    meta?: Partial<RedisOverviewFixture['meta']>
+  } = {},
+): RedisOverviewFixture {
+  return {
+    data: {
+      total: 8,
+      normal: 3,
+      warning: 2,
+      critical: 2,
+      unknown: 1,
+      affected_instances: 5,
+      warning_instances: 3,
+      critical_instances: 2,
+      roles: { master: 4, slave: 3, unknown: 1 },
+      alerts: {
+        availability: { warning: 1, critical: 1 },
+        memory: { warning: 1, critical: 0 },
+        connection: { warning: 1, critical: 0 },
+        replication: { warning: 1, critical: 1 },
+      },
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-fixture-redis-overview-001',
+      stale: false,
+      collected_at: '2026-08-01T08:00:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
+export function redisInstancePageFixture(
+  overrides: {
+    data?: Partial<RedisInstancePageFixture['data']>
+    meta?: Partial<RedisInstancePageFixture['meta']>
+  } = {},
+): RedisInstancePageFixture {
+  return {
+    data: {
+      instances: [
+        {
+          id: 'redis-fixture-001',
+          address: '192.0.2.201:6379',
+          availability: 'up',
+          role: 'master',
+          cluster_enabled: true,
+          used_memory_bytes: 1024 ** 3,
+          max_memory_bytes: 2 * 1024 ** 3,
+          memory_usage_percent: 50,
+          connected_clients: 24,
+          max_clients: 1000,
+          connection_usage_percent: 2.4,
+          blocked_clients: 0,
+          qps: 80.5,
+          hit_rate: 0.97,
+          keys: 4096,
+          expired_keys_per_second: 0.5,
+          evicted_keys_per_second: 0,
+          rejected_connections_rate: 0,
+          replication: {
+            connected_replicas: 2,
+            master_link_up: null,
+            master_last_io_seconds_ago: null,
+            master_sync_in_progress: null,
+            worst_replica_lag_seconds: 2,
+          },
+          uptime_seconds: 183_600,
+          status: 'normal',
+          status_source: 'normal',
+          collection_level: 'normal',
+        },
+        {
+          id: 'redis-fixture-002',
+          address: '192.0.2.202:6379',
+          availability: 'up',
+          role: 'slave',
+          cluster_enabled: true,
+          used_memory_bytes: null,
+          max_memory_bytes: null,
+          memory_usage_percent: null,
+          connected_clients: null,
+          max_clients: null,
+          connection_usage_percent: null,
+          blocked_clients: null,
+          qps: null,
+          hit_rate: null,
+          keys: null,
+          expired_keys_per_second: null,
+          evicted_keys_per_second: null,
+          rejected_connections_rate: null,
+          replication: {
+            connected_replicas: null,
+            master_link_up: false,
+            master_last_io_seconds_ago: 35,
+            master_sync_in_progress: false,
+            worst_replica_lag_seconds: null,
+          },
+          uptime_seconds: null,
+          status: 'critical',
+          status_source: 'replication',
+          collection_level: 'normal',
+        },
+      ],
+      total: 2,
+      page: 1,
+      page_size: 20,
+      total_pages: 1,
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-fixture-redis-instances-001',
+      stale: false,
+      collected_at: '2026-08-01T08:00:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
 export function diskDevicePageFixture(
   overrides: {
     data?: Partial<DiskDevicePageFixture['data']>
@@ -845,6 +1041,10 @@ export const handlers = [
   }),
   http.get(DISK_OVERVIEW_PATH, () =>
     HttpResponse.json(diskOverviewFixture()),
+  ),
+  http.get(REDIS_OVERVIEW_PATH, () => HttpResponse.json(redisOverviewFixture())),
+  http.get(REDIS_INSTANCES_PATH, () =>
+    HttpResponse.json(redisInstancePageFixture()),
   ),
   http.get(OVERVIEW_PATH, () => HttpResponse.json(overviewFixture())),
   http.get(DISK_DEVICES_PATH, () =>

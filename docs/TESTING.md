@@ -144,3 +144,36 @@ docker compose ls
 - 一次性 Playwright 容器使用 host network 访问原 8080，不发布端口、不截图、不保留 trace。最终 1440×900 验收确认总览四轨等宽、三卡宽度分别匹配前三轨且第四轨自然空白；硬盘九列表头、数据行、型号/容量独立两行及各自完整 title 可见；页面和表格无横向溢出、无破坏性控件，登录后无非预期 console/page/request 错误。
 - 首轮现场脚本因使用错误的主机/MySQL 排序参数失败；修正为页面真实白名单后，错误收集又捕获了脚本主动 405 检查和导航取消。按系统化诊断将 405 改由共享登录会话的 request API 验证，并把错误监听提前到首次导航前。预认证会话 GET 401 只有在固定会话路径的响应与同来源标准 Chrome console 文本同时出现且各恰好一次时才视为预期；登录提交阶段只精确豁免成功路由切换产生的 `fetch + net::ERR_ABORTED`。除此之外所有 console/page/request 错误仍阻断。同一完整路径退出 0，产品代码未因这些脚本问题修改。
 - 未运行会创建 18080 的 `scripts/e2e.sh`，未创建额外 InfraView 端口，未连接、切换或探测生产 Nightingale，未输出凭据、Cookie、认证头、Base URL、API 正文或现场标识/数量/指标值。
+
+## 2026-08-01 Redis Cluster 模块离线验证
+
+- 领域/Mock：稳定 ID、深拷贝、角色与正常/警告/严重/未知场景。
+- Nightingale：固定 21 查询副本、一次 batch、无 N+1、身份/数值/角色冲突与安全错误。
+- Service/API：15 秒样本推进、2/5 周期 freshness、状态阈值、同级来源优先、缓存/stale、查询白名单、认证 GET、405 与安全 503。
+- 前端：总览第四卡、侧边栏、固定十列、复用既有带标签控制栏、搜索防抖、刷新状态、URL 状态、分页归一化、loading/empty/stale/error、刷新失败保留旧数据及无破坏性控件。
+- 首次原位重建现有 8080 后，用户现场发现总览提示响应格式无效，以及详情控制栏、列名和长指标可读性问题。RED 测试确认后端 `roles` 输出大写字段而前端契约要求小写；修复为显式小写 view model，并增加 HTTP 契约回归。详情页统一复用主机/MySQL 控制栏，最终列名按批准文案固定，内存、过期/淘汰与复制状态改为可换行结构化展示。
+- 本次修复后 Go 全仓格式/普通/race/编译均退出 0；前端 9 文件/108 项测试、typecheck、production build 均退出 0；Playwright 静态发现为 2 文件/14 项。
+- `docker build --no-cache --tag infraview:redis-ui-fixes-verify .` 退出 0，干净构建上下文内再次通过前端 108 项、typecheck/build、Go 普通/race 和最终编译。镜像仅构建，未运行、未映射端口、未连接上游。
+- `docker build --no-cache --tag infraview:redis-cluster-module-verify .` 退出 0，Dockerfile 内再次通过前端 107 项、typecheck/build 与 Go 普通/race/编译。镜像仅构建，未运行、未映射端口、未连接上游。
+- `npm ci` 仍报告既有 2 个 high severity 依赖项，Vite 仍报告依赖包 `"use client"` 指令被忽略；本轮未修改依赖，也未执行 `audit fix --force`。
+- 本次修复浏览器只执行 `playwright test --list` 静态发现。随后经明确授权原位重建现有 8080，健康、唯一 8080 映射、只读根文件系统、cap drop `ALL` 和禁止提权检查通过；未创建其他端口或项目，未连接生产 Nightingale，页面现场验收由用户进行。
+
+## 2026-08-01 Redis 十一列与共享观测模板验证
+
+- 按 TDD 新增共享列表页与共享总览卡壳测试；两组测试均先因组件不存在而失败，再在最小实现后通过。Redis 仅迁移展示结构，查询、URL、阈值和状态计算仍留在业务模块。
+- Redis 十一列测试先在旧合并列实现上得到 2 项预期失败；实现后 7/7 通过，覆盖内存上限有效/未设置/缺失、独立使用率、主/从/未知复制链路及真实 lag 存在/缺失。运行时间最终格式以后续纠错记录为准。
+- 当前定向验证已通过 TypeScript 类型检查以及共享组件、Redis 页面和 Redis 总览共 4 个测试文件/42 项。
+- 全量前端离线验证退出 0：Vitest 11 文件/112 项、typecheck、production build、Playwright 2 文件/14 项静态发现。Go 格式检查、全仓普通测试、race 测试与编译退出 0。
+- `docker build --no-cache --tag infraview:redis-shared-template-verify .` 退出 0；Dockerfile 内再次通过前端 112 项、typecheck/build、Go 普通/race 与最终编译。镜像仅构建，未运行、未映射端口、未连接上游。
+- `npm ci` 仍报告既有 2 个 high severity 依赖审计项，Vite 仍报告依赖包 `"use client"` 指令被忽略；本轮未修改依赖，也未执行 `npm audit fix --force`。
+- 十一列与共享模板随后经授权原位重建至现有 8080，并通过健康、唯一端口、安全基线和新列静态资源检查；未创建其他端口，未读取私密环境文件或连接生产 Nightingale。后续运行时间纠错见下一节。
+
+## 2026-08-01 Redis 运行时间格式纠错
+
+- 用户验收确认 Redis 应与主机/MySQL 一致显示天/小时，而非累计纯小时。测试先将 `90000` 秒的期望由 `25小时` 改为 `1天 1小时`，得到 1 项预期失败、其余 6 项通过。
+- 最小修复复制主机/MySQL 的既有日/小时分支；同一 Redis 页面测试随后 7/7 通过，并额外锁定 `null` 为“暂无数据”、`3600` 秒为“1小时”、`1800` 秒为“0小时”。
+- 修复后前端全量 Vitest 11 文件/112 项、typecheck、production build 和 Playwright 2 文件/14 项静态发现均退出 0。构建仅生成离线产物，未启动服务或连接上游。
+- 本次纠错随后按用户长期授权原位重建现有 8080。Dockerfile 内前端 11 文件/112 项、typecheck/build、Go 普通/race/编译全部退出 0；容器 healthy、仍只发布原 8080，并保持非 root、只读根文件系统、cap drop `ALL` 与禁止提权。部署页面引用的资源文件与本地最新 production build 完全一致；未创建其他端口、未连接生产 Nightingale、未提交或推送。
+- 后续流程：每次已授权修复通过验证后自动原位重建同一测试 8080，不再逐次询问。该规则不允许读取或输出私密环境内容，不允许创建额外端口或连接生产 Nightingale。
+- 提交前范围审查发现 Redis 极端合法正页码可能使 `(page-1)*page_size` 溢出并触发切片 panic。新增 `math.MaxInt` 回归先稳定复现 RED；随后在查询规范化阶段加入与硬盘模块相同的偏移溢出保护，定向 Redis Service 测试转为 GREEN。该修复不改变正常分页、查询白名单或 API 成功响应。
+- 审查修复后的 Compose 重建退出 0：Dockerfile 内前端 11 文件/112 项、typecheck/build、Go 普通/race/编译全部通过；Playwright 2 文件/14 项静态发现通过。现有 8080 healthy、仅发布原端口，并保持非 root、只读根文件系统、cap drop `ALL` 和禁止提权；部署页面引用最新构建资源。

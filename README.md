@@ -53,3 +53,7 @@ make verify
 - [Nightingale 接入与验证](docs/datasources/NIGHTINGALE.md)
 - [TODO](docs/TODO.md)
 - [架构决策记录](docs/decisions/0001-single-container-go-react.md)
+
+## Redis Cluster 只读模块
+
+当前工作区已实现独立 Redis 垂直模块：总览第四张 Redis 卡、侧边栏入口和十一列实例清单。数据仅来自 Nightingale 代码内置的 21 条固定查询，并合并为一次即时 batch；页面不接受任意 PromQL，不连接 Redis，也不提供切换、故障转移、命令执行或其他写操作。状态覆盖可用性、采集推进、内存、拒绝连接和主从复制；复制拓扑、详情和历史不在首期范围。

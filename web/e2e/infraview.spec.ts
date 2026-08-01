@@ -43,7 +43,7 @@ test('未登录会重定向，登录后可完成总览和主机列表关键路�
   ).toBeVisible()
   const overviewGrid = page.locator('.overview-compact-grid')
   const overviewCards = overviewGrid.locator('.module-status-card')
-  await expect(overviewCards).toHaveCount(3)
+  await expect(overviewCards).toHaveCount(4)
 
   const geometry = await overviewGrid.evaluate((grid) => {
     const cards = Array.from(
@@ -391,6 +391,43 @@ test('shows the read-only MySQL overview and compact instance list', async ({
     scrollWidth: element.scrollWidth,
   }))
   expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.clientWidth)
+})
+
+test('shows the read-only Redis overview and instance list', async ({ page }) => {
+  await login(page)
+  const redisCard = page.getByRole('link', { name: '查看 Redis 板块' })
+  await expect(redisCard).toBeVisible()
+  await expect(redisCard.getByText('复制', { exact: true })).toBeVisible()
+  await redisCard.click()
+
+  await expect(page.getByRole('heading', { name: 'Redis 实例' })).toBeVisible()
+  const headers = page.getByRole('columnheader')
+  await expect(headers).toHaveCount(11)
+  for (const heading of [
+    '实例地址',
+    '角色',
+    '内存上限',
+    '内存使用率',
+    '连接',
+    'QPS/命中率',
+    'key总数',
+    '复制链路',
+    '延迟',
+    '运行时间',
+    '状态',
+  ]) {
+    await expect(headers.filter({ hasText: heading })).toHaveCount(1)
+  }
+  await expect(headers.filter({ hasText: '过期/淘汰key数' })).toHaveCount(0)
+
+  await expect(page.getByRole('combobox', { name: 'Redis 角色' })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: '实例状态' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: '刷新 Redis 实例列表' }),
+  ).toBeVisible()
+  await expect(page.getByRole('navigation').getByText('Redis')).toBeVisible()
+  await expectNoDestructiveControls(page)
+  await expect(page.locator('body')).not.toHaveCSS('overflow-x', 'scroll')
 })
 
 test('刷新后从 URL 恢复 MySQL 筛选、排序和每页数量', async ({ page }) => {

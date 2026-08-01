@@ -103,6 +103,7 @@ export function AppShell() {
           <NavLink to="/hosts">主机</NavLink>
           <NavLink to="/disks">硬盘</NavLink>
           <NavLink to="/mysql">MySQL</NavLink>
+          <NavLink to="/redis">Redis</NavLink>
         </nav>
 
         <details

@@ -11,7 +11,10 @@ import type {
   MySQLOverviewResponse,
   OverviewData,
   OverviewResponse,
+  RedisOverviewData,
+  RedisOverviewResponse,
 } from '../../api/types'
+import { ModuleStatusCardShell } from '../../components/ModuleStatusCardShell'
 import { RefreshControl } from '../../components/RefreshControl'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useRefreshIntervalMs } from '../../app/runtime'
@@ -113,6 +116,64 @@ async function requestDiskOverview(signal: AbortSignal) {
   return response
 }
 
+function isRedisOverviewResponse(
+  value: unknown,
+): value is RedisOverviewResponse {
+  if (!isRecord(value) || !isRecord(value.data) || !isRecord(value.meta)) {
+    return false
+  }
+  const data = value.data
+  if (
+    !isNaturalCount(data.total) ||
+    !isNaturalCount(data.normal) ||
+    !isNaturalCount(data.warning) ||
+    !isNaturalCount(data.critical) ||
+    !isNaturalCount(data.unknown) ||
+    !isNaturalCount(data.affected_instances) ||
+    !isNaturalCount(data.warning_instances) ||
+    !isNaturalCount(data.critical_instances) ||
+    !isRecord(data.roles) ||
+    !isNaturalCount(data.roles.master) ||
+    !isNaturalCount(data.roles.slave) ||
+    !isNaturalCount(data.roles.unknown) ||
+    !isRecord(data.alerts) ||
+    !isAlertCount(data.alerts.availability) ||
+    !isAlertCount(data.alerts.memory) ||
+    !isAlertCount(data.alerts.connection) ||
+    !isAlertCount(data.alerts.replication)
+  ) {
+    return false
+  }
+  return (
+    data.total === data.normal + data.warning + data.critical + data.unknown &&
+    data.total === data.roles.master + data.roles.slave + data.roles.unknown &&
+    data.affected_instances ===
+      data.warning + data.critical + data.unknown &&
+    data.warning_instances === data.warning + data.unknown &&
+    data.critical_instances === data.critical &&
+    typeof value.meta.request_id === 'string' &&
+    typeof value.meta.stale === 'boolean' &&
+    (value.meta.collected_at === undefined ||
+      typeof value.meta.collected_at === 'string')
+  )
+}
+
+async function requestRedisOverview(signal: AbortSignal) {
+  const response = await apiRequest<unknown>('/api/v1/redis/overview', {
+    signal,
+  })
+  if (!isRedisOverviewResponse(response)) {
+    throw new APIError(
+      200,
+      'invalid_response',
+      '服务器响应格式无效',
+      '',
+      false,
+    )
+  }
+  return response
+}
+
 function alertLevel(alerts: AlertCount): MetricLevel {
   if (alerts.critical > 0) return 'critical'
   if (alerts.warning > 0) return 'warning'
@@ -137,10 +198,11 @@ function MetricAlert({ label, alerts }: { label: string; alerts: AlertCount }) {
   )
 }
 
-type ModuleLabel = 'Linux 主机' | '主机硬盘' | 'MySQL'
+type ModuleLabel = 'Linux 主机' | '主机硬盘' | 'MySQL' | 'Redis'
 
 function moduleName(label: ModuleLabel) {
   if (label === 'MySQL') return 'MySQL 板块'
+  if (label === 'Redis') return 'Redis 板块'
   if (label === '主机硬盘') return '主机硬盘板块'
   return 'Linux 主机板块'
 }
@@ -180,7 +242,9 @@ function ModuleError({
             ? '无法加载总览数据'
             : label === '主机硬盘'
               ? '无法加载主机硬盘板块'
-            : '无法加载 MySQL 板块'}
+            : label === 'MySQL'
+              ? '无法加载 MySQL 板块'
+              : '无法加载 Redis 板块'}
         </strong>
         <p>{apiError?.message ?? '服务暂时无法处理请求'}</p>
       </div>
@@ -233,6 +297,8 @@ function ModuleStaleBanner({
   const staleLabel =
     label === 'MySQL'
       ? 'MySQL 数据已过期'
+      : label === 'Redis'
+        ? 'Redis 数据已过期'
       : label === '主机硬盘'
         ? '主机硬盘数据已过期'
         : 'Linux 主机数据已过期'
@@ -471,6 +537,87 @@ function MySQLStatusCard({ data }: { data: MySQLOverviewData }) {
   )
 }
 
+function RedisStatusCard({ data }: { data: RedisOverviewData }) {
+  if (data.total === 0) {
+    return (
+      <ModuleStatusCardShell
+        to="/redis"
+        ariaLabel="查看 Redis 板块"
+        category="缓存板块"
+        title="Redis"
+        level="empty"
+        levelLabel="暂无实例"
+        actionLabel="查看 Redis"
+        className="redis-overview-card"
+        emptyState={{
+          title: '暂无 Redis 实例',
+          description: '尚无可展示的实例健康数据',
+        }}
+      />
+    )
+  }
+  const level: MetricLevel =
+    data.critical_instances > 0
+      ? 'critical'
+      : data.warning_instances > 0 || data.unknown > 0
+        ? 'warning'
+        : 'normal'
+  const label =
+    level === 'critical'
+      ? '存在严重异常'
+      : level === 'warning'
+        ? data.unknown > 0
+          ? '存在警告或未知'
+          : '存在警告'
+        : '全部正常'
+  return (
+    <ModuleStatusCardShell
+      to="/redis"
+      ariaLabel="查看 Redis 板块"
+      category="缓存板块"
+      title="Redis"
+      level={level}
+      levelLabel={label}
+      actionLabel="查看 Redis"
+      className="redis-overview-card"
+    >
+      <div className="module-alert-summary">
+        <div className="module-alert-total">
+          <span>异常实例</span>
+          <strong>
+            {data.affected_instances}
+            <small> / {data.total}</small>
+          </strong>
+        </div>
+        <div className="module-alert-levels">
+          <StatusBadge
+            level={data.critical_instances > 0 ? 'critical' : 'normal'}
+            label={
+              data.critical_instances > 0
+                ? `严重 ${data.critical_instances}`
+                : '无严重'
+            }
+          />
+          <StatusBadge
+            level={data.warning_instances > 0 ? 'warning' : 'normal'}
+            label={
+              data.warning_instances > 0
+                ? `警告风险 ${data.warning_instances}`
+                : '无警告风险'
+            }
+          />
+        </div>
+      </div>
+      <div className="module-metric-alert-grid">
+        <MetricAlert label="可用性" alerts={data.alerts.availability} />
+        <MetricAlert label="内存" alerts={data.alerts.memory} />
+        <MetricAlert label="连接" alerts={data.alerts.connection} />
+        <MetricAlert label="复制" alerts={data.alerts.replication} />
+      </div>
+    </ModuleStatusCardShell>
+  )
+}
+
 function DiskStatusCard({ data }: { data: DiskOverviewData }) {
   if (data.total === 0) {
     return (
@@ -602,14 +749,22 @@ export function OverviewPage() {
     refetchInterval: refreshIntervalMs,
     refetchIntervalInBackground: false,
   })
+  const redisOverview = useQuery({
+    queryKey: ['redis-overview'],
+    queryFn: ({ signal }) => requestRedisOverview(signal),
+    refetchInterval: refreshIntervalMs,
+    refetchIntervalInBackground: false,
+  })
   const allDataUpdatedAt =
     hostOverview.data !== undefined &&
     diskOverview.data !== undefined &&
-    mysqlOverview.data !== undefined
+    mysqlOverview.data !== undefined &&
+    redisOverview.data !== undefined
       ? Math.min(
           hostOverview.dataUpdatedAt,
           diskOverview.dataUpdatedAt,
           mysqlOverview.dataUpdatedAt,
+          redisOverview.dataUpdatedAt,
         )
       : 0
 
@@ -629,7 +784,8 @@ export function OverviewPage() {
             isFetching={
               hostOverview.isFetching ||
               diskOverview.isFetching ||
-              mysqlOverview.isFetching
+              mysqlOverview.isFetching ||
+              redisOverview.isFetching
             }
             dataUpdatedAt={allDataUpdatedAt}
             onRefresh={() => {
@@ -637,6 +793,7 @@ export function OverviewPage() {
                 hostOverview.refetch(),
                 diskOverview.refetch(),
                 mysqlOverview.refetch(),
+                redisOverview.refetch(),
               ])
             }}
             refreshIntervalSeconds={refreshIntervalMs / 1_000}
@@ -665,6 +822,13 @@ export function OverviewPage() {
             collectedAt={diskOverview.data.meta.collected_at}
           />
         )}
+      {redisOverview.data?.meta.stale === true &&
+        redisOverview.data.meta.collected_at !== undefined && (
+          <ModuleStaleBanner
+            label="Redis"
+            collectedAt={redisOverview.data.meta.collected_at}
+          />
+        )}
       {hostOverview.data !== undefined && hostOverview.isError && (
         <ModuleRefreshError
           label="Linux 主机"
@@ -684,6 +848,13 @@ export function OverviewPage() {
           label="主机硬盘"
           error={diskOverview.error}
           onRetry={() => void diskOverview.refetch()}
+        />
+      )}
+      {redisOverview.data !== undefined && redisOverview.isError && (
+        <ModuleRefreshError
+          label="Redis"
+          error={redisOverview.error}
+          onRetry={() => void redisOverview.refetch()}
         />
       )}
 
@@ -732,6 +903,20 @@ export function OverviewPage() {
           )
         ) : (
           <MySQLStatusCard data={mysqlOverview.data.data} />
+        )}
+
+        {redisOverview.data === undefined ? (
+          redisOverview.isPending ? (
+            <ModuleLoading label="Redis" />
+          ) : (
+            <ModuleError
+              label="Redis"
+              error={redisOverview.error}
+              onRetry={() => void redisOverview.refetch()}
+            />
+          )
+        ) : (
+          <RedisStatusCard data={redisOverview.data.data} />
         )}
       </div>
     </section>

@@ -138,3 +138,7 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 2026-07-28 已使用更新后的私密配置完成 v8.4.1 上游只读契约预检：认证 profile、Target 分页、默认 Prometheus 类型数据源以及即时/区间批量查询的状态、Content-Type、envelope 和外层形状均符合适配器预期。随后完成生产镜像构建、隔离 Mock smoke/Chromium 4/4、8080 重建和真实应用端只读 smoke；数据源健康且非 stale，总览、主机、单机详情和 1 小时指标范围均通过。容器保持非 root、只读根文件系统和 capabilities 全删。真实资源数量、标识、地址、值和响应正文均未输出或进入仓库。
 
 磁盘容量、磁盘读写历史没有充分契约证据，适配器明确返回空序列。后续仍需落实每个私有环境的专用最小只读 Token，恢复入口见 `docs/HANDOFF.md`。
+
+## Redis Cluster 只读映射
+
+Redis Provider 固定发送 21 组即时查询且只发送一次 batch：可用性、运行时间、Cluster 标记、内存、客户端、阻塞、QPS、命中率、键数量、过期/淘汰/拒绝连接速率、复制连接/链路/通信/同步/最差延迟，以及 24 小时 inventory/角色补充。第 20 组建立实例集合和原始最后样本时间，第 21 组仅在当前角色缺失时补充 `master|slave`。键数量与复制延迟在 PromQL 中先移除会导致多序列的维度；Provider 不向 API 暴露原始身份标签或复制端身份。查询文本、顺序与数量由测试锁定，调用方不能传入 PromQL。

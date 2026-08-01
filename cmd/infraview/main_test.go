@@ -20,6 +20,7 @@ import (
 	"github.com/Taier05/InfraView/internal/disk"
 	"github.com/Taier05/InfraView/internal/mysql"
 	"github.com/Taier05/InfraView/internal/mysql/mysqltest"
+	"github.com/Taier05/InfraView/internal/redis"
 )
 
 func TestRunCommandRequiresExactlyOneCommand(t *testing.T) {
@@ -224,6 +225,22 @@ func TestBuildHandlerWiresAuthenticatedMockAPI(t *testing.T) {
 	if diskDevices.Code != http.StatusOK || !strings.Contains(diskDevices.Body.String(), `"total":6`) {
 		t.Fatalf("disk devices response = %d %s", diskDevices.Code, diskDevices.Body.String())
 	}
+
+	redisOverviewRequest := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/redis/overview", nil)
+	redisOverviewRequest.AddCookie(login.Result().Cookies()[0])
+	redisOverview := httptest.NewRecorder()
+	handler.ServeHTTP(redisOverview, redisOverviewRequest)
+	if redisOverview.Code != http.StatusOK || !strings.Contains(redisOverview.Body.String(), `"total":8`) {
+		t.Fatalf("Redis overview response = %d %s", redisOverview.Code, redisOverview.Body.String())
+	}
+
+	redisInstancesRequest := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/redis/instances", nil)
+	redisInstancesRequest.AddCookie(login.Result().Cookies()[0])
+	redisInstances := httptest.NewRecorder()
+	handler.ServeHTTP(redisInstances, redisInstancesRequest)
+	if redisInstances.Code != http.StatusOK || !strings.Contains(redisInstances.Body.String(), `"total":8`) {
+		t.Fatalf("Redis instances response = %d %s", redisInstances.Code, redisInstances.Body.String())
+	}
 }
 
 func TestDataSourceProvidersWiresNightingaleConfiguration(t *testing.T) {
@@ -319,6 +336,15 @@ func TestDiskTimeoutProviderCancelsSlowSnapshot(t *testing.T) {
 	provider := withDiskUpstreamTimeout(blockingDiskProvider{}, 10*time.Millisecond)
 	start := time.Now()
 	_, err := provider.SMARTSnapshot(context.Background())
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > time.Second {
+		t.Fatalf("error = %v, elapsed = %s", err, time.Since(start))
+	}
+}
+
+func TestRedisTimeoutProviderCancelsSlowSnapshot(t *testing.T) {
+	provider := withRedisUpstreamTimeout(blockingRedisProvider{}, 10*time.Millisecond)
+	start := time.Now()
+	_, err := provider.RedisSnapshot(context.Background())
 	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > time.Second {
 		t.Fatalf("error = %v, elapsed = %s", err, time.Since(start))
 	}
@@ -456,6 +482,13 @@ type blockingDiskProvider struct{}
 func (blockingDiskProvider) SMARTSnapshot(ctx context.Context) (disk.Snapshot, error) {
 	<-ctx.Done()
 	return disk.Snapshot{}, ctx.Err()
+}
+
+type blockingRedisProvider struct{}
+
+func (blockingRedisProvider) RedisSnapshot(ctx context.Context) (redis.Snapshot, error) {
+	<-ctx.Done()
+	return redis.Snapshot{}, ctx.Err()
 }
 
 var _ disk.Provider = (*deadlineCheckingDiskProvider)(nil)

@@ -123,7 +123,7 @@ it('健康连接默认显示紧凑汇总并可展开 Nightingale 详情', async 
   )
 })
 
-it('增加 MySQL 导航但不改变数据连接数量', async () => {
+it('按总览主机硬盘MySQLRedis顺序展示只读导航', async () => {
   renderShell()
 
   const navigation = screen.getByRole('navigation', { name: '主导航' })
@@ -133,12 +133,14 @@ it('增加 MySQL 导航但不改变数据连接数量', async () => {
     '主机',
     '硬盘',
     'MySQL',
+    'Redis',
   ])
   expect(links.map((link) => link.getAttribute('href'))).toEqual([
     '/',
     '/hosts',
     '/disks',
     '/mysql',
+    '/redis',
   ])
   expect(within(navigation).queryByRole('button')).not.toBeInTheDocument()
   expect(within(navigation).queryByText(/详情|操作/)).not.toBeInTheDocument()

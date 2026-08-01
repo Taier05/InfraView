@@ -294,7 +294,7 @@ func mysqlMetricSortValue(item MySQLInstanceSummary, field string) (float64, boo
 func compareMySQLInstances(left, right MySQLInstanceSummary, field string) int {
 	switch field {
 	case "instance":
-		return compareMySQLAddresses(left.Address, right.Address)
+		return compareAddresses(left.Address, right.Address)
 	case "status":
 		return strings.Compare(string(left.Status), string(right.Status))
 	default:
@@ -302,9 +302,9 @@ func compareMySQLInstances(left, right MySQLInstanceSummary, field string) int {
 	}
 }
 
-func compareMySQLAddresses(left, right string) int {
-	leftHost, leftPort, leftOK := parseMySQLAddress(left)
-	rightHost, rightPort, rightOK := parseMySQLAddress(right)
+func compareAddresses(left, right string) int {
+	leftHost, leftPort, leftOK := parseAddress(left)
+	rightHost, rightPort, rightOK := parseAddress(right)
 	if leftOK && rightOK {
 		if comparison := leftHost.Compare(rightHost); comparison != 0 {
 			return comparison
@@ -314,7 +314,7 @@ func compareMySQLAddresses(left, right string) int {
 	return strings.Compare(strings.ToLower(left), strings.ToLower(right))
 }
 
-func parseMySQLAddress(value string) (netip.Addr, int, bool) {
+func parseAddress(value string) (netip.Addr, int, bool) {
 	host, portValue, err := net.SplitHostPort(value)
 	if err != nil {
 		return netip.Addr{}, 0, false
