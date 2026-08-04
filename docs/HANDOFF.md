@@ -4,7 +4,7 @@
 
 ## 当前 main 恢复入口
 
-当前工作目录为 `/root/github/InfraView`、分支为 `main`，记录状态是 `main...origin/main [ahead 1]`：ahead 提交 `6541556 docs: design Elasticsearch monitoring module` 是已批准 Elasticsearch 设计；Task1–7 实现、终审修复、表格密度/运行时间修复、总览异常节点汇总和持久文档均保留为未提交差异。不得清理、回退或覆盖这些差异。2026-08-04 最新 fresh 全量已完成：前端 12 文件/159 项、typecheck/build、Playwright 3 文件/17 项静态发现和无缓存镜像 `infraview:elasticsearch-overview-summary-verify` 均退出 0；镜像内也完成 Go 普通/race/编译。总览异常节点汇总版本已按授权原位重建现有 8080，Chromium 3/3、唯一端口和容器安全验收通过；继续只连接测试 Nightingale。未运行会创建 18080 的动态 E2E 栈、未连接生产 Nightingale/Elasticsearch，也未 commit/push。
+当前工作目录为 `/root/github/InfraView`、分支为 `main`，Elasticsearch 功能基线为 `80da061 feat: add read-only Elasticsearch monitoring`，此前已批准的设计提交 `6541556` 与功能提交均已推送到 `origin/main`；当前 HEAD 为随后补充的交接记录提交，正常预期为 `main...origin/main` 且工作树干净。2026-08-04 提交前 fresh 无缓存生产镜像 `infraview:elasticsearch-precommit-verify` 已完成前端 12 文件/159 项、typecheck/build、Go 全仓普通/race 和编译，均退出 0。总览异常节点汇总版本已按授权原位重建现有 8080，Chromium 3/3、唯一端口和容器安全验收通过；继续只连接测试 Nightingale。未运行会创建 18080 的动态 E2E 栈，也未连接生产 Nightingale/Elasticsearch。
 
 历史 Redis 功能基线为 `c3b5c7d feat: add read-only Redis monitoring`，已推送到 `origin/main`；此前交接基线 `cfe4a40` 与 SMART 功能提交 `6300413` 也均在 `origin/main`。这些 Redis/SMART 的现场验收、8080 重建和提交/推送记录只属于历史功能，不是当前 Elasticsearch 结果。继续开发前仍须先做 Git 只读检查；如实际工作区出现用户后续差异，必须保留，不得清理或回退。
 
@@ -51,7 +51,7 @@ git status --short --branch
 git log -3 --oneline
 git diff --check
 
-InfraView 始终只读。当前应看到 main 比 origin/main ahead 1，且保留 Elasticsearch Task1–7、密度/运行时间修复及总览异常节点汇总的未提交差异；不得按历史“工作树干净”预期清理。Elasticsearch 首期为总览第五卡与 16 列节点页，固定一次 26 查询 batch、无 N+1，集群身份为 cluster，节点身份为 cluster + name；仅有两个认证 GET API。集群与节点状态严格分离，默认 15 秒周期 2/5 周期 freshness；节点磁盘 85%/90%、JVM 堆 75%/85%、拒绝速率大于 0 的阈值由测试锁定。总览卡显示“异常节点 x / 总节点”，异常节点为节点 warning、critical、unknown 之和；严重与警告/未知分徽标展示，集群健康继续单独展示，集群与节点总数同时为零才显示空状态。页面复用共享 ListPage/ModuleStatusCardShell，每格单值单行；角色超过两个时显示前两个与 `…`，`title` 保留完整值。1440×900 页面和表格均无横向滚动，更窄视口才使用表格内部滚动兜底。uptime 专用解析接受 Prometheus 有限非负小数/科学计数文本并向下取整，其他计数指标仍严格解析。最新 fresh 全量为前端 159 项、typecheck/build、Playwright 17 项静态发现和无缓存镜像，均已通过；现有 8080 已原位重建，Chromium 3/3、唯一端口和容器安全验收通过，并继续只连接测试 Nightingale。未运行会创建 18080 的动态 E2E 栈、未连接生产 Nightingale/Elasticsearch，也未 commit/push；提交和推送仍分别需要明确授权。禁止读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/容量/指标值或上游正文，任何生产 Nightingale/Elasticsearch 验证永久禁止。
+InfraView 始终只读。当前应看到 `main...origin/main` 且工作树干净，Elasticsearch 功能基线为 `80da061`；若出现后续用户差异必须保留，不得清理。Elasticsearch 首期为总览第五卡与 16 列节点页，固定一次 26 查询 batch、无 N+1，集群身份为 cluster，节点身份为 cluster + name；仅有两个认证 GET API。集群与节点状态严格分离，默认 15 秒周期 2/5 周期 freshness；节点磁盘 85%/90%、JVM 堆 75%/85%、拒绝速率大于 0 的阈值由测试锁定。总览卡显示“异常节点 x / 总节点”，异常节点为节点 warning、critical、unknown 之和；严重与警告/未知分徽标展示，集群健康继续单独展示，集群与节点总数同时为零才显示空状态。页面复用共享 ListPage/ModuleStatusCardShell，每格单值单行；角色超过两个时显示前两个与 `…`，`title` 保留完整值。1440×900 页面和表格均无横向滚动，更窄视口才使用表格内部滚动兜底。uptime 专用解析接受 Prometheus 有限非负小数/科学计数文本并向下取整，其他计数指标仍严格解析。提交前 fresh 全量、现有 8080 原位重建、Chromium 3/3、唯一端口和容器安全验收均已通过；8080 继续只连接测试 Nightingale。未运行会创建 18080 的动态 E2E 栈，也未连接生产 Nightingale/Elasticsearch；后续修改、提交、推送仍分别需要明确授权。禁止读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/容量/指标值或上游正文，任何生产 Nightingale/Elasticsearch 验证永久禁止。
 
 Redis 为独立垂直模块，固定 21 查询一次 batch、无 N+1，15 秒预期周期与 2/5 周期 freshness。共享 `ListPage` 与 `ModuleStatusCardShell`、Redis 首个接入和最终十一列已完成全量离线验证并原位重建至现有 8080。运行时间已纠正为主机/MySQL 的天/小时格式；Dockerfile 内前端/Go 全量验证、容器健康、唯一 8080、安全基线和部署资源匹配均通过。功能提交 `c3b5c7d` 已推送到 `origin/main`，未连接生产 Nightingale。
 
@@ -70,7 +70,7 @@ Redis 为独立垂直模块，固定 21 查询一次 batch、无 N+1，15 秒预
 - 密度/运行时间修复后的 fresh 结果为前端 12 文件/157 项、typecheck/build、Playwright 17 项静态发现、Go gofmt/vet/全仓普通/race/编译和无缓存镜像 `infraview:elasticsearch-density-uptime-verify` 全部通过。原 8080 再次原位重建，脱敏 API 确认 uptime 非空，Chromium 3/3 确认无横向滚动、角色省略、健康颜色、16 列单行和紧凑等高。
 - 总览节点汇总按 RED→GREEN 补齐：主汇总为“异常节点 x / 总节点”，严重独立、warning 与 unknown 仅在紧凑徽标中合并，集群健康仍与节点分开；集群和节点同时为零时显示“暂无 Elasticsearch 节点”。定向 RED 为 3 项失败/45 项通过，GREEN 为 48/48；fresh 前端全量 12 文件/159 项、typecheck/build、Playwright 17 项静态发现及无缓存镜像 `infraview:elasticsearch-overview-summary-verify` 通过。后端、26 条查询、API 与阈值未改。
 - 总览节点汇总版本已原位重建现有 8080；服务 healthy，仍为单服务、唯一发布 8080，并保持 `10001:10001`、只读根文件系统、cap drop `ALL` 与禁止提权。一次性 Chromium 3/3 通过，新增精确文本断言确认“异常节点”可见；未输出现场数量。
-- 未执行：会创建 18080 的动态 E2E 栈、生产 Nightingale/Elasticsearch、commit、push。
+- 功能提交 `80da061` 已推送到 `origin/main`；提交前无缓存全量镜像 `infraview:elasticsearch-precommit-verify` 通过。未执行会创建 18080 的动态 E2E 栈或任何生产 Nightingale/Elasticsearch 验证。
 
 ## Redis Cluster 当前暂停点
 
@@ -179,9 +179,9 @@ Nightingale v8.4.1 兼容功能已经快进合并并推送到 `origin/main`，�
 
 ## 新对话的第一组任务
 
-1. 先查看 `git status`、`git log -3 --oneline` 和 `git diff --check`，确认当前位于 `main`；记录预期是比 `origin/main` ahead 1，并有 Elasticsearch Task1–7 未提交差异。
-2. 完整审查当前 Elasticsearch diff 和本地 Task1–7 report；不得 reset/restore/checkout/clean。若实际状态不同，先报告，不把历史 Redis/SMART 的已部署/已提交状态套用到 Elasticsearch。
-3. 表格密度、角色省略、健康颜色和 uptime 修复已实现并原位重建至现有测试 8080；下一道门是用户现场验收后决定是否授权 commit，push 仍需独立明确授权。禁止动态 E2E 创建 18080、额外端口、生产 Nightingale/Elasticsearch 和私密信息输出。
+1. 先查看 `git status`、`git log -3 --oneline` 和 `git diff --check`，确认当前位于 `main`；记录预期是 `main...origin/main`、工作树干净，且历史中包含 Elasticsearch 功能基线 `80da061`。
+2. Elasticsearch 已提交并推送；若出现新的用户差异，必须保留且不得 reset/restore/checkout/clean。若实际状态不同先报告，不把历史 Redis/SMART 状态覆盖到当前工作树。
+3. 表格密度、角色省略、健康颜色、uptime 和总览异常节点汇总均已实现并原位重建至现有测试 8080。等待下一项明确开发需求；禁止动态 E2E 创建 18080、额外端口、生产 Nightingale/Elasticsearch 和私密信息输出。
 
 ## 安全边界
 

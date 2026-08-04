@@ -146,6 +146,6 @@
 - [x] 完成密度/uptime 修复 fresh 全量（前端 12 文件/157 项、typecheck/build、Playwright 17 项静态发现、Go gofmt/vet/普通/race/编译、无缓存镜像），并原位重建原 8080；脱敏 API 与 Chromium 3/3、唯一端口和安全基线均通过。
 - [x] 按 RED→GREEN 为 Elasticsearch 总览卡补齐“异常节点 x / 总节点”、严重与警告/未知徽标，以及集群和节点同时为空时的共享空状态；集群与节点继续分开统计。
 - [x] 完成节点汇总修复的现有 8080 原位重建、Chromium 3/3、唯一端口和容器安全验收。
-- [ ] 经明确授权提交 Elasticsearch Task1–7；push 仍需独立明确授权。
+- [x] 经明确授权提交并推送 Elasticsearch Task1–7、终审修复、密度/uptime 与总览异常节点汇总；功能基线为 `80da061`，已进入 `origin/main`。
 
 首期明确不做索引列表/详情、节点详情、历史趋势、拓扑、分片详情、慢查询、日志、追踪、Elasticsearch 直连、任意查询或任何运维操作。任何生产 Nightingale/Elasticsearch 验证永久禁止。
