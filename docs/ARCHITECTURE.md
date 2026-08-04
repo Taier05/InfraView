@@ -10,9 +10,10 @@
                                              ├─ MySQL 查询/聚合 Service
                                              ├─ 硬盘 SMART 查询/聚合 DiskService
                                              ├─ Redis 查询/聚合 RedisService
+                                             ├─ Elasticsearch 查询/聚合 ElasticsearchService
                                              ├─ 内存 TTL/stale/singleflight 缓存
                                              └─ 数据源接口
-                                                ├─ Mock（Linux、MySQL、硬盘与 Redis）
+                                                ├─ Mock（Linux、MySQL、硬盘、Redis 与 Elasticsearch）
                                                 └─ Nightingale（受限只读客户端）
 ```
 
@@ -34,6 +35,7 @@
 12. 硬盘稳定 ID 将主机身份与 WWN、`serial_no`、设备名中最高优先级的可用身份及其类型一起做不可逆哈希；原始身份只在 Provider 内归并，不进入领域输出、HTTP View 或前端类型。温度、寿命和错误计数只展示，不使用 InfraView 通用阈值改变最终状态。
 13. 硬盘最终状态来源通过六值 `status_source` 明示：`smart_health`、`device_warning`、`attribute_failure`、`collection`、`normal`、`unknown`。等级相同时设备来源优先于采集来源，设备来源内部依次为 SMART 健康、设备警告、属性失败；只有采集等级严格更高时来源才是 `collection`。
 14. RedisService 使用独立快照缓存；Nightingale Provider 固定发送一次 21 查询即时 batch，以 `ident + instance + address` 归并，无实例 N+1。15 秒预期周期与 2/5 周期 freshness 规则独立于 Linux/MySQL 状态；总览与实例列表复用同一快照。
+15. ElasticsearchService 的集群与节点共用一份快照缓存；Nightingale Provider 恰好发送一次固定 26 查询即时 batch，无集群/节点 N+1。集群按 `cluster`、节点按 `cluster + name` 形成不可逆稳定 ID；`host` 仅展示，`ident`/`instance` 不进入 API。集群与节点各自维护样本推进 freshness，2/5 个默认 15 秒周期升级为 warning/critical，集群黄/红不传播为节点异常。
 
 ## 目录职责
 
@@ -47,9 +49,10 @@
 | `internal/mysql` | MySQL 领域模型、稳定实例 ID 与 Provider 契约 |
 | `internal/disk` | 硬盘领域模型、不可逆稳定设备 ID 与只读 Provider 契约 |
 | `internal/redis` | Redis 领域模型、不可逆稳定实例 ID 与只读 Provider 契约 |
-| `internal/adapters/mock` | 确定性 Linux、MySQL、硬盘与 Redis Mock |
+| `internal/elasticsearch` | Elasticsearch 集群/节点领域、不可逆稳定 ID 与只读 Provider 契约 |
+| `internal/adapters/mock` | 确定性 Linux、MySQL、硬盘、Redis 与 Elasticsearch Mock |
 | `internal/adapters/nightingale` | 代码内置查询、受限 HTTP 校验与只读归并 |
-| `internal/service` | Linux/MySQL/硬盘总览聚合、查询、阈值、新鲜度与降级 |
+| `internal/service` | Linux/MySQL/硬盘/Redis/Elasticsearch 总览聚合、查询、阈值、新鲜度与降级 |
 | `internal/httpapi` | 只读路由、认证、错误、安全头、日志、SPA 托管 |
 | `web/src` | React 页面、共享组件、API 客户端与深色主题 |
 | `scripts` | smoke、E2E 编排和缓存延迟验收 |
@@ -66,10 +69,11 @@
 - MySQL 路由只接受 GET；总览拒绝查询参数，实例清单只接受固定的搜索、状态、角色、排序与分页参数。没有 MySQL 历史、详情、写入或代理路由。
 - 硬盘路由只接受 GET；总览拒绝查询参数，设备清单只接受固定搜索、状态、排序和分页参数。响应不包含序列号、WWN、原始标签、PromQL 或上游请求信息。
 - Redis 路由只接受 GET；总览拒绝查询参数，实例清单只接受固定搜索、角色、状态、排序与分页参数。没有 Redis 直连、命令、任意查询、历史或运维路由。
+- Elasticsearch 仅暴露受认证的 `GET /api/v1/elasticsearch/overview` 与 `GET /api/v1/elasticsearch/nodes`；节点清单只接受固定搜索、集群、角色、集群健康、节点状态、16 个排序字段与分页参数，其他方法为 405。显式 View 不包含原始标签、采集身份、PromQL、数据源信息或上游正文。
 
 ## 前端构建
 
-Vite 产物复制到忽略目录 `internal/httpapi/webdist` 后由 `go:embed` 嵌入。当前前端不包含主机、硬盘或 Redis 详情页和图表运行时；总览分别加载 Linux、硬盘、MySQL 与 Redis 可点击板块卡，任一板块失败或 stale 不阻塞其他板块。清单均使用服务端规范化的指标值与等级直接渲染，并共用刷新控制组件。
+Vite 产物复制到忽略目录 `internal/httpapi/webdist` 后由 `go:embed` 嵌入。当前前端不包含主机、硬盘、Redis 或 Elasticsearch 详情页和图表运行时；总览分别加载 Linux、硬盘、MySQL、Redis 与 Elasticsearch 可点击板块卡，任一板块失败或 stale 不阻塞其他板块。清单均使用服务端规范化的指标值与等级直接渲染，并共用刷新控制组件。
 
 观测模块的公共展示结构位于 `web/src/components/ListPage.tsx` 与 `web/src/components/ModuleStatusCardShell.tsx`。前者统一列表标题、搜索/筛选/每页数量、刷新状态、表格/空状态/分页容器；后者统一总览卡链接、标题、等级、空状态和入口。共享组件不引用业务类型、不计算阈值；Redis 是首个完整接入者，Linux、硬盘和 MySQL 在后续相关修改时渐进迁移。新增模块必须复用这些结构，只有业务语义经设计确认确实不同时才允许增加专用结构或样式。
 
@@ -80,3 +84,7 @@ Vite 产物复制到忽略目录 `internal/httpapi/webdist` 后由 `go:embed` �
 ## Redis 垂直模块
 
 Redis 使用独立 `internal/redis` 领域、Nightingale/Mock Provider、`RedisService`、显式 HTTP view model 和 React 页面。Nightingale Provider 固定执行一次 21 查询即时 batch，以 `ident + instance + address` 生成不可逆稳定 ID；Service 使用独立缓存键和样本推进 freshness，HTTP 仅暴露受认证的 `GET /api/v1/redis/overview` 与 `GET /api/v1/redis/instances`。总览和列表共享同一快照缓存，不按实例发起 N+1 请求。
+
+## Elasticsearch 垂直模块
+
+Elasticsearch 使用独立 `internal/elasticsearch` 领域、Nightingale/Mock Provider、`ElasticsearchService`、显式 HTTP View 与 React 页面。Provider 的 26 组固定结果同时构建集群和节点，Service 严格分离集群来源 `availability|health|collection|normal|unknown` 与节点来源 `collection|disk|jvm|thread_pool|normal|unknown`。总览复用 `ModuleStatusCardShell`，节点页复用 `ListPage`；16 列均为单值单行，页面不横向溢出，宽表由唯一表格滚动容器承载。

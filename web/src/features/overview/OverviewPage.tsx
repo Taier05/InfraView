@@ -6,6 +6,9 @@ import type {
   AlertCount,
   DiskOverviewData,
   DiskOverviewResponse,
+  ElasticsearchLevelCounts,
+  ElasticsearchOverviewData,
+  ElasticsearchOverviewResponse,
   MetricLevel,
   MySQLOverviewData,
   MySQLOverviewResponse,
@@ -37,6 +40,70 @@ function isAlertCount(value: unknown): value is AlertCount {
     isNaturalCount(value.warning) &&
     isNaturalCount(value.critical)
   )
+}
+
+function isMetricLevel(value: unknown): value is MetricLevel {
+  return (
+    value === 'normal' ||
+    value === 'warning' ||
+    value === 'critical' ||
+    value === 'unknown'
+  )
+}
+
+function isElasticsearchLevelCounts(
+  value: unknown,
+): value is ElasticsearchLevelCounts {
+  if (!isRecord(value)) return false
+  const { total, normal, warning, critical, unknown } = value
+  return (
+    isNaturalCount(total) &&
+    isNaturalCount(normal) &&
+    isNaturalCount(warning) &&
+    isNaturalCount(critical) &&
+    isNaturalCount(unknown) &&
+    total === normal + warning + critical + unknown
+  )
+}
+
+function isElasticsearchOverviewResponse(
+  value: unknown,
+): value is ElasticsearchOverviewResponse {
+  if (!isRecord(value) || !isRecord(value.data) || !isRecord(value.meta)) {
+    return false
+  }
+  const { data, meta } = value
+  return (
+    isMetricLevel(data.status) &&
+    isElasticsearchLevelCounts(data.clusters) &&
+    isElasticsearchLevelCounts(data.nodes) &&
+    isRecord(data.alerts) &&
+    isAlertCount(data.alerts.cluster_health) &&
+    isAlertCount(data.alerts.node_resource) &&
+    isAlertCount(data.alerts.unassigned_shards) &&
+    isAlertCount(data.alerts.request_rejections) &&
+    typeof meta.request_id === 'string' &&
+    typeof meta.stale === 'boolean' &&
+    (meta.collected_at === undefined ||
+      typeof meta.collected_at === 'string')
+  )
+}
+
+async function requestElasticsearchOverview(signal: AbortSignal) {
+  const response = await apiRequest<unknown>(
+    '/api/v1/elasticsearch/overview',
+    { signal },
+  )
+  if (!isElasticsearchOverviewResponse(response)) {
+    throw new APIError(
+      200,
+      'invalid_response',
+      '服务器响应格式无效',
+      '',
+      false,
+    )
+  }
+  return response
 }
 
 function isDiskOverviewResponse(
@@ -198,11 +265,17 @@ function MetricAlert({ label, alerts }: { label: string; alerts: AlertCount }) {
   )
 }
 
-type ModuleLabel = 'Linux 主机' | '主机硬盘' | 'MySQL' | 'Redis'
+type ModuleLabel =
+  | 'Linux 主机'
+  | '主机硬盘'
+  | 'MySQL'
+  | 'Redis'
+  | 'Elasticsearch'
 
 function moduleName(label: ModuleLabel) {
   if (label === 'MySQL') return 'MySQL 板块'
   if (label === 'Redis') return 'Redis 板块'
+  if (label === 'Elasticsearch') return 'Elasticsearch 板块'
   if (label === '主机硬盘') return '主机硬盘板块'
   return 'Linux 主机板块'
 }
@@ -244,7 +317,9 @@ function ModuleError({
               ? '无法加载主机硬盘板块'
             : label === 'MySQL'
               ? '无法加载 MySQL 板块'
-              : '无法加载 Redis 板块'}
+              : label === 'Redis'
+                ? '无法加载 Redis 板块'
+                : '无法加载 Elasticsearch 板块'}
         </strong>
         <p>{apiError?.message ?? '服务暂时无法处理请求'}</p>
       </div>
@@ -299,6 +374,8 @@ function ModuleStaleBanner({
       ? 'MySQL 数据已过期'
       : label === 'Redis'
         ? 'Redis 数据已过期'
+      : label === 'Elasticsearch'
+        ? 'Elasticsearch 数据已过期'
       : label === '主机硬盘'
         ? '主机硬盘数据已过期'
         : 'Linux 主机数据已过期'
@@ -618,6 +695,118 @@ function RedisStatusCard({ data }: { data: RedisOverviewData }) {
   )
 }
 
+function elasticsearchOverviewLevel(
+  data: ElasticsearchOverviewData,
+): MetricLevel {
+  if (data.clusters.critical > 0 || data.nodes.critical > 0) {
+    return 'critical'
+  }
+  if (data.clusters.warning > 0 || data.nodes.warning > 0) {
+    return 'warning'
+  }
+  if (data.clusters.unknown > 0 || data.nodes.unknown > 0) {
+    return 'unknown'
+  }
+  return 'normal'
+}
+
+function ElasticsearchStatusCard({
+  data,
+}: {
+  data: ElasticsearchOverviewData
+}) {
+  if (data.clusters.total === 0 && data.nodes.total === 0) {
+    return (
+      <ModuleStatusCardShell
+        to="/elasticsearch"
+        ariaLabel="查看 Elasticsearch 板块"
+        category="搜索板块"
+        title="Elasticsearch"
+        level="empty"
+        levelLabel="暂无节点"
+        actionLabel="查看 Elasticsearch"
+        className="elasticsearch-overview-card"
+        emptyState={{
+          title: '暂无 Elasticsearch 节点',
+          description: '尚无可展示的集群与节点健康数据',
+        }}
+      />
+    )
+  }
+
+  const level = elasticsearchOverviewLevel(data)
+  const levelLabel =
+    level === 'critical'
+      ? '存在严重异常'
+      : level === 'warning'
+        ? '存在警告'
+        : level === 'unknown'
+          ? '存在未知'
+          : '全部正常'
+  const affectedNodes =
+    data.nodes.critical + data.nodes.warning + data.nodes.unknown
+  const warningOrUnknown = data.nodes.warning + data.nodes.unknown
+  const warningOrUnknownLevel: MetricLevel =
+    data.nodes.warning > 0
+      ? 'warning'
+      : data.nodes.unknown > 0
+        ? 'unknown'
+        : 'normal'
+
+  return (
+    <ModuleStatusCardShell
+      to="/elasticsearch"
+      ariaLabel="查看 Elasticsearch 板块"
+      category="搜索板块"
+      title="Elasticsearch"
+      level={level}
+      levelLabel={levelLabel}
+      actionLabel="查看 Elasticsearch"
+      className="elasticsearch-overview-card"
+    >
+      <div className="module-alert-summary">
+        <div className="module-alert-total">
+          <span>异常节点</span>
+          <strong>
+            {affectedNodes}
+            <small> / {data.nodes.total}</small>
+          </strong>
+        </div>
+        <div className="module-alert-levels">
+          <StatusBadge
+            level={data.nodes.critical > 0 ? 'critical' : 'normal'}
+            label={
+              data.nodes.critical > 0
+                ? `严重 ${data.nodes.critical}`
+                : '无严重'
+            }
+          />
+          <StatusBadge
+            level={warningOrUnknownLevel}
+            label={
+              warningOrUnknown > 0
+                ? `警告/未知 ${warningOrUnknown}`
+                : '无警告/未知'
+            }
+          />
+        </div>
+      </div>
+      <div className="module-metric-alert-grid">
+        <MetricAlert label="集群健康" alerts={data.alerts.cluster_health} />
+        <MetricAlert label="节点资源" alerts={data.alerts.node_resource} />
+        <MetricAlert
+          label="未分配分片"
+          alerts={data.alerts.unassigned_shards}
+        />
+        <MetricAlert
+          label="请求拒绝"
+          alerts={data.alerts.request_rejections}
+        />
+      </div>
+    </ModuleStatusCardShell>
+  )
+}
+
 function DiskStatusCard({ data }: { data: DiskOverviewData }) {
   if (data.total === 0) {
     return (
@@ -755,16 +944,24 @@ export function OverviewPage() {
     refetchInterval: refreshIntervalMs,
     refetchIntervalInBackground: false,
   })
+  const elasticsearchOverview = useQuery({
+    queryKey: ['elasticsearch-overview'],
+    queryFn: ({ signal }) => requestElasticsearchOverview(signal),
+    refetchInterval: refreshIntervalMs,
+    refetchIntervalInBackground: false,
+  })
   const allDataUpdatedAt =
     hostOverview.data !== undefined &&
     diskOverview.data !== undefined &&
     mysqlOverview.data !== undefined &&
-    redisOverview.data !== undefined
+    redisOverview.data !== undefined &&
+    elasticsearchOverview.data !== undefined
       ? Math.min(
           hostOverview.dataUpdatedAt,
           diskOverview.dataUpdatedAt,
           mysqlOverview.dataUpdatedAt,
           redisOverview.dataUpdatedAt,
+          elasticsearchOverview.dataUpdatedAt,
         )
       : 0
 
@@ -785,7 +982,8 @@ export function OverviewPage() {
               hostOverview.isFetching ||
               diskOverview.isFetching ||
               mysqlOverview.isFetching ||
-              redisOverview.isFetching
+              redisOverview.isFetching ||
+              elasticsearchOverview.isFetching
             }
             dataUpdatedAt={allDataUpdatedAt}
             onRefresh={() => {
@@ -794,6 +992,7 @@ export function OverviewPage() {
                 diskOverview.refetch(),
                 mysqlOverview.refetch(),
                 redisOverview.refetch(),
+                elasticsearchOverview.refetch(),
               ])
             }}
             refreshIntervalSeconds={refreshIntervalMs / 1_000}
@@ -829,6 +1028,13 @@ export function OverviewPage() {
             collectedAt={redisOverview.data.meta.collected_at}
           />
         )}
+      {elasticsearchOverview.data?.meta.stale === true &&
+        elasticsearchOverview.data.meta.collected_at !== undefined && (
+          <ModuleStaleBanner
+            label="Elasticsearch"
+            collectedAt={elasticsearchOverview.data.meta.collected_at}
+          />
+        )}
       {hostOverview.data !== undefined && hostOverview.isError && (
         <ModuleRefreshError
           label="Linux 主机"
@@ -857,6 +1063,14 @@ export function OverviewPage() {
           onRetry={() => void redisOverview.refetch()}
         />
       )}
+      {elasticsearchOverview.data !== undefined &&
+        elasticsearchOverview.isError && (
+          <ModuleRefreshError
+            label="Elasticsearch"
+            error={elasticsearchOverview.error}
+            onRetry={() => void elasticsearchOverview.refetch()}
+          />
+        )}
 
       <div
         className="overview-status-grid overview-compact-grid"
@@ -917,6 +1131,20 @@ export function OverviewPage() {
           )
         ) : (
           <RedisStatusCard data={redisOverview.data.data} />
+        )}
+
+        {elasticsearchOverview.data === undefined ? (
+          elasticsearchOverview.isPending ? (
+            <ModuleLoading label="Elasticsearch" />
+          ) : (
+            <ModuleError
+              label="Elasticsearch"
+              error={elasticsearchOverview.error}
+              onRetry={() => void elasticsearchOverview.refetch()}
+            />
+          )
+        ) : (
+          <ElasticsearchStatusCard data={elasticsearchOverview.data.data} />
         )}
       </div>
     </section>

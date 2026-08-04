@@ -19,6 +19,7 @@ import (
 	"github.com/Taier05/InfraView/internal/config"
 	"github.com/Taier05/InfraView/internal/datasource"
 	"github.com/Taier05/InfraView/internal/disk"
+	"github.com/Taier05/InfraView/internal/elasticsearch"
 	"github.com/Taier05/InfraView/internal/httpapi"
 	"github.com/Taier05/InfraView/internal/mysql"
 	"github.com/Taier05/InfraView/internal/redis"
@@ -90,6 +91,7 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 	mysqlProvider := withMySQLUpstreamTimeout(providers.MySQL, cfg.UpstreamTimeout)
 	diskProvider := withDiskUpstreamTimeout(providers.Disks, cfg.UpstreamTimeout)
 	redisProvider := withRedisUpstreamTimeout(providers.Redis, cfg.UpstreamTimeout)
+	elasticsearchProvider := withElasticsearchUpstreamTimeout(providers.Elasticsearch, cfg.UpstreamTimeout)
 	store := cache.New(clock)
 	queryService := service.New(hostProvider, store, service.Options{
 		InventoryTTL:       cfg.InventoryTTL,
@@ -122,33 +124,42 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 		MaxStale:           cfg.MaxStale,
 		Clock:              clock,
 	})
+	elasticsearchService := service.NewElasticsearch(elasticsearchProvider, store, service.ElasticsearchOptions{
+		SnapshotTTL:        cfg.ExpectedCollectionInterval,
+		CollectionInterval: cfg.ExpectedCollectionInterval,
+		MaxStale:           cfg.MaxStale,
+		Clock:              clock,
+	})
 	return httpapi.New(httpapi.Dependencies{
-		Config:       cfg,
-		Auth:         auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, clock),
-		Limiter:      auth.NewLimiter(5, time.Minute, clock),
-		Service:      queryService,
-		MySQLService: mysqlService,
-		DiskService:  diskService,
-		RedisService: redisService,
-		Logger:       logger,
+		Config:               cfg,
+		Auth:                 auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, clock),
+		Limiter:              auth.NewLimiter(5, time.Minute, clock),
+		Service:              queryService,
+		MySQLService:         mysqlService,
+		DiskService:          diskService,
+		RedisService:         redisService,
+		ElasticsearchService: elasticsearchService,
+		Logger:               logger,
 	})
 }
 
 type providerSet struct {
-	Hosts datasource.Provider
-	MySQL mysql.Provider
-	Disks disk.Provider
-	Redis redis.Provider
+	Hosts         datasource.Provider
+	MySQL         mysql.Provider
+	Disks         disk.Provider
+	Redis         redis.Provider
+	Elasticsearch elasticsearch.Provider
 }
 
 func dataSourceProviders(cfg config.Config, clock func() time.Time) providerSet {
 	switch cfg.DataSource {
 	case "mock":
 		return providerSet{
-			Hosts: mock.New(cfg.MockHostCount, clock),
-			MySQL: mock.NewMySQL(),
-			Disks: mock.NewDisk(clock),
-			Redis: mock.NewRedis(clock),
+			Hosts:         mock.New(cfg.MockHostCount, clock),
+			MySQL:         mock.NewMySQL(),
+			Disks:         mock.NewDisk(clock),
+			Redis:         mock.NewRedis(clock),
+			Elasticsearch: mock.NewElasticsearch(),
 		}
 	case "nightingale":
 		provider := nightingale.New(nightingale.Options{
@@ -158,10 +169,10 @@ func dataSourceProviders(cfg config.Config, clock func() time.Time) providerSet 
 			Clock:                clock,
 			AllowInsecureHTTP:    cfg.NightingaleAllowInsecureHTTP,
 		})
-		return providerSet{Hosts: provider, MySQL: provider, Disks: provider, Redis: provider}
+		return providerSet{Hosts: provider, MySQL: provider, Disks: provider, Redis: provider, Elasticsearch: provider}
 	default:
 		provider := nightingale.New(nightingale.Options{})
-		return providerSet{Hosts: provider, MySQL: provider, Disks: provider, Redis: provider}
+		return providerSet{Hosts: provider, MySQL: provider, Disks: provider, Redis: provider, Elasticsearch: provider}
 	}
 }
 
@@ -215,6 +226,23 @@ func (provider *redisTimeoutProvider) RedisSnapshot(ctx context.Context) (redis.
 }
 
 var _ redis.Provider = (*redisTimeoutProvider)(nil)
+
+type elasticsearchTimeoutProvider struct {
+	provider elasticsearch.Provider
+	timeout  time.Duration
+}
+
+func withElasticsearchUpstreamTimeout(provider elasticsearch.Provider, timeout time.Duration) elasticsearch.Provider {
+	return &elasticsearchTimeoutProvider{provider: provider, timeout: timeout}
+}
+
+func (p *elasticsearchTimeoutProvider) ElasticsearchSnapshot(ctx context.Context) (elasticsearch.Snapshot, error) {
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+	return p.provider.ElasticsearchSnapshot(ctx)
+}
+
+var _ elasticsearch.Provider = (*elasticsearchTimeoutProvider)(nil)
 
 type timeoutProvider struct {
 	provider datasource.Provider

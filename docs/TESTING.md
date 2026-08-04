@@ -44,6 +44,53 @@ make verify
 - 可控 stale 与 503 error 展示。
 - 页面不存在重启、删除、执行、切换、修改、发布或配置下发控件。
 
+`web/e2e/elasticsearch.spec.ts` 额外锁定侧边栏与第五张总览卡、16 个精确表头、search/filter/sort/page URL 状态、无破坏性控件，以及 1440×900 下页面无横向溢出、表格内部横向滚动、所有单元格 nowrap/clip/no `<br>`、紧凑等高与代表值不截断。本轮仅执行 `npx playwright test --list` 静态发现，不运行动态 E2E。
+
+## 2026-08-01 Elasticsearch 模块离线验证
+
+- Playwright 静态发现退出 0：3 个文件共 17 项，其中 Elasticsearch 3 项；未运行 `npm run e2e`、`scripts/e2e.sh` 或任何会创建端口的命令。
+- 前端全量退出 0：Vitest 12 个文件、154 项测试，TypeScript typecheck 与 production build 均通过。
+- Go 容器中 gofmt 检查无输出，`go vet ./...`、全仓普通测试、race 测试和主程序编译均退出 0。
+- `docker build --no-cache --tag infraview:elasticsearch-verify .` 退出 0，并在干净构建上下文内再次通过前端 154 项、typecheck/build、Go 普通/race 与编译。镜像只创建未运行，没有发布端口或连接上游。
+- `npm ci` 仍报告锁定依赖树中 2 个 high severity 项；Vite 仍报告第三方包的 `"use client"` 指令被忽略。两者为既有 warning，本轮未修改依赖或执行强制审计修复。
+- 本轮未访问真实 Nightingale/Elasticsearch 或现有 8080，未读取私密环境，未重建/部署服务，也未 commit/push；真实 8080 API 与 Chromium 验收仍待单独授权。
+
+### 2026-08-04 Elasticsearch 终审集中修复与最终全量
+
+- health `color`、inventory 缺领域身份、节点地址时间归并、clusterinfo/node_stats 来源拆分、浮点按语义 key 排序求和均已先取得对应 RED，再最小修复为单项 GREEN。
+- 修复后 provider/service 定向普通与 race 均退出 0；Elasticsearch 页面状态回归 1 文件/28 项通过；本轮四个 Go 文件的容器 gofmt 检查无输出。这些是终审定向证据，不把 2026-08-01 的旧基线镜像结果当作终审修复后的最终全量证据。
+- 主控 fresh 最终全量退出 0：Vitest 12 文件/155 项、TypeScript typecheck、production build、Playwright 3 文件/17 项静态发现、Go gofmt/vet/全仓普通/race/编译，以及只读/敏感/whitespace 扫描。
+- `docker build --no-cache --tag infraview:elasticsearch-final-verify .` 退出 0，并在干净上下文内再次通过前端 155 项、typecheck/build、Go 普通/race 与最终二进制编译。镜像只创建未运行，未发布端口或连接上游。
+- `npm ci` 报告既有 1 个 moderate 与 2 个 high；Vite 仍报告第三方 `"use client"` 指令被忽略。本轮没有修改依赖或执行强制审计修复。
+- 未启动、重建、部署或重启服务，未访问 8080/真实上游，未读取私密环境，也未 commit/push。
+
+### 2026-08-04 Elasticsearch 现有 8080 原位重建与现场验收
+
+- 经用户单独授权，仅执行 `INFRAVIEW_ENV_FILE=/root/github/InfraView/.env INFRAVIEW_PORT=8080 docker compose --project-name infraview up -d --build --force-recreate infraview`；Compose 只读取既有配置，没有输出其内容。没有创建其他项目或发布其他端口。
+- 重建后服务 healthy，唯一服务仍只发布原 8080，并保持 `10001:10001`、只读根文件系统、cap drop `ALL` 与 `no-new-privileges`。
+- 一次性 Node 客户端使用 host network 访问原 8080，不发布端口；登录态验收只输出固定布尔结果，不输出 Cookie、正文或现场值。测试 Nightingale 健康、Elasticsearch 总览/节点 GET 非 stale、节点集合非空、采集敏感字段排除、两个接口的 POST/PUT/PATCH/DELETE 405，以及 Linux/硬盘/MySQL/Redis 回归均为 true。
+- 首次 API 脚本错误地把成功登录写成 200 并使用不受支持的 `sort=name`，诊断只输出状态码后确认实际公开契约为登录 204、`sort=node`；修正脚本后全部布尔检查通过，产品代码未因此修改。
+- 一次性 Playwright Chromium 容器不发布端口、不截图、不保留 trace。1440×900 现场验收确认总览五卡四轨、第五卡位于第二行、16 个精确表头、每行 16 格、所有值单行且代表值不截断、页面无横向溢出、表格内部滚动、行高紧凑一致、无破坏性控件和无浏览器错误。
+- 未连接、切换或探测生产 Nightingale/Elasticsearch，未运行会创建 18080 的动态 E2E 栈，未 commit/push。
+
+### 2026-08-04 Elasticsearch 表格密度与运行时间修复
+
+- 只读诊断确认 uptime 当前/历史序列均存在，值为合法有限非负数，但上游以小数或科学计数文本编码，旧的严格整数解析因此返回 `nil`。Provider 测试先取得合法小数/科学计数为空的 RED，再对合法向下取整和负数/NaN/Inf/越界拒绝取得 GREEN；其他整数指标路径未改。
+- 前端 RED 锁定旧页面展示完整角色且表格仍内部溢出；GREEN 后角色仅显示前两个与 `…`、完整值保留在 `title`，集群健康映射四色徽标，16 列固定紧凑布局在 1440×900 下页面与表格均不横向溢出，更窄视口仍有表格内部滚动兜底。
+- fresh 离线全量退出 0：Vitest 12 文件/157 项、TypeScript typecheck、production build、Playwright 3 文件/17 项静态发现；Go gofmt/vet/全仓普通/race/编译；无缓存镜像 `infraview:elasticsearch-density-uptime-verify`。npm 仍报告既有 1 个 moderate、2 个 high，Vite 仍报告第三方 `"use client"` warning；未改依赖。
+- 按用户授权仅原位重建既有 `infraview` 8080；服务 healthy、唯一服务仅发布原 8080，并保持 `10001:10001`、只读根文件系统、cap drop `ALL` 和禁止提权。脱敏 API 布尔验收确认测试 Nightingale、Elasticsearch 非 stale/节点非空/uptime 非空/敏感字段排除、写方法 405 和既有四个总览回归均通过。
+- 一次性 Chromium 不发布端口，最终 3/3 通过：侧边栏/总览入口、16 列 URL 状态、1440×900 页面与表格无横向溢出、角色省略与完整提示、健康颜色等级、uptime 非空、16 格单行、紧凑等高和无破坏性控件。首次动态用例把不存在的假集群名写死，修正为选择当前首个实际选项且不记录其值；颜色断言也从原始枚举文案更正为页面中文文案。这两次失败均是测试假设问题，产品代码未因此修改。
+- 未运行会创建 18080 的动态 E2E 栈，未创建额外 InfraView 端口，未连接生产 Nightingale/Elasticsearch，未 commit/push。
+
+### 2026-08-04 Elasticsearch 总览异常节点汇总补齐
+
+- 根因是总览 API 已返回集群和节点分级计数，但 `ElasticsearchStatusCard` 只渲染四类指标告警，没有渲染共享 `module-alert-summary`；原测试也只锁定四类告警。此次只修改前端展示与测试，不修改后端、固定查询、API 或阈值。
+- Vitest 先取得预期 RED：新增的汇总、双空和单侧为空三个契约失败，结果为 3 项失败/45 项通过；最小实现后同文件 48/48 GREEN。异常节点为节点 warning、critical、unknown 之和，集群健康仍单独展示；只有集群与节点总数同时为零才进入“暂无 Elasticsearch 节点”空状态。
+- fresh 顺序全量退出 0：Vitest 12 文件/159 项、TypeScript typecheck、production build、Playwright 3 文件/17 项静态发现。并行验证受资源竞争影响时，既有 Elasticsearch 16 表头排序用例曾在 5 秒超时；该用例随后单独 1/1 通过，顺序全量也 159/159 通过，未调整产品或超时时间。
+- `docker build --no-cache --tag infraview:elasticsearch-overview-summary-verify .` 退出 0，并在干净构建上下文内再次通过前端 159 项、typecheck/build、Go 普通/race 与最终二进制编译。npm 仍报告既有 1 个 moderate、2 个 high，Vite 仍报告第三方 `"use client"` warning；未改依赖。
+- Playwright 首个 Elasticsearch 用例新增总览卡“异常节点”精确文本可见断言，不读取、断言或输出现场数量。首次动态运行因默认子串匹配同时命中主汇总和包含该词的指标区域而 2/3 通过；将测试定位器最小收紧为 `{ exact: true }` 后，产品代码未改，现有 8080 动态 Chromium 3/3 通过。
+- 按授权原位重建既有 `infraview` 8080 后，服务 healthy、单服务且端口键仅为 `8080/tcp`，双栈绑定均为 8080；保持 `10001:10001`、只读根文件系统、cap drop `ALL` 与禁止提权。未运行会创建 18080 的动态 E2E 栈，未创建额外 InfraView 端口，未连接生产，未 commit/push。
+
 运行：
 
 ```bash

@@ -9,6 +9,7 @@ import {
 import { AuthProvider, useAuth } from '../auth/AuthProvider'
 import { LoginPage } from '../auth/LoginPage'
 import { DiskPage } from '../features/disks/DiskPage'
+import { ElasticsearchPage } from '../features/elasticsearch/ElasticsearchPage'
 import { HostListPage } from '../features/hosts/HostListPage'
 import { MySQLPage } from '../features/mysql/MySQLPage'
 import { OverviewPage } from '../features/overview/OverviewPage'
@@ -69,6 +70,7 @@ export function App() {
               <Route path="disks" element={<DiskPage />} />
               <Route path="mysql" element={<MySQLPage />} />
               <Route path="redis" element={<RedisPage />} />
+              <Route path="elasticsearch" element={<ElasticsearchPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -1,5 +1,13 @@
 import { setupServer } from 'msw/node'
 
-import { handlers, mysqlHandlers } from './fixtures'
+import {
+  elasticsearchHandlers,
+  handlers,
+  mysqlHandlers,
+} from './fixtures'
 
-export const server = setupServer(...handlers, ...mysqlHandlers)
+export const server = setupServer(
+  ...handlers,
+  ...mysqlHandlers,
+  ...elasticsearchHandlers,
+)

@@ -1,6 +1,6 @@
 # InfraView
 
-InfraView 是一个轻量、只读的 Linux 基础设施可视化平台。当前版本具备固定账号登录、Linux 主机、主机硬盘 SMART 与 MySQL 板块状态总览、紧凑清单、搜索/筛选/排序/分页、指标状态着色、旧缓存提示和统一错误展示。
+InfraView 是一个轻量、只读的 Linux 基础设施可视化平台。当前工作区具备固定账号登录、Linux 主机、主机硬盘 SMART、MySQL、Redis 与 Elasticsearch 板块状态总览、紧凑清单、搜索/筛选/排序/分页、指标状态着色、旧缓存提示和统一错误展示；其中 Elasticsearch 已完成离线实现与验证，尚未重建到现有 8080，也未提交或推送。
 
 生产形态是一个非 root InfraView 容器：Go 同源提供只读 API 与 React 静态页面，无业务数据库、任务队列、SSH 客户端或远程执行器。数据源支持确定性 Mock 和 Nightingale 只读适配器；MySQL 与硬盘 SMART 分别使用独立领域、Service 和缓存，复用 Nightingale 的受限安全客户端。当前主要开发与验证版本为 Nightingale v8.4.1，v9.x 仅保留已覆盖的协议兼容。浏览器只接收归一化 InfraView API，不接触 Token、任意 PromQL、硬盘序列号或 WWN。
 
@@ -57,3 +57,7 @@ make verify
 ## Redis Cluster 只读模块
 
 当前工作区已实现独立 Redis 垂直模块：总览第四张 Redis 卡、侧边栏入口和十一列实例清单。数据仅来自 Nightingale 代码内置的 21 条固定查询，并合并为一次即时 batch；页面不接受任意 PromQL，不连接 Redis，也不提供切换、故障转移、命令执行或其他写操作。状态覆盖可用性、采集推进、内存、拒绝连接和主从复制；复制拓扑、详情和历史不在首期范围。
+
+## Elasticsearch 只读模块
+
+Elasticsearch 首期只提供总览第五张集群健康卡与 `/elasticsearch` 节点列表。数据来自 Nightingale 代码内置的 26 条固定查询，恰好一次即时 batch、无集群或节点 N+1；集群身份为 `cluster`，节点身份为 `cluster + name`，地址不参与稳定身份。HTTP 仅提供 `GET /api/v1/elasticsearch/overview` 与 `GET /api/v1/elasticsearch/nodes`。节点页复用共享列表模板，固定 16 个单值单行列；空间不足时只允许表格内部横向滚动。首期不含索引/节点详情、历史、拓扑、Elasticsearch 直连、任意查询或运维操作。

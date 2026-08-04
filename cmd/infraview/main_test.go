@@ -18,6 +18,7 @@ import (
 	"github.com/Taier05/InfraView/internal/config"
 	"github.com/Taier05/InfraView/internal/datasource"
 	"github.com/Taier05/InfraView/internal/disk"
+	"github.com/Taier05/InfraView/internal/elasticsearch"
 	"github.com/Taier05/InfraView/internal/mysql"
 	"github.com/Taier05/InfraView/internal/mysql/mysqltest"
 	"github.com/Taier05/InfraView/internal/redis"
@@ -241,6 +242,52 @@ func TestBuildHandlerWiresAuthenticatedMockAPI(t *testing.T) {
 	if redisInstances.Code != http.StatusOK || !strings.Contains(redisInstances.Body.String(), `"total":8`) {
 		t.Fatalf("Redis instances response = %d %s", redisInstances.Code, redisInstances.Body.String())
 	}
+
+	elasticsearchOverviewRequest := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/elasticsearch/overview", nil)
+	elasticsearchOverviewRequest.AddCookie(login.Result().Cookies()[0])
+	elasticsearchOverview := httptest.NewRecorder()
+	handler.ServeHTTP(elasticsearchOverview, elasticsearchOverviewRequest)
+	if elasticsearchOverview.Code != http.StatusOK || !strings.Contains(elasticsearchOverview.Body.String(), `"clusters"`) {
+		t.Fatalf("Elasticsearch overview response = %d %s", elasticsearchOverview.Code, elasticsearchOverview.Body.String())
+	}
+
+	elasticsearchNodesRequest := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/elasticsearch/nodes", nil)
+	elasticsearchNodesRequest.AddCookie(login.Result().Cookies()[0])
+	elasticsearchNodes := httptest.NewRecorder()
+	handler.ServeHTTP(elasticsearchNodes, elasticsearchNodesRequest)
+	if elasticsearchNodes.Code != http.StatusOK || !strings.Contains(elasticsearchNodes.Body.String(), `"nodes":[`) {
+		t.Fatalf("Elasticsearch nodes response = %d %s", elasticsearchNodes.Code, elasticsearchNodes.Body.String())
+	}
+}
+
+func TestBuildHandlerUsesInjectedClockForElasticsearchService(t *testing.T) {
+	now := time.Date(2026, 8, 1, 8, 0, 0, 0, time.UTC)
+	clock := func() time.Time { return now }
+	cfg := config.Config{
+		Username:                   "admin",
+		Password:                   "correct-password",
+		SessionTTL:                 12 * time.Hour,
+		DataSource:                 "mock",
+		MockHostCount:              1,
+		ExpectedCollectionInterval: 15 * time.Second,
+		SMARTCollectionInterval:    time.Minute,
+		MaxStale:                   time.Minute,
+		UpstreamTimeout:            time.Second,
+	}
+	handler := buildHandler(cfg, clock, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	loginRequest := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/session", strings.NewReader(`{"username":"admin","password":"correct-password"}`))
+	login := httptest.NewRecorder()
+	handler.ServeHTTP(login, loginRequest)
+	if login.Code != http.StatusNoContent || len(login.Result().Cookies()) != 1 {
+		t.Fatalf("login response = %d", login.Code)
+	}
+	request := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/elasticsearch/overview", nil)
+	request.AddCookie(login.Result().Cookies()[0])
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"collected_at":"2026-08-01T08:00:00Z"`) {
+		t.Fatalf("Elasticsearch response does not use injected clock: %d %s", response.Code, response.Body.String())
+	}
 }
 
 func TestDataSourceProvidersWiresNightingaleConfiguration(t *testing.T) {
@@ -276,30 +323,39 @@ func TestDataSourceProvidersWiresNightingaleConfiguration(t *testing.T) {
 	}
 }
 
-func TestProviderSetUsesMockForHostsMySQLAndDisk(t *testing.T) {
+func TestProviderSetUsesMockForHostsMySQLDiskAndElasticsearch(t *testing.T) {
 	providers := dataSourceProviders(config.Config{
 		DataSource: "mock", MockHostCount: 8,
 	}, time.Now)
-	if providers.Hosts == nil || providers.MySQL == nil || providers.Disks == nil {
+	if providers.Hosts == nil || providers.MySQL == nil || providers.Disks == nil || providers.Elasticsearch == nil {
 		t.Fatalf("providers = %#v", providers)
 	}
 	mysqltest.RunContract(t, providers.MySQL)
 	if _, err := providers.Disks.SMARTSnapshot(context.Background()); err != nil {
 		t.Fatalf("SMARTSnapshot() error = %v", err)
 	}
+	if _, err := providers.Elasticsearch.ElasticsearchSnapshot(context.Background()); err != nil {
+		t.Fatalf("ElasticsearchSnapshot() error = %v", err)
+	}
 }
 
 func TestProviderSetSharesOneNightingaleProvider(t *testing.T) {
-	providers := dataSourceProviders(config.Config{
-		DataSource:         "nightingale",
-		NightingaleBaseURL: "https://n9e.example.com",
-		NightingaleToken:   "fixture-token",
-	}, time.Now)
-	hostProvider, hostOK := providers.Hosts.(*nightingale.Provider)
-	mysqlProvider, mysqlOK := providers.MySQL.(*nightingale.Provider)
-	diskProvider, diskOK := providers.Disks.(*nightingale.Provider)
-	if !hostOK || !mysqlOK || !diskOK || hostProvider != mysqlProvider || hostProvider != diskProvider {
-		t.Fatalf("providers do not share one Nightingale client")
+	for _, mode := range []string{"nightingale", "unknown"} {
+		t.Run(mode, func(t *testing.T) {
+			providers := dataSourceProviders(config.Config{
+				DataSource:         mode,
+				NightingaleBaseURL: "https://n9e.example.com",
+				NightingaleToken:   "fixture-token",
+			}, time.Now)
+			hostProvider, hostOK := providers.Hosts.(*nightingale.Provider)
+			mysqlProvider, mysqlOK := providers.MySQL.(*nightingale.Provider)
+			diskProvider, diskOK := providers.Disks.(*nightingale.Provider)
+			elasticsearchProvider, elasticsearchOK := providers.Elasticsearch.(*nightingale.Provider)
+			if !hostOK || !mysqlOK || !diskOK || !elasticsearchOK ||
+				hostProvider != mysqlProvider || hostProvider != diskProvider || hostProvider != elasticsearchProvider {
+				t.Fatalf("providers do not share one Nightingale client")
+			}
+		})
 	}
 }
 
@@ -313,6 +369,9 @@ func TestProviderSetUsesSafeUnavailableProvidersForUnknownMode(t *testing.T) {
 	}
 	if _, err := providers.Disks.SMARTSnapshot(context.Background()); !errors.Is(err, disk.ErrUnavailable) {
 		t.Fatalf("disk error = %v", err)
+	}
+	if _, err := providers.Elasticsearch.ElasticsearchSnapshot(context.Background()); !errors.Is(err, elasticsearch.ErrUnavailable) {
+		t.Fatalf("Elasticsearch error = %v", err)
 	}
 }
 
@@ -347,6 +406,15 @@ func TestRedisTimeoutProviderCancelsSlowSnapshot(t *testing.T) {
 	_, err := provider.RedisSnapshot(context.Background())
 	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > time.Second {
 		t.Fatalf("error = %v, elapsed = %s", err, time.Since(start))
+	}
+}
+
+func TestElasticsearchTimeoutProviderAddsDeadlineAndCancelsSlowSnapshot(t *testing.T) {
+	provider := withElasticsearchUpstreamTimeout(blockingElasticsearchProvider{}, 10*time.Millisecond)
+	started := time.Now()
+	_, err := provider.ElasticsearchSnapshot(context.Background())
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) > time.Second {
+		t.Fatalf("error = %v, elapsed = %s", err, time.Since(started))
 	}
 }
 
@@ -538,6 +606,15 @@ func (p *deadlineCheckingProvider) QueryAggregateRange(ctx context.Context, _ da
 }
 
 var _ datasource.Provider = (*deadlineCheckingProvider)(nil)
+
+type blockingElasticsearchProvider struct{}
+
+func (blockingElasticsearchProvider) ElasticsearchSnapshot(ctx context.Context) (elasticsearch.Snapshot, error) {
+	<-ctx.Done()
+	return elasticsearch.Snapshot{}, ctx.Err()
+}
+
+var _ elasticsearch.Provider = blockingElasticsearchProvider{}
 
 func newControlledServer() *controlledServer {
 	return &controlledServer{

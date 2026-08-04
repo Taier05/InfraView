@@ -43,7 +43,7 @@ test('未登录会重定向，登录后可完成总览和主机列表关键路�
   ).toBeVisible()
   const overviewGrid = page.locator('.overview-compact-grid')
   const overviewCards = overviewGrid.locator('.module-status-card')
-  await expect(overviewCards).toHaveCount(4)
+  await expect(overviewCards).toHaveCount(5)
 
   const geometry = await overviewGrid.evaluate((grid) => {
     const cards = Array.from(
@@ -60,7 +60,8 @@ test('未登录会重定向，登录后可完成总览和主机列表关键路�
   })
 
   expect(geometry.columns).toBe(4)
-  expect(new Set(geometry.cardTops)).toHaveLength(1)
+  expect(new Set(geometry.cardTops.slice(0, 4))).toHaveLength(1)
+  expect(geometry.cardTops[4]).toBeGreaterThan(geometry.cardTops[0])
   for (const width of geometry.cardWidths) {
     expect(width).toBeGreaterThan(geometry.gridWidth * 0.2)
     expect(width).toBeLessThan(geometry.gridWidth * 0.27)

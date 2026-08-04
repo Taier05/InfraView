@@ -6,6 +6,9 @@ export const MYSQL_OVERVIEW_PATH = '*/api/v1/mysql/overview'
 export const MYSQL_INSTANCES_PATH = '*/api/v1/mysql/instances'
 export const REDIS_OVERVIEW_PATH = '*/api/v1/redis/overview'
 export const REDIS_INSTANCES_PATH = '*/api/v1/redis/instances'
+export const ELASTICSEARCH_OVERVIEW_PATH =
+  '*/api/v1/elasticsearch/overview'
+export const ELASTICSEARCH_NODES_PATH = '*/api/v1/elasticsearch/nodes'
 export const DISK_OVERVIEW_PATH = '*/api/v1/disks/overview'
 export const DISK_DEVICES_PATH = '*/api/v1/disks/devices'
 
@@ -263,6 +266,94 @@ export interface RedisInstancePageFixture {
         | 'unknown'
       collection_level: MetricLevelFixture
     }>
+    total: number
+    page: number
+    page_size: number
+    total_pages: number
+  }
+  meta: {
+    request_id: string
+    stale: boolean
+    collected_at: string
+  }
+}
+
+export type ElasticsearchRoleFixture =
+  | 'master'
+  | 'data'
+  | 'data_content'
+  | 'data_hot'
+  | 'data_warm'
+  | 'data_cold'
+  | 'data_frozen'
+  | 'ingest'
+  | 'ml'
+  | 'transform'
+  | 'remote_cluster_client'
+  | 'client'
+
+export interface ElasticsearchOverviewFixture {
+  data: {
+    status: MetricLevelFixture
+    clusters: {
+      total: number
+      normal: number
+      warning: number
+      critical: number
+      unknown: number
+    }
+    nodes: {
+      total: number
+      normal: number
+      warning: number
+      critical: number
+      unknown: number
+    }
+    alerts: {
+      cluster_health: { warning: number; critical: number }
+      node_resource: { warning: number; critical: number }
+      unassigned_shards: { warning: number; critical: number }
+      request_rejections: { warning: number; critical: number }
+    }
+  }
+  meta: {
+    request_id: string
+    stale: boolean
+    collected_at: string
+  }
+}
+
+export interface ElasticsearchNodePageFixture {
+  data: {
+    nodes: Array<{
+      id: string
+      name: string
+      cluster: string
+      address: string
+      roles: ElasticsearchRoleFixture[]
+      cluster_health: 'green' | 'yellow' | 'red' | 'unknown'
+      heap_usage_percent: number | null
+      disk_usage_percent: number | null
+      cpu_usage_percent: number | null
+      index_rate: number | null
+      search_rate: number | null
+      documents: number | null
+      store_size_bytes: number | null
+      thread_pool_queue: number | null
+      rejected_rate: number | null
+      uptime_seconds: number | null
+      status: MetricLevelFixture
+      status_source:
+        | 'collection'
+        | 'disk'
+        | 'jvm'
+        | 'thread_pool'
+        | 'normal'
+        | 'unknown'
+      collection_level: MetricLevelFixture
+    }>
+    available_clusters: string[]
+    available_roles: ElasticsearchRoleFixture[]
     total: number
     page: number
     page_size: number
@@ -715,6 +806,94 @@ export function redisOverviewFixture(
   }
 }
 
+export function elasticsearchOverviewFixture(
+  overrides: {
+    data?: Partial<ElasticsearchOverviewFixture['data']>
+    meta?: Partial<ElasticsearchOverviewFixture['meta']>
+  } = {},
+): ElasticsearchOverviewFixture {
+  return {
+    data: {
+      status: 'critical',
+      clusters: {
+        total: 4,
+        normal: 2,
+        warning: 1,
+        critical: 0,
+        unknown: 1,
+      },
+      nodes: {
+        total: 9,
+        normal: 5,
+        warning: 2,
+        critical: 1,
+        unknown: 1,
+      },
+      alerts: {
+        cluster_health: { warning: 1, critical: 0 },
+        node_resource: { warning: 2, critical: 1 },
+        unassigned_shards: { warning: 3, critical: 0 },
+        request_rejections: { warning: 1, critical: 1 },
+      },
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-fixture-elasticsearch-overview-001',
+      stale: false,
+      collected_at: '2026-08-01T08:00:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
+export function elasticsearchNodePageFixture(
+  overrides: {
+    data?: Partial<ElasticsearchNodePageFixture['data']>
+    meta?: Partial<ElasticsearchNodePageFixture['meta']>
+  } = {},
+): ElasticsearchNodePageFixture {
+  return {
+    data: {
+      nodes: [
+        {
+          id: 'elasticsearch-fixture-node-001',
+          name: 'fixture-es-node-a',
+          cluster: 'fixture-es-cluster-a',
+          address: '192.0.2.31:9200',
+          roles: ['master', 'data_hot', 'ingest'],
+          cluster_health: 'yellow',
+          heap_usage_percent: 72.5,
+          disk_usage_percent: 81,
+          cpu_usage_percent: 36.5,
+          index_rate: 14.25,
+          search_rate: 28.5,
+          documents: 1200,
+          store_size_bytes: 2 * 1024 ** 3,
+          thread_pool_queue: 3,
+          rejected_rate: 0.02,
+          uptime_seconds: 172_800,
+          status: 'warning',
+          status_source: 'disk',
+          collection_level: 'normal',
+        },
+      ],
+      available_clusters: ['fixture-es-cluster-a'],
+      available_roles: ['master', 'data_hot', 'ingest'],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      total_pages: 1,
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-fixture-elasticsearch-nodes-001',
+      stale: false,
+      collected_at: '2026-08-01T08:00:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
 export function redisInstancePageFixture(
   overrides: {
     data?: Partial<RedisInstancePageFixture['data']>
@@ -1008,6 +1187,15 @@ export const mysqlHandlers = [
   ),
   http.get(MYSQL_INSTANCES_PATH, () =>
     HttpResponse.json(mysqlInstancePageFixture()),
+  ),
+]
+
+export const elasticsearchHandlers = [
+  http.get(ELASTICSEARCH_OVERVIEW_PATH, () =>
+    HttpResponse.json(elasticsearchOverviewFixture()),
+  ),
+  http.get(ELASTICSEARCH_NODES_PATH, () =>
+    HttpResponse.json(elasticsearchNodePageFixture()),
   ),
 ]
 

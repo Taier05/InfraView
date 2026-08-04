@@ -12,7 +12,8 @@
 - 静态路径拒绝 dotfile、路径穿越和缺失资源 SPA fallback；只有指纹资源可 immutable。
 - Nightingale 客户端只拼接代码内置路径和 PromQL 白名单，默认只允许 HTTPS；HTTP 必须通过测试环境专用开关显式选择。客户端校验 HTTP 状态、JSON Content-Type、envelope `err` 和 8 MiB 响应上限；401、非 JSON 与上游正文统一转换为不含 Token 的领域错误。
 - MySQL 复用上述 Nightingale 安全客户端，只允许代码固定的 16 条即时查询并合并为一次 batch；页面和 API 不接受 MySQL PromQL、上游 URL、查询体或认证信息。MySQL 仅有两个受认证 GET 路由，写方法由测试验证为 405。
-- 硬盘 SMART 复用同一安全客户端，仅允许代码固定的 17 条即时查询组成一次 batch，无主机/设备 N+1；不提供范围查询、任意 PromQL、任意上游 URL、代理或原始请求体。硬盘仅有两个受认证 GET 路由，其他方法由测试拒绝。
+- 硬盘 SMART 复用同一安全客户端，仅允许代码固定的 18 条即时查询组成一次 batch，无主机/设备 N+1；不提供范围查询、任意 PromQL、任意上游 URL、代理或原始请求体。硬盘仅有两个受认证 GET 路由，其他方法由测试拒绝。
+- Elasticsearch 复用同一 Nightingale 安全客户端，仅允许代码固定的 26 条即时查询组成一次 batch，无集群/节点 N+1；不直连 Elasticsearch，不接受任意 PromQL、指标名、URL、代理或上游请求体。仅有两个受认证 GET 路由，显式 View 排除 `ident`、`instance`、原始标签、数据源信息和上游正文，其他方法为 405。
 - 原始 WWN、序列号与标签只允许在 Nightingale Provider 内部归并；稳定设备 ID 包含主机身份并按 WWN、序列号、设备名回退后做不可逆哈希。领域输出、HTTP View、前端类型、日志和错误不得包含原始身份。
 - 产品不包含 `smartctl`、`nvme-cli`、块设备访问、SMART 扫描/自检、修复、启停、擦除、SSH、命令执行或远程控制能力。温度、寿命和错误计数仅展示，不驱动通用阈值告警或自动操作。
 
@@ -45,3 +46,7 @@
 ## Redis 模块边界
 
 Redis 复用 Nightingale 安全客户端，只允许代码固定的 21 条即时查询组成一次 batch，无实例 N+1。API 仅有两个受认证 GET 路由；显式 view model 排除原始标签、PromQL、数据源信息和复制端身份，写方法为 405。运行时不连接 Redis，不包含 Redis 命令、主从切换、故障转移或执行能力。
+
+## Elasticsearch 模块边界
+
+Elasticsearch 首期只展示集群健康和节点清单，不含索引/节点详情、历史、拓扑或控制能力。稳定集群 ID 只使用 `cluster`，稳定节点 ID 只使用 `cluster + name`；地址仅展示，采集身份不得进入 API。产品不包含 Elasticsearch 客户端、写 API、`_cluster/reroute`、设置修改、索引开关、forcemerge、delete-by-query、命令执行或远程控制。本轮只完成离线验证，未访问真实 Nightingale/Elasticsearch，未重建或访问现有 8080。

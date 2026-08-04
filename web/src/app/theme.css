@@ -1077,6 +1077,89 @@ h1 {
 .host-table th:nth-child(10) { width: 10%; }
 .host-table th:nth-child(11) { width: 7%; }
 
+.elasticsearch-list-controls {
+  grid-template-columns:
+    minmax(14rem, 1fr) repeat(4, minmax(7rem, 9rem)) minmax(6rem, 7rem) auto;
+}
+
+.elasticsearch-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.host-table.elasticsearch-table th,
+.host-table.elasticsearch-table td {
+  padding: 0.3rem 0.2rem;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.host-table.elasticsearch-table th {
+  font-size: 0.64rem;
+  letter-spacing: 0;
+}
+
+.host-table.elasticsearch-table td {
+  font-size: 0.7rem;
+}
+
+.host-table.elasticsearch-table th:nth-child(1) { width: 7.5%; }
+.host-table.elasticsearch-table th:nth-child(2) { width: 6.5%; }
+.host-table.elasticsearch-table th:nth-child(3) { width: 8%; }
+.host-table.elasticsearch-table th:nth-child(4) { width: 11.5%; }
+.host-table.elasticsearch-table th:nth-child(5) { width: 5.5%; }
+.host-table.elasticsearch-table th:nth-child(6) { width: 6%; }
+.host-table.elasticsearch-table th:nth-child(7) { width: 5.5%; }
+.host-table.elasticsearch-table th:nth-child(8) { width: 5%; }
+.host-table.elasticsearch-table th:nth-child(9) { width: 5.5%; }
+.host-table.elasticsearch-table th:nth-child(10) { width: 5.5%; }
+.host-table.elasticsearch-table th:nth-child(11) { width: 4.5%; }
+.host-table.elasticsearch-table th:nth-child(12) { width: 5.5%; }
+.host-table.elasticsearch-table th:nth-child(13) { width: 5.5%; }
+.host-table.elasticsearch-table th:nth-child(14) { width: 5.5%; }
+.host-table.elasticsearch-table th:nth-child(15) { width: 6.5%; }
+.host-table.elasticsearch-table th:nth-child(16) { width: 6%; }
+
+.elasticsearch-identity,
+.elasticsearch-role {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.elasticsearch-identity {
+  text-overflow: ellipsis;
+}
+
+.elasticsearch-role {
+  text-overflow: clip;
+}
+
+.elasticsearch-health,
+.elasticsearch-table td:last-child .status-badge {
+  max-width: 100%;
+  gap: 0.2rem;
+  padding: 0.14rem 0.26rem;
+  font-size: 0.66rem;
+}
+
+.elasticsearch-health .status-badge-dot,
+.elasticsearch-table td:last-child .status-badge-dot {
+  width: 0.36rem;
+  height: 0.36rem;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1100px) {
+  .elasticsearch-table {
+    min-width: 72rem;
+  }
+}
+
 .mysql-table-compact th,
 .mysql-table-compact td {
   padding: 0.32rem 0.3rem;

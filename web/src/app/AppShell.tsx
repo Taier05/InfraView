@@ -104,6 +104,7 @@ export function AppShell() {
           <NavLink to="/disks">硬盘</NavLink>
           <NavLink to="/mysql">MySQL</NavLink>
           <NavLink to="/redis">Redis</NavLink>
+          <NavLink to="/elasticsearch">Elasticsearch</NavLink>
         </nav>
 
         <details

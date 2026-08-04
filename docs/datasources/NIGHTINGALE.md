@@ -118,7 +118,7 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 
 ## 目标映射
 
-共享的 `*Provider` 同时实现 Linux 主机 `internal/datasource.Provider`（`Health`、`ListHosts`、`GetHost`、`GetCurrentMetrics`、`QueryRange`、`QueryAggregateRange`）、MySQL `internal/mysql.Provider`（`MySQLSnapshot`）与硬盘 `internal/disk.Provider`（`SMARTSnapshot`）。前端和服务层不接收 Nightingale 原始请求体、任意 URL 或任意查询表达式。
+共享的 `*Provider` 同时实现 Linux 主机 `internal/datasource.Provider`（`Health`、`ListHosts`、`GetHost`、`GetCurrentMetrics`、`QueryRange`、`QueryAggregateRange`）、MySQL `internal/mysql.Provider`（`MySQLSnapshot`）、硬盘 `internal/disk.Provider`（`SMARTSnapshot`）、Redis `internal/redis.Provider`（`RedisSnapshot`）与 Elasticsearch `internal/elasticsearch.Provider`（`ElasticsearchSnapshot`）。前端和服务层不接收 Nightingale 原始请求体、任意 URL 或任意查询表达式。
 
 ## 实施顺序
 
@@ -142,3 +142,42 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 ## Redis Cluster 只读映射
 
 Redis Provider 固定发送 21 组即时查询且只发送一次 batch：可用性、运行时间、Cluster 标记、内存、客户端、阻塞、QPS、命中率、键数量、过期/淘汰/拒绝连接速率、复制连接/链路/通信/同步/最差延迟，以及 24 小时 inventory/角色补充。第 20 组建立实例集合和原始最后样本时间，第 21 组仅在当前角色缺失时补充 `master|slave`。键数量与复制延迟在 PromQL 中先移除会导致多序列的维度；Provider 不向 API 暴露原始身份标签或复制端身份。查询文本、顺序与数量由测试锁定，调用方不能传入 PromQL。
+
+## Elasticsearch 只读映射
+
+Elasticsearch Provider 复用同一个受限 Nightingale Client，恰好发送一次 `POST /api/n9e/query-instant-batch`，固定 26 条查询且顺序不可变：
+
+```promql
+elasticsearch_clusterinfo_up
+elasticsearch_node_stats_up
+elasticsearch_cluster_health_status
+elasticsearch_cluster_health_number_of_nodes
+elasticsearch_cluster_health_number_of_data_nodes
+elasticsearch_cluster_health_active_primary_shards
+elasticsearch_cluster_health_active_shards
+elasticsearch_cluster_health_relocating_shards
+elasticsearch_cluster_health_initializing_shards
+elasticsearch_cluster_health_unassigned_shards
+elasticsearch_cluster_health_number_of_pending_tasks
+elasticsearch_cluster_health_task_max_waiting_in_queue_millis
+elasticsearch_nodes_roles
+elasticsearch_jvm_memory_used_bytes{area="heap"}
+elasticsearch_jvm_memory_max_bytes{area="heap"}
+max by (cluster, name, host, ident, instance, es_client_node, es_data_node, es_ingest_node, es_master_node) (100 * (1 - elasticsearch_filesystem_data_available_bytes / elasticsearch_filesystem_data_size_bytes))
+elasticsearch_process_cpu_percent
+rate(elasticsearch_indices_indexing_index_total[5m])
+rate(elasticsearch_indices_search_query_total[5m])
+elasticsearch_indices_docs
+elasticsearch_indices_store_size_bytes
+elasticsearch_jvm_uptime_seconds
+max by (cluster, name, host, ident, instance) (elasticsearch_thread_pool_queue_count)
+sum by (cluster, name, host, ident, instance) (rate(elasticsearch_thread_pool_rejected_count[5m]))
+tlast_over_time(elasticsearch_clusterinfo_up[24h])
+tlast_over_time(elasticsearch_jvm_uptime_seconds[24h])
+```
+
+第 25 组只建立最近 24 小时集群集合并提供原始最后样本时间，第 26 组只建立最近 24 小时节点集合并提供原始最后样本时间；其他指标不能创建未知身份。集群身份只使用规范化 `cluster`，节点身份只使用 `cluster + name`；`host` 仅用于地址展示，`ident`、`instance`、原始角色标志、PromQL 和数据源信息不进入领域输出或 API。多采集器序列按领域身份去重，最新同时间冲突保持缺失。
+
+集群和节点共用一次快照、无 N+1，但状态与 freshness 分离。集群来源同级优先为 availability、health、collection；节点来源同级优先为 collection、disk、jvm、thread_pool。默认 15 秒周期下连续 2/5 周期未推进为 warning/critical。节点磁盘使用率 85%/90%、JVM 堆使用率 75%/85% 分别为 warning/critical；最近 5 分钟拒绝速率大于 0 为 warning。`elasticsearch_node_stats_up` 仅表达集群级采集状态，集群黄/红不传播为单节点异常。
+
+HTTP 仅暴露受认证的 `GET /api/v1/elasticsearch/overview` 和 `GET /api/v1/elasticsearch/nodes`；前端为总览第五卡和共享模板上的 16 列节点页。首期不直连 Elasticsearch，不做详情、历史、拓扑、任意查询或运维写操作。本轮只使用完全脱敏夹具完成离线验证，未访问真实 Nightingale/Elasticsearch 或现有 8080。

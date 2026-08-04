@@ -248,6 +248,87 @@ export interface RedisOverviewData {
 }
 export type RedisOverviewResponse = ApiResponse<RedisOverviewData>
 
+export type ElasticsearchHealth = 'green' | 'yellow' | 'red' | 'unknown'
+
+export type ElasticsearchRole =
+  | 'master'
+  | 'data'
+  | 'data_content'
+  | 'data_hot'
+  | 'data_warm'
+  | 'data_cold'
+  | 'data_frozen'
+  | 'ingest'
+  | 'ml'
+  | 'transform'
+  | 'remote_cluster_client'
+  | 'client'
+
+export type ElasticsearchNodeStatusSource =
+  | 'collection'
+  | 'disk'
+  | 'jvm'
+  | 'thread_pool'
+  | 'normal'
+  | 'unknown'
+
+export interface ElasticsearchNode {
+  id: string
+  name: string
+  cluster: string
+  address: string
+  roles: ElasticsearchRole[]
+  cluster_health: ElasticsearchHealth
+  heap_usage_percent: number | null
+  disk_usage_percent: number | null
+  cpu_usage_percent: number | null
+  index_rate: number | null
+  search_rate: number | null
+  documents: number | null
+  store_size_bytes: number | null
+  thread_pool_queue: number | null
+  rejected_rate: number | null
+  uptime_seconds: number | null
+  status: MetricLevel
+  status_source: ElasticsearchNodeStatusSource
+  collection_level: MetricLevel
+}
+
+export interface ElasticsearchLevelCounts {
+  total: number
+  normal: number
+  warning: number
+  critical: number
+  unknown: number
+}
+
+export interface ElasticsearchOverviewData {
+  status: MetricLevel
+  clusters: ElasticsearchLevelCounts
+  nodes: ElasticsearchLevelCounts
+  alerts: {
+    cluster_health: AlertCount
+    node_resource: AlertCount
+    unassigned_shards: AlertCount
+    request_rejections: AlertCount
+  }
+}
+
+export interface ElasticsearchNodePageData {
+  nodes: ElasticsearchNode[]
+  available_clusters: string[]
+  available_roles: ElasticsearchRole[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export type ElasticsearchOverviewResponse =
+  ApiResponse<ElasticsearchOverviewData>
+export type ElasticsearchNodePageResponse =
+  ApiResponse<ElasticsearchNodePageData>
+
 export type DiskSMARTHealth = 'healthy' | 'failed' | 'unknown'
 
 export type DiskStatusSource =

@@ -15,26 +15,28 @@ import (
 const sessionCookieName = "infraview_session"
 
 type Dependencies struct {
-	Config       config.Config
-	Auth         *auth.Manager
-	Limiter      *auth.Limiter
-	Service      *service.Service
-	MySQLService *service.MySQLService
-	DiskService  *service.DiskService
-	RedisService *service.RedisService
-	Logger       *slog.Logger
+	Config               config.Config
+	Auth                 *auth.Manager
+	Limiter              *auth.Limiter
+	Service              *service.Service
+	MySQLService         *service.MySQLService
+	DiskService          *service.DiskService
+	RedisService         *service.RedisService
+	ElasticsearchService *service.ElasticsearchService
+	Logger               *slog.Logger
 }
 
 type api struct {
-	config       config.Config
-	auth         *auth.Manager
-	limiter      *auth.Limiter
-	service      *service.Service
-	mysqlService *service.MySQLService
-	diskService  *service.DiskService
-	redisService *service.RedisService
-	logger       *slog.Logger
-	verifyLogin  func(string, string) (auth.Session, bool)
+	config               config.Config
+	auth                 *auth.Manager
+	limiter              *auth.Limiter
+	service              *service.Service
+	mysqlService         *service.MySQLService
+	diskService          *service.DiskService
+	redisService         *service.RedisService
+	elasticsearchService *service.ElasticsearchService
+	logger               *slog.Logger
+	verifyLogin          func(string, string) (auth.Session, bool)
 }
 
 func New(dependencies Dependencies) http.Handler {
@@ -54,15 +56,16 @@ func New(dependencies Dependencies) http.Handler {
 		dependencies.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	server := &api{
-		config:       dependencies.Config,
-		auth:         dependencies.Auth,
-		limiter:      dependencies.Limiter,
-		service:      dependencies.Service,
-		mysqlService: dependencies.MySQLService,
-		diskService:  dependencies.DiskService,
-		redisService: dependencies.RedisService,
-		logger:       dependencies.Logger,
-		verifyLogin:  dependencies.Auth.Login,
+		config:               dependencies.Config,
+		auth:                 dependencies.Auth,
+		limiter:              dependencies.Limiter,
+		service:              dependencies.Service,
+		mysqlService:         dependencies.MySQLService,
+		diskService:          dependencies.DiskService,
+		redisService:         dependencies.RedisService,
+		elasticsearchService: dependencies.ElasticsearchService,
+		logger:               dependencies.Logger,
+		verifyLogin:          dependencies.Auth.Login,
 	}
 
 	mux := http.NewServeMux()
@@ -81,6 +84,8 @@ func New(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/disks/devices", server.requireAuthentication(http.HandlerFunc(server.diskDevices)))
 	mux.Handle("GET /api/v1/redis/overview", server.requireAuthentication(http.HandlerFunc(server.redisOverview)))
 	mux.Handle("GET /api/v1/redis/instances", server.requireAuthentication(http.HandlerFunc(server.redisInstances)))
+	mux.Handle("GET /api/v1/elasticsearch/overview", server.requireAuthentication(http.HandlerFunc(server.elasticsearchOverview)))
+	mux.Handle("GET /api/v1/elasticsearch/nodes", server.requireAuthentication(http.HandlerFunc(server.elasticsearchNodes)))
 
 	mux.HandleFunc("/api/v1/session", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/overview", server.methodNotAllowed)
@@ -93,6 +98,8 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/disks/devices", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/redis/overview", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/redis/instances", server.methodNotAllowed)
+	mux.Handle("/api/v1/elasticsearch/overview", server.requireAuthentication(http.HandlerFunc(server.methodNotAllowed)))
+	mux.Handle("/api/v1/elasticsearch/nodes", server.requireAuthentication(http.HandlerFunc(server.methodNotAllowed)))
 	mux.HandleFunc("/api", server.notFound)
 	mux.HandleFunc("/api/", server.notFound)
 

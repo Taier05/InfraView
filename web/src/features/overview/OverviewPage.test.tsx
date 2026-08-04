@@ -12,15 +12,18 @@ import {
 
 import {
   diskOverviewFixture,
+  elasticsearchOverviewFixture,
   mysqlOverviewFixture,
   overviewFixture,
   redisOverviewFixture,
   type DiskOverviewFixture,
+  type ElasticsearchOverviewFixture,
   type ErrorFixture,
   type MySQLOverviewFixture,
   type OverviewFixture,
   type RedisOverviewFixture,
 } from '../../test/fixtures'
+import '../../app/theme.css'
 import { OverviewPage } from './OverviewPage'
 
 function renderOverview() {
@@ -71,19 +74,23 @@ function mockOverviewRequests({
   disk = diskOverviewFixture(),
   mysql = mysqlOverviewFixture(),
   redis = redisOverviewFixture(),
+  elasticsearch = elasticsearchOverviewFixture(),
   hostError,
   diskError,
   mysqlError,
   redisError,
+  elasticsearchError,
 }: {
   host?: OverviewFixture
   disk?: DiskOverviewFixture
   mysql?: MySQLOverviewFixture
   redis?: RedisOverviewFixture
+  elasticsearch?: unknown
   hostError?: ErrorFixture
   diskError?: ErrorFixture
   mysqlError?: ErrorFixture
   redisError?: ErrorFixture
+  elasticsearchError?: ErrorFixture
 } = {}) {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
@@ -105,6 +112,14 @@ function mockOverviewRequests({
         ),
       )
     }
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(
+        jsonResponse(
+          elasticsearchError ?? elasticsearch,
+          elasticsearchError === undefined ? 200 : 503,
+        ),
+      )
+    }
     return Promise.resolve(
       jsonResponse(hostError ?? host, hostError === undefined ? 200 : 503),
     )
@@ -121,7 +136,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('总览按顺序展示 Linux 主机主机硬盘MySQL和Redis告警摘要卡', async () => {
+it('总览按顺序展示五张模块卡并保留四列桌面网格', async () => {
   renderOverview()
 
   const hostCard = await screen.findByRole('link', {
@@ -134,6 +149,9 @@ it('总览按顺序展示 Linux 主机主机硬盘MySQL和Redis告警摘要卡',
     name: '查看主机硬盘板块',
   })
   const redisCard = screen.getByRole('link', { name: '查看 Redis 板块' })
+  const elasticsearchCard = screen.getByRole('link', {
+    name: '查看 Elasticsearch 板块',
+  })
   const moduleGrid = screen.getByRole('group', { name: '基础设施模块' })
   expect(moduleGrid).toHaveClass(
     'overview-status-grid',
@@ -153,7 +171,45 @@ it('总览按顺序展示 Linux 主机主机硬盘MySQL和Redis告警摘要卡',
   for (const label of ['可用性', '内存', '连接', '复制']) {
     expect(within(redisCard).getByText(label)).toBeVisible()
   }
-  expect(within(moduleGrid).getAllByRole('link')).toHaveLength(4)
+  const moduleCards = within(moduleGrid).getAllByRole('link')
+  expect(moduleCards).toHaveLength(5)
+  expect(moduleCards).toEqual([
+    hostCard,
+    diskCard,
+    mysqlCard,
+    redisCard,
+    elasticsearchCard,
+  ])
+  expect(getComputedStyle(moduleGrid).gridTemplateColumns).toBe(
+    'repeat(4, minmax(0, 1fr))',
+  )
+  expect(elasticsearchCard).toHaveAttribute('href', '/elasticsearch')
+  expect(elasticsearchCard).toHaveClass(
+    'module-status-card',
+    'elasticsearch-overview-card',
+  )
+  expect(elasticsearchCard).toHaveAttribute('data-level', 'critical')
+  expect(within(elasticsearchCard).getByText('Elasticsearch')).toBeVisible()
+  for (const label of [
+    '集群健康',
+    '节点资源',
+    '未分配分片',
+    '请求拒绝',
+  ]) {
+    expect(within(elasticsearchCard).getByText(label)).toBeVisible()
+  }
+  const elasticsearchSummary = within(elasticsearchCard)
+    .getByText('异常节点')
+    .closest('.module-alert-summary')
+  expect(elasticsearchSummary).not.toBeNull()
+  expect(within(elasticsearchSummary as HTMLElement).getByText('4')).toBeVisible()
+  expect(within(elasticsearchSummary as HTMLElement).getByText('/ 9')).toBeVisible()
+  expect(
+    within(elasticsearchSummary as HTMLElement).getByText('严重 1'),
+  ).toBeVisible()
+  expect(
+    within(elasticsearchSummary as HTMLElement).getByText('警告/未知 3'),
+  ).toBeVisible()
   expect(screen.queryAllByRole('article')).toHaveLength(0)
   expect(diskCard).toHaveAttribute('href', '/disks')
   expect(diskCard).toHaveAttribute('data-level', 'critical')
@@ -218,6 +274,353 @@ it('总览按顺序展示 Linux 主机主机硬盘MySQL和Redis告警摘要卡',
     within(controls).getByText(/上次刷新 \d{2}:\d{2}:\d{2}/),
   ).toBeInTheDocument()
   expect(within(controls).getByText(/每 15 秒自动刷新/)).toBeInTheDocument()
+})
+
+it('Elasticsearch 集群和节点都为空时显示中性空状态', async () => {
+  const fixture = elasticsearchOverviewFixture()
+  const emptyCounts = {
+    total: 0,
+    normal: 0,
+    warning: 0,
+    critical: 0,
+    unknown: 0,
+  }
+  fixture.data.status = 'normal'
+  fixture.data.clusters = { ...emptyCounts }
+  fixture.data.nodes = { ...emptyCounts }
+  fixture.data.alerts = {
+    cluster_health: { warning: 0, critical: 0 },
+    node_resource: { warning: 0, critical: 0 },
+    unassigned_shards: { warning: 0, critical: 0 },
+    request_rejections: { warning: 0, critical: 0 },
+  }
+  mockOverviewRequests({ elasticsearch: fixture })
+
+  renderOverview()
+
+  const card = await screen.findByRole('link', {
+    name: '查看 Elasticsearch 板块',
+  })
+  expect(card).toHaveAttribute('data-level', 'empty')
+  expect(within(card).getByText('暂无 Elasticsearch 节点')).toBeVisible()
+  expect(within(card).queryByText('集群健康')).not.toBeInTheDocument()
+})
+
+it('Elasticsearch 仅节点为空但集群存在时仍展示汇总', async () => {
+  const fixture = elasticsearchOverviewFixture()
+  fixture.data.nodes = {
+    total: 0,
+    normal: 0,
+    warning: 0,
+    critical: 0,
+    unknown: 0,
+  }
+  mockOverviewRequests({ elasticsearch: fixture })
+
+  renderOverview()
+
+  const card = await screen.findByRole('link', {
+    name: '查看 Elasticsearch 板块',
+  })
+  expect(card).not.toHaveAttribute('data-level', 'empty')
+  expect(within(card).getByText('异常节点')).toBeVisible()
+  expect(within(card).getByText('集群健康')).toBeVisible()
+})
+
+const invalidElasticsearchOverviewCases = [
+  {
+    name: 'data 不是 object',
+    body: () => ({
+      data: null,
+      meta: {
+        request_id: 'req-fixture-elasticsearch-invalid-data',
+        stale: false,
+        collected_at: '2026-08-01T08:00:00.000Z',
+      },
+    }),
+  },
+  {
+    name: '缺少 request_rejections 告警组',
+    body: () => {
+      const fixture = elasticsearchOverviewFixture()
+      delete (
+        fixture.data.alerts as Partial<
+          ElasticsearchOverviewFixture['data']['alerts']
+        >
+      ).request_rejections
+      return fixture
+    },
+  },
+  {
+    name: 'status 枚举无效',
+    body: () => {
+      const fixture = elasticsearchOverviewFixture()
+      fixture.data.status = 'degraded' as ElasticsearchOverviewFixture['data']['status']
+      return fixture
+    },
+  },
+  {
+    name: 'meta collected_at 不是 string',
+    body: () => {
+      const fixture = elasticsearchOverviewFixture()
+      fixture.meta.collected_at = 42 as unknown as string
+      return fixture
+    },
+  },
+  {
+    name: '节点计数为负数',
+    body: () => {
+      const fixture = elasticsearchOverviewFixture()
+      fixture.data.nodes.warning = -1
+      return fixture
+    },
+  },
+  {
+    name: '集群计数不是安全整数',
+    body: () => {
+      const fixture = elasticsearchOverviewFixture()
+      fixture.data.clusters.total = Number.MAX_SAFE_INTEGER + 1
+      return fixture
+    },
+  },
+  {
+    name: 'AlertCount 不是整数',
+    body: () => {
+      const fixture = elasticsearchOverviewFixture()
+      fixture.data.alerts.cluster_health.warning = 0.5
+      return fixture
+    },
+  },
+  {
+    name: 'clusters total 不等于状态桶之和',
+    body: () => {
+      const fixture = elasticsearchOverviewFixture()
+      fixture.data.clusters.total += 1
+      return fixture
+    },
+  },
+  {
+    name: 'nodes total 不等于状态桶之和',
+    body: () => {
+      const fixture = elasticsearchOverviewFixture()
+      fixture.data.nodes.total += 1
+      return fixture
+    },
+  },
+] satisfies Array<{ name: string; body: () => unknown }>
+
+it('Elasticsearch overview 缺少 collected_at 时仍渲染有效卡片', async () => {
+  const fixture = elasticsearchOverviewFixture()
+  delete (
+    fixture.meta as Partial<ElasticsearchOverviewFixture['meta']>
+  ).collected_at
+  mockOverviewRequests({ elasticsearch: fixture })
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Elasticsearch 板块' }),
+  ).toBeVisible()
+  expect(
+    screen.queryByRole('alert', { name: 'Elasticsearch 板块加载失败' }),
+  ).not.toBeInTheDocument()
+})
+
+it.each(invalidElasticsearchOverviewCases)(
+  'Elasticsearch 成功响应拒绝$name并保持其他模块可用',
+  async ({ body }) => {
+    mockOverviewRequests({ elasticsearch: body() })
+    renderOverview()
+
+    expect(
+      await screen.findByRole('link', { name: '查看 Linux 主机板块' }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('alert', { name: 'Elasticsearch 板块加载失败' }),
+    ).toHaveTextContent('服务器响应格式无效')
+    expect(
+      screen.queryByRole('link', { name: '查看 Elasticsearch 板块' }),
+    ).not.toBeInTheDocument()
+  },
+)
+
+it('Elasticsearch 使用集群与节点中最坏级别而不直接信任 status', async () => {
+  mockOverviewRequests({
+    elasticsearch: elasticsearchOverviewFixture({
+      data: {
+        status: 'normal',
+        clusters: {
+          total: 1,
+          normal: 0,
+          warning: 1,
+          critical: 0,
+          unknown: 0,
+        },
+        nodes: {
+          total: 1,
+          normal: 0,
+          warning: 0,
+          critical: 1,
+          unknown: 0,
+        },
+      },
+    }),
+  })
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Elasticsearch 板块' }),
+  ).toHaveAttribute('data-level', 'critical')
+})
+
+it('其他模块已加载时独立显示 Elasticsearch 加载状态', async () => {
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const path = requestedPath(input)
+    if (path === '/api/v1/elasticsearch/overview') {
+      return new Promise<Response>(() => undefined)
+    }
+    if (path === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(jsonResponse(diskOverviewFixture()))
+    }
+    if (path === '/api/v1/redis/overview') {
+      return Promise.resolve(jsonResponse(redisOverviewFixture()))
+    }
+    return Promise.resolve(jsonResponse(overviewFixture()))
+  })
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Linux 主机板块' }),
+  ).toBeVisible()
+  expect(
+    screen.getByRole('status', { name: 'Elasticsearch 板块加载中' }),
+  ).toBeVisible()
+})
+
+it('Elasticsearch 首次请求失败不阻塞其他模块且可独立重试', async () => {
+  let attempts = 0
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const path = requestedPath(input)
+    if (path === '/api/v1/elasticsearch/overview') {
+      attempts += 1
+      return Promise.resolve(
+        attempts === 1
+          ? jsonResponse(
+              {
+                code: 'elasticsearch_unavailable',
+                message: 'Elasticsearch 数据源暂时不可用',
+                request_id: 'req-fixture-elasticsearch-overview-error',
+                retryable: true,
+              },
+              503,
+            )
+          : jsonResponse(elasticsearchOverviewFixture()),
+      )
+    }
+    if (path === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(jsonResponse(diskOverviewFixture()))
+    }
+    if (path === '/api/v1/redis/overview') {
+      return Promise.resolve(jsonResponse(redisOverviewFixture()))
+    }
+    return Promise.resolve(jsonResponse(overviewFixture()))
+  })
+  const user = userEvent.setup()
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Linux 主机板块' }),
+  ).toBeVisible()
+  const error = screen.getByRole('alert', {
+    name: 'Elasticsearch 板块加载失败',
+  })
+  expect(error).toHaveTextContent('Elasticsearch 数据源暂时不可用')
+  await user.click(within(error).getByRole('button', { name: '重试' }))
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Elasticsearch 板块' }),
+  ).toBeVisible()
+  expect(attempts).toBe(2)
+})
+
+it('Elasticsearch 过期数据保持可见并显示精确采集时间', async () => {
+  mockOverviewRequests({
+    elasticsearch: elasticsearchOverviewFixture({
+      meta: {
+        stale: true,
+        collected_at: '2026-08-01T07:30:00.000Z',
+      },
+    }),
+  })
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Elasticsearch 板块' }),
+  ).toBeVisible()
+  const banner = screen.getByRole('alert', {
+    name: 'Elasticsearch 数据已过期',
+  })
+  expect(within(banner).getByRole('time')).toHaveAttribute(
+    'dateTime',
+    '2026-08-01T07:30:00.000Z',
+  )
+})
+
+it('Elasticsearch 后台刷新失败时保留旧卡并显示独立重试状态', async () => {
+  let attempts = 0
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const path = requestedPath(input)
+    if (path === '/api/v1/elasticsearch/overview') {
+      attempts += 1
+      return Promise.resolve(
+        attempts === 1
+          ? jsonResponse(elasticsearchOverviewFixture())
+          : jsonResponse(
+              {
+                code: 'elasticsearch_unavailable',
+                message: 'Elasticsearch 数据刷新失败',
+                request_id:
+                  'req-fixture-elasticsearch-overview-refresh-error',
+                retryable: true,
+              },
+              503,
+            ),
+      )
+    }
+    if (path === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(jsonResponse(diskOverviewFixture()))
+    }
+    if (path === '/api/v1/redis/overview') {
+      return Promise.resolve(jsonResponse(redisOverviewFixture()))
+    }
+    return Promise.resolve(jsonResponse(overviewFixture()))
+  })
+  const user = userEvent.setup()
+  renderOverview()
+
+  const card = await screen.findByRole('link', {
+    name: '查看 Elasticsearch 板块',
+  })
+  await user.click(screen.getByRole('button', { name: '刷新' }))
+
+  expect(card).toBeVisible()
+  const error = await screen.findByRole('alert', {
+    name: 'Elasticsearch 板块刷新失败',
+  })
+  expect(error).toHaveTextContent('Elasticsearch 数据刷新失败')
+  expect(
+    within(error).getByRole('button', {
+      name: '重试 Elasticsearch 板块',
+    }),
+  ).toBeVisible()
 })
 
 it('全正常时用绿色无异常文案展示所有零值状态', async () => {
@@ -375,6 +778,9 @@ it('硬盘 unknown 直接使用后端 warning_devices 归入警告风险', async
 it('Linux 和 MySQL 已加载时独立显示硬盘加载状态', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
     if (path === '/api/v1/disks/overview') {
       return new Promise<Response>(() => undefined)
     }
@@ -398,6 +804,9 @@ it('硬盘首次请求失败不阻塞 Linux 和 MySQL 且可独立重试', async
   let diskAttempts = 0
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
     if (path === '/api/v1/disks/overview') {
       diskAttempts += 1
       return Promise.resolve(
@@ -439,6 +848,9 @@ it('硬盘首次请求失败不阻塞 Linux 和 MySQL 且可独立重试', async
 it('硬盘成功响应结构无效时独立报错而不使总览崩溃', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
     if (path === '/api/v1/disks/overview') {
       return Promise.resolve(
         jsonResponse({
@@ -564,6 +976,9 @@ it('硬盘刷新失败时保留旧卡并显示独立重试状态', async () => {
   let diskAttempts = 0
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
     if (path === '/api/v1/disks/overview') {
       diskAttempts += 1
       return Promise.resolve(
@@ -754,6 +1169,9 @@ it('MySQL 无实例时显示空状态而不是异常', async () => {
 it('Linux 已加载时独立显示 MySQL 加载状态', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
     if (path === '/api/v1/mysql/overview') {
       return new Promise<Response>(() => undefined)
     }
@@ -796,11 +1214,17 @@ it('MySQL 刷新失败时保留旧卡并显示独立重试状态', async () => {
   let mysqlAttempts = 0
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
     if (path === '/api/v1/disks/overview') {
       return Promise.resolve(jsonResponse(diskOverviewFixture()))
     }
     if (path === '/api/v1/overview') {
       return Promise.resolve(jsonResponse(overviewFixture()))
+    }
+    if (path === '/api/v1/redis/overview') {
+      return Promise.resolve(jsonResponse(redisOverviewFixture()))
     }
     mysqlAttempts += 1
     return Promise.resolve(
@@ -858,6 +1282,9 @@ it('使用固定查询范围且不显示总览时间范围控件', async () => {
   const requestedRanges: string[] = []
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
     if (path === '/api/v1/mysql/overview') {
       return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
     }
@@ -880,16 +1307,16 @@ it('使用固定查询范围且不显示总览时间范围控件', async () => {
   expect(screen.queryByRole('button', { name: '7天' })).not.toBeInTheDocument()
 })
 
-it('手动刷新会同时重新请求四个总览模块', async () => {
+it('手动刷新会同时重新请求五个总览模块', async () => {
   const user = userEvent.setup()
   renderOverview()
 
   await screen.findByRole('link', { name: '查看 Linux 主机板块' })
   await screen.findByRole('link', { name: '查看主机硬盘板块' })
-  expect(globalThis.fetch).toHaveBeenCalledTimes(4)
+  expect(globalThis.fetch).toHaveBeenCalledTimes(5)
   await user.click(screen.getByRole('button', { name: '刷新' }))
 
-  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(8))
+  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(10))
   const calls = vi.mocked(globalThis.fetch).mock.calls
   expect(calls.map(([input]) => requestedPath(input))).toEqual(
     expect.arrayContaining([
@@ -897,6 +1324,7 @@ it('手动刷新会同时重新请求四个总览模块', async () => {
       '/api/v1/disks/overview',
       '/api/v1/mysql/overview',
       '/api/v1/redis/overview',
+      '/api/v1/elasticsearch/overview',
     ]),
   )
   const hostCalls = calls.filter(
@@ -912,6 +1340,9 @@ it('每 15 秒刷新且前一请求未完成时不发起重叠请求', async () 
   let resolveRefresh!: (response: Response) => void
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
     if (path === '/api/v1/mysql/overview') {
       return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
     }
@@ -974,6 +1405,9 @@ it('可重试错误显示中文信息并可重试成功', async () => {
   let attempts = 0
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
     if (path === '/api/v1/mysql/overview') {
       return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
     }

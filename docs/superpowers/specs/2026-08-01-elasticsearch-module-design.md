@@ -1,7 +1,7 @@
 # InfraView Elasticsearch 首期模块设计
 
 日期：2026-08-01
-状态：设计已批准，待实施计划
+状态：设计已批准，离线实现与验证完成；待现有 8080 验收、提交和推送授权
 范围：总览 Elasticsearch 集群健康卡与 Elasticsearch 节点列表
 
 ## 背景与证据
@@ -325,3 +325,11 @@ Nodes 参数：
 - 节点表 16 列均为单值单行，完整显示；宽度不足只在表格内部滚动。
 - API/UI 不暴露原始采集身份、数据源信息或上游内容。
 - Docker 全量验证通过，既有模块无回归，产品继续严格只读。
+
+## 2026-08-01 离线实现结果（终审修复前历史基线）
+
+Task1–7 已按本规格完成离线实现与验证。固定 26 查询、一次 batch、无 N+1、多集群身份、集群/节点状态分离、阈值与来源优先、两个认证 GET、显式 View/非 null 数组、共享模板及 16 个单值单行列均有自动化测试覆盖。Playwright 仅静态发现 3 文件/17 项；前端 12 文件/154 项、typecheck/build，Go gofmt/vet/普通/race/编译，以及无缓存镜像 `infraview:elasticsearch-verify` 均通过。
+
+上述结果只是 2026-08-01 终审修复前的历史基线。2026-08-04 终审修复已完成单项与定向验证；随后主控 fresh 最终全量通过前端 12 文件/155 项、typecheck/build、Playwright 3 文件/17 项静态发现、Go gofmt/vet/全仓普通/race/编译、只读/敏感/whitespace 扫描和无缓存镜像 `infraview:elasticsearch-final-verify`。镜像只创建未运行。
+
+上述离线结果本身不包含 8080 浏览器/API 验收。随后经用户单独授权，现有测试 8080 已原位重建并完成脱敏 API、1440×900 Chromium、唯一端口和容器安全验收；未创建其他 InfraView 端口，未连接生产 Nightingale/Elasticsearch。commit/push 仍未执行。既有 npm 1 个 moderate、2 个 high 与 Vite 第三方 `"use client"` warning 未在本功能中处理。

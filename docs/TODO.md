@@ -128,3 +128,24 @@
 - [x] 经明确授权提交并推送 Redis 首期模块、共享模板及相关测试和文档；功能基线为 `c3b5c7d`，已进入 `origin/main`。
 
 首期明确不做 Redis 拓扑图、slot 分布、实例详情、历史趋势、故障转移、主从切换、Redis 直连或命令执行。
+
+## Elasticsearch 首期模块
+
+- [x] 实现独立 Elasticsearch 领域、完全脱敏多集群 Mock 与不可逆集群/节点稳定 ID。
+- [x] 实现 Nightingale 一次固定 26 查询即时 batch、inventory-first 归并、安全错误和无集群/节点 N+1。
+- [x] 实现共享快照缓存、集群/节点独立 freshness、状态来源优先、磁盘/JVM/拒绝阈值、筛选/16 字段排序/安全分页。
+- [x] 实现两个受认证 GET API、显式 View、非 null 数组、参数白名单、405 与安全 503。
+- [x] 实现总览第五卡、侧边栏和复用 `ListPage` 的 16 列节点页；每格单值单行，角色超过两个时显示前两个与 `…`、完整值保留在 `title`。
+- [x] 新增 Elasticsearch Playwright 静态规格，并完成 3 文件/17 项静态发现；未运行动态 E2E 或创建端口。
+- [x] 完成离线全量验证：前端 12 文件/154 项、typecheck/build；Go gofmt/vet/普通/race/编译；无缓存镜像与只读/敏感静态扫描。
+- [x] 终审发现的 health `color`、inventory 身份/地址归并、采集来源拆分与浮点求和顺序均完成单项 RED→GREEN。
+- [x] 完成终审修复后的 provider/service 定向普通+race、Elasticsearch 页面 28 项状态回归和 gofmt 汇总。
+- [x] 完成主控 fresh 最终全量：前端 12 文件/155 项、typecheck/build、Playwright 3 文件/17 项静态发现、Go gofmt/vet/全仓普通/race/编译、只读/敏感/whitespace 扫描和无缓存镜像均退出 0。
+- [x] 经单独授权原位重建现有测试 Nightingale 8080；两个 GET API、写方法 405、五卡/16 列 Chromium、容器安全与既有模块回归验收均通过，未创建其他端口。
+- [x] 修复 uptime 小数/科学计数文本被严格整数解析拒绝的问题，并完成角色前两个 + `…`、集群健康四色徽标及 1440×900 表格无横向滚动。
+- [x] 完成密度/uptime 修复 fresh 全量（前端 12 文件/157 项、typecheck/build、Playwright 17 项静态发现、Go gofmt/vet/普通/race/编译、无缓存镜像），并原位重建原 8080；脱敏 API 与 Chromium 3/3、唯一端口和安全基线均通过。
+- [x] 按 RED→GREEN 为 Elasticsearch 总览卡补齐“异常节点 x / 总节点”、严重与警告/未知徽标，以及集群和节点同时为空时的共享空状态；集群与节点继续分开统计。
+- [x] 完成节点汇总修复的现有 8080 原位重建、Chromium 3/3、唯一端口和容器安全验收。
+- [ ] 经明确授权提交 Elasticsearch Task1–7；push 仍需独立明确授权。
+
+首期明确不做索引列表/详情、节点详情、历史趋势、拓扑、分片详情、慢查询、日志、追踪、Elasticsearch 直连、任意查询或任何运维操作。任何生产 Nightingale/Elasticsearch 验证永久禁止。
