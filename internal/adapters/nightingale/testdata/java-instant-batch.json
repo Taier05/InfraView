@@ -1,0 +1,16 @@
+{
+  "dat": [
+    [{"metric":{"name":"fixture-java-a","server_ip":"fixture-address-a","ident":"fixture-ident-private"},"value":[1785200100,"12.5"]}],
+    [{"metric":{"name":"fixture-java-a","server_ip":"fixture-address-a","ident":"fixture-ident-private"},"value":[1785200100,"1"]}],
+    [{"metric":{"name":"fixture-java-a","server_ip":"fixture-address-a","ident":"fixture-ident-private"},"value":[1785200100,"1"]}],
+    [{"metric":{"name":"fixture-java-a","server_ip":"fixture-address-a","ident":"fixture-ident-private"},"value":[1785200100,"2"]}],
+    [{"metric":{"name":"fixture-java-a","server_ip":"fixture-address-a","ident":"fixture-ident-private"},"value":[1785200100,"7.5"]}],
+    [{"metric":{"name":"fixture-java-a","server_ip":"fixture-address-a","ident":"fixture-ident-private"},"value":[1785200100,"9007199254740993"]}],
+    [{"metric":{"name":"fixture-java-a","server_ip":"fixture-address-a","ident":"fixture-ident-private"},"value":[1785200100,"42.5"]}],
+    [{"metric":{"name":"fixture-java-a","server_ip":"fixture-address-a","ident":"fixture-ident-private"},"value":[1785200100,"1"]}],
+    [{"metric":{"name":"fixture-java-a","server_ip":"fixture-address-a","ident":"fixture-ident-private"},"value":[1785200100,"1785100000"]}],
+    [{"metric":{"name":"fixture-java-a","server_ip":"fixture-address-a","ident":"fixture-ident-private"},"value":[1785200100,"1"]}],
+    [{"metric":{"name":"fixture-java-a","server_ip":"fixture-address-a","ident":"fixture-ident-private"},"value":[1785200200,"1785200000"]}]
+  ],
+  "err": ""
+}
