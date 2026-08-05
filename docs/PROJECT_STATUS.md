@@ -8,7 +8,7 @@
 
 现场反馈确认，部分实例具有连接指标但当前/近期 `rabbitmq_identity_info` 没有覆盖，原 inventory-only 集合会漏节点；连接发现补齐实例后，旧回退又把实例地址错误写入“节点名称”。最终架构改为：当前与近期身份优先建立具名节点，连接指标只补充发现缺失实例；Provider 扫描同一固定批次，只有采集键对应唯一一致的显式 `rabbitmq_node` 才补全名称，缺失或冲突时名称保持空值，页面显示“暂无数据”。实例地址和 `ident` 均不再参与名称猜测。
 
-两个 Provider 回归测试分别锁定“缺名不能冒充地址”和“其他节点级序列携带唯一标签时可确定性补全”，旧实现均得到 RED，最小修复后 GREEN；页面空名称规格同样先 RED 后 GREEN。RabbitMQ 前后端定向测试通过，随后现有 8080 原位重建；镜像内前端全量、typecheck/build、Go 普通/race/编译全部通过。容器健康、唯一 8080、错误回退源码移除及 staged/unstaged whitespace 检查通过。未访问夜莺仪表盘、未读取或输出上游正文与真实身份数据；动态登录态 Chromium 未执行。
+两个 Provider 回归测试分别锁定“缺名不能冒充地址”和“其他节点级序列携带唯一标签时可确定性补全”，旧实现均得到 RED，最小修复后 GREEN；页面空名称规格同样先 RED 后 GREEN。RabbitMQ 前后端定向测试通过，随后现有 8080 原位重建；提交前无缓存镜像内前端全量、typecheck/build、Go 普通/race/编译全部通过。容器健康、唯一 8080、错误回退源码移除及 staged/unstaged whitespace 检查通过。未访问夜莺仪表盘、未读取或输出上游正文与真实身份数据；动态登录态 Chromium 未执行。功能提交为 `2d18aae feat: add read-only RabbitMQ monitoring`，已在本地 `main` 创建，推送已获授权、尚待执行。
 
 ### 2026-08-05 RabbitMQ Task 10（共享采集目标多节点与零值摘要修复完成）
 
