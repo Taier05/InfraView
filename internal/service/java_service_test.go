@@ -374,6 +374,42 @@ func TestJavaServicesSupportsAllSortKeysBothDirectionsAndNilLast(t *testing.T) {
 	}
 }
 
+func TestJavaServicesSortsMultipleMissingTextValuesLastByID(t *testing.T) {
+	now := time.Date(2026, time.August, 5, 0, 0, 10, 0, time.UTC)
+	tests := []struct {
+		field  string
+		mutate func(low, high, missingA, missingB *javaapp.Service)
+	}{
+		{"business", func(low, high, missingA, missingB *javaapp.Service) {
+			low.Name, high.Name, missingA.Name, missingB.Name = "aaa", "zzz", " ", ""
+		}},
+		{"address", func(low, high, missingA, missingB *javaapp.Service) {
+			low.Address, high.Address, missingA.Address, missingB.Address = "address-a", "address-z", " ", ""
+		}},
+	}
+	for _, test := range tests {
+		for _, order := range []string{"asc", "desc"} {
+			t.Run(test.field+"/"+order, func(t *testing.T) {
+				low := healthyJavaService("id-low", "saas", "address-low", now)
+				high := healthyJavaService("id-high", "saas", "address-high", now)
+				missingA := healthyJavaService("id-missing-a", "saas", "address-missing-a", now)
+				missingB := healthyJavaService("id-missing-b", "saas", "address-missing-b", now)
+				test.mutate(&low, &high, &missingA, &missingB)
+				page := mustJavaPage(t, newJavaServiceWithSnapshot(now, javaapp.Snapshot{Services: []javaapp.Service{missingB, high, missingA, low}}), JavaQuery{
+					Sort: test.field, Order: order, Page: 1, PageSize: 20,
+				})
+				want := []string{"id-low", "id-high", "id-missing-a", "id-missing-b"}
+				if order == "desc" {
+					want = []string{"id-high", "id-low", "id-missing-a", "id-missing-b"}
+				}
+				if got := javaIDs(page.Services); !reflect.DeepEqual(got, want) {
+					t.Fatalf("IDs = %#v, want %#v", got, want)
+				}
+			})
+		}
+	}
+}
+
 func TestJavaServicesAlwaysUsesIDAscendingToCloseSortTies(t *testing.T) {
 	now := time.Date(2026, time.August, 5, 0, 0, 0, 0, time.UTC)
 	services := []javaapp.Service{

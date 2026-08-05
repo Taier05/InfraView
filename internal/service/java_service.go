@@ -398,6 +398,9 @@ func sortJavaServices(items []JavaServiceSummary, field, order string) {
 		if text && leftTextOK != rightTextOK {
 			return leftTextOK
 		}
+		if text && !leftTextOK {
+			return items[i].ID < items[j].ID
+		}
 		leftBool, leftBoolOK, boolean := javaBoolSortValue(items[i], field)
 		rightBool, rightBoolOK, _ := javaBoolSortValue(items[j], field)
 		if boolean && leftBoolOK != rightBoolOK {
