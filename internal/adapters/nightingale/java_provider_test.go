@@ -167,6 +167,26 @@ func TestBuildJavaSnapshotSelectsLatestValuesAndClearsLatestConflicts(t *testing
 	}
 }
 
+func TestJavaLatestTreatsGoZeroTimeAsInitializedForConflict(t *testing.T) {
+	var latest javaLatest[float64]
+	mergeJavaLatest(&latest, 1, time.Time{})
+	mergeJavaLatest(&latest, 2, time.Time{})
+
+	if latest.value != nil || !latest.conflict {
+		t.Fatalf("same-zero-time conflict = %#v", latest)
+	}
+}
+
+func TestJavaLatestDoesNotLetOlderSampleReplaceGoZeroTime(t *testing.T) {
+	var latest javaLatest[float64]
+	mergeJavaLatest(&latest, 2, time.Time{})
+	mergeJavaLatest(&latest, 1, time.Time{}.Add(-time.Second))
+
+	if latest.value == nil || *latest.value != 2 || latest.conflict {
+		t.Fatalf("zero-time latest was replaced = %#v", latest)
+	}
+}
+
 func TestBuildJavaSnapshotRejectsInvalidOptionalValues(t *testing.T) {
 	tests := []struct {
 		name       string

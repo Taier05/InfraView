@@ -13,9 +13,10 @@ import (
 )
 
 type javaLatest[T comparable] struct {
-	value     *T
-	timestamp time.Time
-	conflict  bool
+	value       *T
+	timestamp   time.Time
+	conflict    bool
+	initialized bool
 }
 
 type javaServiceState struct {
@@ -217,11 +218,12 @@ func parseJavaInt64(raw []json.RawMessage) (int64, time.Time, bool) {
 }
 
 func mergeJavaLatest[T comparable](target *javaLatest[T], value T, timestamp time.Time) {
-	if target.timestamp.IsZero() || timestamp.After(target.timestamp) {
+	if !target.initialized || timestamp.After(target.timestamp) {
 		copyValue := value
 		target.value = &copyValue
 		target.timestamp = timestamp
 		target.conflict = false
+		target.initialized = true
 		return
 	}
 	if timestamp.Equal(target.timestamp) && target.value != nil && *target.value != value {
