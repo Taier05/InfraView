@@ -678,6 +678,12 @@ h1 {
     linear-gradient(135deg, rgb(62 34 36 / 82%), rgb(18 25 32 / 98%));
 }
 
+.module-status-card[data-level="unknown"] {
+  border-color: #485966;
+  background:
+    linear-gradient(135deg, rgb(36 45 53 / 88%), rgb(18 25 32 / 98%));
+}
+
 .module-status-card[data-level="empty"] {
   border-color: var(--border-strong);
   background:
@@ -733,6 +739,11 @@ h1 {
 .module-status-level[data-level="critical"] {
   color: var(--danger);
   background: #321f21;
+}
+
+.module-status-level[data-level="unknown"] {
+  color: #a7b0b6;
+  background: #252c31;
 }
 
 .module-status-level[data-level="empty"] {
@@ -829,6 +840,11 @@ h1 {
   background: rgb(50 31 33 / 76%);
 }
 
+.module-metric-alert[data-level="unknown"] {
+  border-color: #46535c;
+  background: rgb(37 45 51 / 76%);
+}
+
 .module-metric-alert > div {
   display: flex;
   align-items: baseline;
@@ -855,6 +871,10 @@ h1 {
 
 .module-metric-alert[data-level="critical"] strong {
   color: var(--danger);
+}
+
+.module-metric-alert[data-level="unknown"] strong {
+  color: #a7b0b6;
 }
 
 .module-metric-alert > span {
@@ -927,8 +947,9 @@ h1 {
 
 .host-list-controls {
   display: grid;
-  grid-template-columns:
-    minmax(16rem, 1fr) minmax(8rem, 10rem) minmax(6rem, 7rem) auto;
+  grid-template-columns: minmax(16rem, 1fr);
+  grid-auto-columns: minmax(6rem, max-content);
+  grid-auto-flow: column;
   gap: 0.45rem;
   margin-bottom: 0.5rem;
 }
@@ -1157,6 +1178,86 @@ h1 {
 @media (max-width: 1100px) {
   .elasticsearch-table {
     min-width: 72rem;
+  }
+}
+
+.rabbitmq-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.host-table.rabbitmq-table th,
+.host-table.rabbitmq-table td {
+  padding: 0.3rem 0.18rem;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.host-table.rabbitmq-table th {
+  font-size: 0.62rem;
+  letter-spacing: 0;
+}
+
+.host-table.rabbitmq-table td {
+  font-size: 0.69rem;
+}
+
+.host-table.rabbitmq-table th:nth-child(1) { width: 9%; }
+.host-table.rabbitmq-table th:nth-child(2) { width: 8%; }
+.host-table.rabbitmq-table th:nth-child(3) { width: 9%; }
+.host-table.rabbitmq-table th:nth-child(4) { width: 7%; }
+.host-table.rabbitmq-table th:nth-child(5) { width: 6.5%; }
+.host-table.rabbitmq-table th:nth-child(6) { width: 6.5%; }
+.host-table.rabbitmq-table th:nth-child(7) { width: 7.5%; }
+.host-table.rabbitmq-table th:nth-child(8) { width: 7.5%; }
+.host-table.rabbitmq-table th:nth-child(9) { width: 4.5%; }
+.host-table.rabbitmq-table th:nth-child(10) { width: 4%; }
+.host-table.rabbitmq-table th:nth-child(11) { width: 5%; }
+.host-table.rabbitmq-table th:nth-child(12) { width: 5.5%; }
+.host-table.rabbitmq-table th:nth-child(13) { width: 5.5%; }
+.host-table.rabbitmq-table th:nth-child(14) { width: 6.5%; }
+.host-table.rabbitmq-table th:nth-child(15) { width: 8%; }
+
+.rabbitmq-identity {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rabbitmq-value {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rabbitmq-status {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.rabbitmq-table td:last-child .status-badge {
+  max-width: 100%;
+  gap: 0.2rem;
+  padding: 0.14rem 0.26rem;
+  font-size: 0.66rem;
+}
+
+.rabbitmq-table td:last-child .status-badge-dot {
+  width: 0.36rem;
+  height: 0.36rem;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1100px) {
+  .rabbitmq-table {
+    min-width: 68rem;
   }
 }
 
@@ -1460,6 +1561,21 @@ h1 {
 }
 
 @media (min-width: 761px) and (max-width: 1100px) {
+  .host-list-controls {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-columns: auto;
+    grid-auto-flow: row;
+  }
+
+  .host-list-controls > * {
+    min-width: 0;
+  }
+
+  .host-list-controls .refresh-time {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .mysql-list-controls {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1508,6 +1624,8 @@ h1 {
 
   .host-list-controls {
     grid-template-columns: 1fr;
+    grid-auto-columns: auto;
+    grid-auto-flow: row;
   }
 
   .mysql-list-controls {

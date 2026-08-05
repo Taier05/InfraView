@@ -329,6 +329,75 @@ export type ElasticsearchOverviewResponse =
 export type ElasticsearchNodePageResponse =
   ApiResponse<ElasticsearchNodePageData>
 
+export type RabbitMQNodeStatusSource =
+  | 'alarm'
+  | 'collection'
+  | 'memory'
+  | 'disk'
+  | 'file_descriptor'
+  | 'erlang_process'
+  | 'normal'
+  | 'unknown'
+
+export interface RabbitMQNode {
+  id: string
+  name: string
+  cluster: string
+  address: string
+  version: string
+  memory_usage_percent: number | null
+  disk_available_bytes: number | null
+  file_descriptor_usage_percent: number | null
+  erlang_process_usage_percent: number | null
+  connections: number | null
+  queues: number | null
+  messages: number | null
+  publish_rate: number | null
+  deliver_rate: number | null
+  uptime_seconds: number | null
+  status: MetricLevel
+  status_source: RabbitMQNodeStatusSource
+  collection_level: MetricLevel
+}
+
+export interface RabbitMQLevelCounts {
+  total: number
+  normal: number
+  warning: number
+  critical: number
+  unknown: number
+}
+
+export interface RabbitMQAlertCount {
+  warning: number
+  critical: number
+  unknown: number
+}
+
+export interface RabbitMQOverviewData {
+  status: MetricLevel
+  clusters: RabbitMQLevelCounts
+  nodes: RabbitMQLevelCounts
+  alerts: {
+    cluster_connectivity: RabbitMQAlertCount
+    resource_alarms: RabbitMQAlertCount
+    resource_pressure: RabbitMQAlertCount
+    collection: RabbitMQAlertCount
+  }
+}
+
+export interface RabbitMQNodePageData {
+  nodes: RabbitMQNode[]
+  available_clusters: string[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export type RabbitMQOverviewResponse = ApiResponse<RabbitMQOverviewData>
+export type RabbitMQNodePageResponse = ApiResponse<RabbitMQNodePageData>
+
 export type DiskSMARTHealth = 'healthy' | 'failed' | 'unknown'
 
 export type DiskStatusSource =

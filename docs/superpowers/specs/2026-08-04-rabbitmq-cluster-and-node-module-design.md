@@ -15,7 +15,7 @@
 - `rabbitmq_identity_info` 同时提供采集集群、RabbitMQ 逻辑集群、永久集群身份和 RabbitMQ 节点名称标签。
 - `rabbitmq_build_info` 提供 RabbitMQ 与 Erlang 版本标签。
 - 节点资源、三类 RabbitMQ 告警、不可达 peer、连接、队列、消息、吞吐和运行时间指标均存在。
-- 普通节点级指标使用 `cluster + ident + instance` 归并；协议、队列类型等额外标签在固定查询中显式聚合。
+- `cluster + instance` 只作为采集关联键；当前与近期身份以集群内部身份与 `rabbitmq_node` 建立具名节点，连接指标可补充发现身份结果暂缺的实例。整批固定结果中同一采集键只有唯一一致的显式 `rabbitmq_node` 时才补全名称；缺失或冲突时名称保持缺失。带 `rabbitmq_node` 的普通指标精确归并，无节点标签且关联不唯一时保持缺失。
 - 真实标签值、样本值、地址、身份、数量和上游正文不进入本文档。
 
 Provider 每个快照恰好发送一次 `query-instant-batch`，固定 22 组查询且顺序不可变：
@@ -38,8 +38,8 @@ Provider 每个快照恰好发送一次 `query-instant-batch`，固定 22 组查
 16. `rabbitmq_connections`
 17. `rabbitmq_queues`
 18. `rabbitmq_queue_messages`
-19. `sum by (cluster, ident, instance) (rate(rabbitmq_global_messages_received_total[5m]))`
-20. `sum by (cluster, ident, instance) (rate(rabbitmq_global_messages_delivered_total[5m]))`
+19. `sum by (cluster, ident, instance, rabbitmq_node) (rate(rabbitmq_global_messages_received_total[5m]))`
+20. `sum by (cluster, ident, instance, rabbitmq_node) (rate(rabbitmq_global_messages_delivered_total[5m]))`
 21. `tlast_over_time(rabbitmq_identity_info[24h])`
 22. `tlast_over_time(rabbitmq_erlang_uptime_seconds[24h])`
 
@@ -61,12 +61,12 @@ API 和前端不能提交指标名、PromQL、URL 或任意查询。禁止按集
 
 集群内部身份优先使用 `rabbitmq_cluster_permanent_id`；缺失时依次回退 `rabbitmq_cluster` 和采集 `cluster`。API 的集群 ID 是内部身份的不可逆哈希，永久集群身份原文永不进入 API。
 
-节点必须具有 `rabbitmq_node`。节点 ID 是“集群内部身份 + RabbitMQ 节点名称”的不可逆哈希，避免跨集群同名节点冲突。`ident` 只参与当前指标归并，不进入 API；`instance` 作为已认证页面的实例地址和归并键，不作为稳定节点身份。
+身份 inventory 节点必须具有 `rabbitmq_node`；连接发现的节点允许名称缺失。具名节点 ID 是“集群内部身份 + RabbitMQ 节点名称”的不可逆哈希，缺名节点使用集群内部身份与仅供内部观察的实例身份生成不可逆 ID。`ident` 不参与名称推测也不进入 API；`instance` 作为已认证页面的实例地址和采集关联键，不能冒充节点名称。
 
 归并遵守以下规则：
 
-- inventory-first，只向已由近期身份查询建立的节点归并指标。
-- 普通指标按 `cluster + ident + instance` 定位节点；同一节点出现多个合法采集序列时按原始样本时间确定最新值。
+- 当前与近期身份优先建立具名节点；连接指标只补充发现未被身份结果覆盖的实例。
+- 普通指标先按 `cluster + instance` 找到候选节点；带 `rabbitmq_node` 时精确定位，无节点标签时仅允许唯一候选归并。同一批结果中的唯一一致节点标签可补全连接发现节点的名称，冲突标签不得任意选择。同一稳定节点出现多个合法采集序列时按原始样本时间确定最新值。
 - 同一最新时间出现不同身份或不同数值时保持未知，不任意选值。
 - 计数和容量拒绝负数、NaN、Inf 与越界；可整型指标不通过不安全浮点中转。
 - 运行时间接受 Prometheus 有限非负小数或科学计数文本，检查越界后向下取整为秒。
@@ -173,7 +173,7 @@ RabbitMQ 是总览第六张独立卡，继续使用桌面四轨网格并自然�
 
 所有功能按 TDD 完成：
 
-- 领域/Provider：锁定 22 条查询及顺序、一次 batch、无 N+1、身份回退、跨集群同名节点、inventory-first、最新值、冲突值、数值边界、响应与认证安全。
+- 领域/Provider：锁定 22 条查询及顺序、一次 batch、无 N+1、身份回退、跨集群同名节点、当前/近期身份优先、连接补充发现、显式名称标签、最新值、冲突值、数值边界、响应与认证安全。
 - Service：锁定集群/节点分离、告警、资源阈值、2/5 freshness、未知、恢复推进、积压只展示、筛选、自然排序、缺失置后、分页与极端页码防溢出。
 - HTTP：锁定认证、GET、非 null 数组、参数白名单、400、405、503、stale 和敏感字段排除。
 - 前端：锁定第六张卡、四类摘要、双空状态、15 个精确表头、每格单值单行、统一控制栏、URL 恢复、空/错/stale/刷新状态和无破坏性控件。

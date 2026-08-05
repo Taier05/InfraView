@@ -1,5 +1,11 @@
 import { HttpResponse, http } from 'msw'
 
+import type {
+  RabbitMQNodePageResponse,
+  RabbitMQNodeStatusSource,
+  RabbitMQOverviewResponse,
+} from '../api/types'
+
 export const SESSION_PATH = '/api/v1/session'
 export const OVERVIEW_PATH = '*/api/v1/overview'
 export const MYSQL_OVERVIEW_PATH = '*/api/v1/mysql/overview'
@@ -9,6 +15,8 @@ export const REDIS_INSTANCES_PATH = '*/api/v1/redis/instances'
 export const ELASTICSEARCH_OVERVIEW_PATH =
   '*/api/v1/elasticsearch/overview'
 export const ELASTICSEARCH_NODES_PATH = '*/api/v1/elasticsearch/nodes'
+export const RABBITMQ_OVERVIEW_PATH = '*/api/v1/rabbitmq/overview'
+export const RABBITMQ_NODES_PATH = '*/api/v1/rabbitmq/nodes'
 export const DISK_OVERVIEW_PATH = '*/api/v1/disks/overview'
 export const DISK_DEVICES_PATH = '*/api/v1/disks/devices'
 
@@ -365,6 +373,10 @@ export interface ElasticsearchNodePageFixture {
     collected_at: string
   }
 }
+
+export type RabbitMQNodeStatusSourceFixture = RabbitMQNodeStatusSource
+export type RabbitMQOverviewFixture = RabbitMQOverviewResponse
+export type RabbitMQNodePageFixture = RabbitMQNodePageResponse
 
 export interface DiskDevicePageFixture {
   data: {
@@ -894,6 +906,199 @@ export function elasticsearchNodePageFixture(
   }
 }
 
+export function rabbitMQOverviewFixture(
+  overrides: {
+    data?: Partial<RabbitMQOverviewFixture['data']>
+    meta?: Partial<RabbitMQOverviewFixture['meta']>
+  } = {},
+): RabbitMQOverviewFixture {
+  return {
+    data: {
+      status: 'critical',
+      clusters: {
+        total: 3,
+        normal: 1,
+        warning: 1,
+        critical: 0,
+        unknown: 1,
+      },
+      nodes: {
+        total: 4,
+        normal: 1,
+        warning: 1,
+        critical: 1,
+        unknown: 1,
+      },
+      alerts: {
+        cluster_connectivity: { warning: 1, critical: 0, unknown: 1 },
+        resource_alarms: { warning: 0, critical: 1, unknown: 0 },
+        resource_pressure: { warning: 1, critical: 1, unknown: 0 },
+        collection: { warning: 1, critical: 0, unknown: 1 },
+      },
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-fixture-rabbitmq-overview-001',
+      stale: false,
+      collected_at: '2026-08-04T08:00:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
+export function rabbitMQNodePageFixture(
+  overrides: {
+    data?: Partial<RabbitMQNodePageFixture['data']>
+    meta?: Partial<RabbitMQNodePageFixture['meta']>
+  } = {},
+): RabbitMQNodePageFixture {
+  return {
+    data: {
+      nodes: [
+        {
+          id: 'rabbitmq-fixture-node-001',
+          name: 'fixture-rabbit-node-normal',
+          cluster: 'fixture-rabbit-cluster-a',
+          address: '192.0.2.41:15692',
+          version: 'fixture-rabbit-4.0',
+          memory_usage_percent: 48.5,
+          disk_available_bytes: 12 * 1024 ** 3,
+          file_descriptor_usage_percent: 24,
+          erlang_process_usage_percent: 31.5,
+          connections: 16,
+          queues: 8,
+          messages: 42,
+          publish_rate: 12.5,
+          deliver_rate: 11.75,
+          uptime_seconds: 86_400,
+          status: 'normal',
+          status_source: 'normal',
+          collection_level: 'normal',
+        },
+        {
+          id: 'rabbitmq-fixture-node-002',
+          name: 'fixture-rabbit-node-warning',
+          cluster: 'fixture-rabbit-cluster-a',
+          address: '192.0.2.42:15692',
+          version: 'fixture-rabbit-4.0',
+          memory_usage_percent: 84,
+          disk_available_bytes: 9 * 1024 ** 3,
+          file_descriptor_usage_percent: 44,
+          erlang_process_usage_percent: 39,
+          connections: 23,
+          queues: 11,
+          messages: 64,
+          publish_rate: 9.25,
+          deliver_rate: 9,
+          uptime_seconds: 172_800,
+          status: 'warning',
+          status_source: 'memory',
+          collection_level: 'normal',
+        },
+        {
+          id: 'rabbitmq-fixture-node-003',
+          name: 'fixture-rabbit-node-critical',
+          cluster: 'fixture-rabbit-cluster-b',
+          address: '192.0.2.43:15692',
+          version: 'fixture-rabbit-4.0',
+          memory_usage_percent: 93,
+          disk_available_bytes: 2 * 1024 ** 3,
+          file_descriptor_usage_percent: 91,
+          erlang_process_usage_percent: 88,
+          connections: 31,
+          queues: 17,
+          messages: 128,
+          publish_rate: 7.5,
+          deliver_rate: 6.75,
+          uptime_seconds: 259_200,
+          status: 'critical',
+          status_source: 'alarm',
+          collection_level: 'normal',
+        },
+        {
+          id: 'rabbitmq-fixture-node-004',
+          name: 'fixture-rabbit-node-unknown',
+          cluster: 'fixture-rabbit-cluster-c',
+          address: '192.0.2.44:15692',
+          version: 'fixture-rabbit-4.0',
+          memory_usage_percent: null,
+          disk_available_bytes: null,
+          file_descriptor_usage_percent: null,
+          erlang_process_usage_percent: null,
+          connections: null,
+          queues: null,
+          messages: null,
+          publish_rate: null,
+          deliver_rate: null,
+          uptime_seconds: null,
+          status: 'unknown',
+          status_source: 'unknown',
+          collection_level: 'unknown',
+        },
+      ],
+      available_clusters: [
+        'fixture-rabbit-cluster-a',
+        'fixture-rabbit-cluster-b',
+        'fixture-rabbit-cluster-c',
+      ],
+      total: 4,
+      page: 1,
+      page_size: 20,
+      total_pages: 1,
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-fixture-rabbitmq-nodes-001',
+      stale: false,
+      collected_at: '2026-08-04T08:00:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
+export function rabbitMQOverviewEmptyFixture(): RabbitMQOverviewFixture {
+  return rabbitMQOverviewFixture({
+    data: {
+      status: 'normal',
+      clusters: { total: 0, normal: 0, warning: 0, critical: 0, unknown: 0 },
+      nodes: { total: 0, normal: 0, warning: 0, critical: 0, unknown: 0 },
+      alerts: {
+        cluster_connectivity: { warning: 0, critical: 0, unknown: 0 },
+        resource_alarms: { warning: 0, critical: 0, unknown: 0 },
+        resource_pressure: { warning: 0, critical: 0, unknown: 0 },
+        collection: { warning: 0, critical: 0, unknown: 0 },
+      },
+    },
+  })
+}
+
+export function rabbitMQNodePageEmptyFixture(): RabbitMQNodePageFixture {
+  return rabbitMQNodePageFixture({
+    data: {
+      nodes: [],
+      available_clusters: [],
+      total: 0,
+      page: 1,
+      page_size: 20,
+      total_pages: 0,
+    },
+  })
+}
+
+export function rabbitMQOverviewMalformedFixture(): unknown {
+  return {
+    ...rabbitMQOverviewFixture(),
+    data: { status: 'invalid' },
+  }
+}
+
+export function rabbitMQNodePageMalformedFixture(): unknown {
+  return {
+    ...rabbitMQNodePageFixture(),
+    data: { nodes: [{ id: 42 }] },
+  }
+}
+
 export function redisInstancePageFixture(
   overrides: {
     data?: Partial<RedisInstancePageFixture['data']>
@@ -1196,6 +1401,15 @@ export const elasticsearchHandlers = [
   ),
   http.get(ELASTICSEARCH_NODES_PATH, () =>
     HttpResponse.json(elasticsearchNodePageFixture()),
+  ),
+]
+
+export const rabbitMQHandlers = [
+  http.get(RABBITMQ_OVERVIEW_PATH, () =>
+    HttpResponse.json(rabbitMQOverviewFixture()),
+  ),
+  http.get(RABBITMQ_NODES_PATH, () =>
+    HttpResponse.json(rabbitMQNodePageFixture()),
   ),
 ]
 

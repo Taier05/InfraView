@@ -1,8 +1,8 @@
 # InfraView
 
-InfraView 是一个轻量、只读的 Linux 基础设施可视化平台。当前工作区具备固定账号登录、Linux 主机、主机硬盘 SMART、MySQL、Redis 与 Elasticsearch 板块状态总览、紧凑清单、搜索/筛选/排序/分页、指标状态着色、旧缓存提示和统一错误展示；其中 Elasticsearch 已完成离线实现与验证，尚未重建到现有 8080，也未提交或推送。
+InfraView 是一个轻量、只读的 Linux 基础设施可视化平台。当前工作区具备固定账号登录、Linux 主机、主机硬盘 SMART、MySQL、Redis、Elasticsearch 与 RabbitMQ 板块状态总览、紧凑清单、搜索/筛选/排序/分页、指标状态着色、旧缓存提示和统一错误展示。RabbitMQ Task 1–11 已完成实现与全量验证；连接指标可补充发现身份 inventory 暂缺的实例，节点名称只接受唯一一致的 `rabbitmq_node`，缺失时显示“暂无数据”，不再以实例地址或采集身份冒充。总览零风险摘要统一显示“无异常”。现有测试 8080 已按授权原位重建，动态登录态 E2E 仍未执行。
 
-生产形态是一个非 root InfraView 容器：Go 同源提供只读 API 与 React 静态页面，无业务数据库、任务队列、SSH 客户端或远程执行器。数据源支持确定性 Mock 和 Nightingale 只读适配器；MySQL 与硬盘 SMART 分别使用独立领域、Service 和缓存，复用 Nightingale 的受限安全客户端。当前主要开发与验证版本为 Nightingale v8.4.1，v9.x 仅保留已覆盖的协议兼容。浏览器只接收归一化 InfraView API，不接触 Token、任意 PromQL、硬盘序列号或 WWN。
+生产形态是一个非 root InfraView 容器：Go 同源提供只读 API 与 React 静态页面，无业务数据库、任务队列、SSH 客户端或远程执行器。数据源支持确定性 Mock 和 Nightingale 只读适配器；各观测领域使用独立 Service 与缓存，并复用 Nightingale 的受限安全客户端。当前主要开发与验证版本为 Nightingale v8.4.1，v9.x 仅保留已覆盖的协议兼容。浏览器只接收归一化 InfraView API，不接触 Token、任意 PromQL、原始永久集群身份、硬盘序列号或 WWN。
 
 Linux 主机与 MySQL 实例会按原始样本是否持续推进判断数据新鲜度：连续 2 个预期采集周期未推进显示“采集延迟”，连续 5 个周期未推进显示“采集失联”。MySQL 清单通过固定的 24 小时近期身份查询保留刚停止上报的实例，并以“QPS / TPS”展示查询吞吐与显式事务吞吐。
 
@@ -17,6 +17,7 @@ Linux 主机与 MySQL 实例会按原始样本是否持续推进判断数据新�
 - 除登录/退出 Web 会话外，业务 API 全部只读。
 - MySQL 仅提供总览和实例清单；不提供历史、实例详情、写入或运维操作。
 - 硬盘仅提供总览和设备清单；稳定 ID 使用包含主机身份的不可逆哈希，API 永不返回序列号、WWN、原始标签或数据源请求信息。
+- RabbitMQ 仅提供集群健康总览与节点清单；不直连 RabbitMQ Management API，不提供队列详情、消息操作、命令、切换、配置或其他运维入口。
 - 监控数据和会话只存在内存中，容器重启后清空。
 
 ## 快速部署
@@ -61,3 +62,7 @@ make verify
 ## Elasticsearch 只读模块
 
 Elasticsearch 首期只提供总览第五张集群健康卡与 `/elasticsearch` 节点列表。数据来自 Nightingale 代码内置的 26 条固定查询，恰好一次即时 batch、无集群或节点 N+1；集群身份为 `cluster`，节点身份为 `cluster + name`，地址不参与稳定身份。HTTP 仅提供 `GET /api/v1/elasticsearch/overview` 与 `GET /api/v1/elasticsearch/nodes`。节点页复用共享列表模板，固定 16 个单值单行列；空间不足时只允许表格内部横向滚动。首期不含索引/节点详情、历史、拓扑、Elasticsearch 直连、任意查询或运维操作。
+
+## RabbitMQ 只读模块
+
+RabbitMQ 首期提供总览第六卡与 `/rabbitmq` 节点列表。数据来自 Nightingale 代码内置且顺序固定的 22 条查询，恰好一次即时 batch、无集群/节点/指标 N+1；集群内部身份依次使用永久集群 ID、逻辑集群名、采集集群名。近期身份建立具名节点，连接指标只补充发现缺失实例；整批结果中唯一一致的 `rabbitmq_node` 可确定性补全名称，完全缺失时保留空名称并由页面显示“暂无数据”。API 只返回不可逆 ID。集群通信与节点状态严格分离，消息积压、连接、队列和吞吐仅展示。节点页复用共享列表模板，固定 15 个单值单行列；1440×900 页面和表格均不横向溢出，更窄视口只允许表格内部滚动。当前队列指标没有 queue/vhost 身份标签，因此首期不提供队列清单或详情。

@@ -11,9 +11,10 @@
                                              ├─ 硬盘 SMART 查询/聚合 DiskService
                                              ├─ Redis 查询/聚合 RedisService
                                              ├─ Elasticsearch 查询/聚合 ElasticsearchService
+                                             ├─ RabbitMQ 查询/聚合 RabbitMQService
                                              ├─ 内存 TTL/stale/singleflight 缓存
                                              └─ 数据源接口
-                                                ├─ Mock（Linux、MySQL、硬盘、Redis 与 Elasticsearch）
+                                                ├─ Mock（Linux、MySQL、硬盘、Redis、Elasticsearch 与 RabbitMQ）
                                                 └─ Nightingale（受限只读客户端）
 ```
 
@@ -36,6 +37,7 @@
 13. 硬盘最终状态来源通过六值 `status_source` 明示：`smart_health`、`device_warning`、`attribute_failure`、`collection`、`normal`、`unknown`。等级相同时设备来源优先于采集来源，设备来源内部依次为 SMART 健康、设备警告、属性失败；只有采集等级严格更高时来源才是 `collection`。
 14. RedisService 使用独立快照缓存；Nightingale Provider 固定发送一次 21 查询即时 batch，以 `ident + instance + address` 归并，无实例 N+1。15 秒预期周期与 2/5 周期 freshness 规则独立于 Linux/MySQL 状态；总览与实例列表复用同一快照。
 15. ElasticsearchService 的集群与节点共用一份快照缓存；Nightingale Provider 恰好发送一次固定 26 查询即时 batch，无集群/节点 N+1。集群按 `cluster`、节点按 `cluster + name` 形成不可逆稳定 ID；`host` 仅展示，`ident`/`instance` 不进入 API。集群与节点各自维护样本推进 freshness，2/5 个默认 15 秒周期升级为 warning/critical，集群黄/红不传播为节点异常。
+16. RabbitMQService 的集群与节点共用 `service:rabbitmq:snapshot` 快照缓存；Provider 恰好发送一次固定 22 查询即时 batch，无集群/节点/指标 N+1。集群内部身份依次回退 `rabbitmq_cluster_permanent_id`、`rabbitmq_cluster`、采集 `cluster`。近期身份建立具名节点，连接指标可补充发现缺失实例；`cluster + instance` 仅建立采集候选索引。整批结果中同一采集键只有唯一一致的 `rabbitmq_node` 时才补全名称，缺失或冲突时名称保持缺失，实例地址和 `ident` 均不得冒充节点名称。具名节点按集群内部身份与节点名哈希，缺名节点按内部观察身份生成不可逆 ID；永久身份、`ident` 与原始标签不进入 API。集群不可达 peer 只影响集群通信，不能批量污染节点状态；节点按 2/5 个默认 15 秒周期计算采集 freshness。
 
 ## 目录职责
 
@@ -50,9 +52,10 @@
 | `internal/disk` | 硬盘领域模型、不可逆稳定设备 ID 与只读 Provider 契约 |
 | `internal/redis` | Redis 领域模型、不可逆稳定实例 ID 与只读 Provider 契约 |
 | `internal/elasticsearch` | Elasticsearch 集群/节点领域、不可逆稳定 ID 与只读 Provider 契约 |
-| `internal/adapters/mock` | 确定性 Linux、MySQL、硬盘、Redis 与 Elasticsearch Mock |
+| `internal/rabbitmq` | RabbitMQ 集群/节点领域、不可逆稳定 ID 与只读 Provider 契约 |
+| `internal/adapters/mock` | 确定性 Linux、MySQL、硬盘、Redis、Elasticsearch 与 RabbitMQ Mock |
 | `internal/adapters/nightingale` | 代码内置查询、受限 HTTP 校验与只读归并 |
-| `internal/service` | Linux/MySQL/硬盘/Redis/Elasticsearch 总览聚合、查询、阈值、新鲜度与降级 |
+| `internal/service` | Linux/MySQL/硬盘/Redis/Elasticsearch/RabbitMQ 总览聚合、查询、阈值、新鲜度与降级 |
 | `internal/httpapi` | 只读路由、认证、错误、安全头、日志、SPA 托管 |
 | `web/src` | React 页面、共享组件、API 客户端与深色主题 |
 | `scripts` | smoke、E2E 编排和缓存延迟验收 |
@@ -61,7 +64,7 @@
 ## API 表面
 
 - 会话：`POST/GET/DELETE /api/v1/session`。
-- 只读查询：`GET /api/v1/overview`、`GET /api/v1/hosts`、`GET /api/v1/hosts/{id}`、`GET /api/v1/hosts/{id}/metrics`、`GET /api/v1/datasource/status`、`GET /api/v1/mysql/overview`、`GET /api/v1/mysql/instances`、`GET /api/v1/disks/overview`、`GET /api/v1/disks/devices`、`GET /api/v1/redis/overview`、`GET /api/v1/redis/instances`。
+- 只读查询：`GET /api/v1/overview`、`GET /api/v1/hosts`、`GET /api/v1/hosts/{id}`、`GET /api/v1/hosts/{id}/metrics`、`GET /api/v1/datasource/status`、`GET /api/v1/mysql/overview`、`GET /api/v1/mysql/instances`、`GET /api/v1/disks/overview`、`GET /api/v1/disks/devices`、`GET /api/v1/redis/overview`、`GET /api/v1/redis/instances`、`GET /api/v1/elasticsearch/overview`、`GET /api/v1/elasticsearch/nodes`、`GET /api/v1/rabbitmq/overview`、`GET /api/v1/rabbitmq/nodes`。
 - `GET /api/v1/overview` 的 `alerts` 字段包含受影响主机、严重/警告主机以及 CPU、内存、IO、网络分级数量；主机数按最高等级去重，指标数独立统计。
 - 主机清单与单机只读响应中的 `cpu_cores`、`memory_total_bytes` 为可选资产配置字段；数据源未知时返回 `null`。这两个字段来自主机资产清单，不从使用率指标反推。
 - 进程健康：`GET /healthz`，只反映 InfraView 进程与 HTTP 服务，不以数据源故障触发容器重启。
@@ -70,10 +73,11 @@
 - 硬盘路由只接受 GET；总览拒绝查询参数，设备清单只接受固定搜索、状态、排序和分页参数。响应不包含序列号、WWN、原始标签、PromQL 或上游请求信息。
 - Redis 路由只接受 GET；总览拒绝查询参数，实例清单只接受固定搜索、角色、状态、排序与分页参数。没有 Redis 直连、命令、任意查询、历史或运维路由。
 - Elasticsearch 仅暴露受认证的 `GET /api/v1/elasticsearch/overview` 与 `GET /api/v1/elasticsearch/nodes`；节点清单只接受固定搜索、集群、角色、集群健康、节点状态、16 个排序字段与分页参数，其他方法为 405。显式 View 不包含原始标签、采集身份、PromQL、数据源信息或上游正文。
+- RabbitMQ 仅暴露受认证的 `GET /api/v1/rabbitmq/overview` 与 `GET /api/v1/rabbitmq/nodes`；节点清单只接受固定搜索、集群、节点状态、15 个排序字段、方向与分页参数，其他方法为 405。显式 View 不包含永久集群身份、`ident`、原始标签、PromQL、数据源信息或上游正文。
 
 ## 前端构建
 
-Vite 产物复制到忽略目录 `internal/httpapi/webdist` 后由 `go:embed` 嵌入。当前前端不包含主机、硬盘、Redis 或 Elasticsearch 详情页和图表运行时；总览分别加载 Linux、硬盘、MySQL、Redis 与 Elasticsearch 可点击板块卡，任一板块失败或 stale 不阻塞其他板块。清单均使用服务端规范化的指标值与等级直接渲染，并共用刷新控制组件。
+Vite 产物复制到忽略目录 `internal/httpapi/webdist` 后由 `go:embed` 嵌入。当前前端不包含主机、硬盘、Redis、Elasticsearch 或 RabbitMQ 详情页和图表运行时；总览分别加载 Linux、硬盘、MySQL、Redis、Elasticsearch 与 RabbitMQ 可点击板块卡，任一板块失败或 stale 不阻塞其他板块。清单均使用服务端规范化的指标值与等级直接渲染，并共用刷新控制组件。
 
 观测模块的公共展示结构位于 `web/src/components/ListPage.tsx` 与 `web/src/components/ModuleStatusCardShell.tsx`。前者统一列表标题、搜索/筛选/每页数量、刷新状态、表格/空状态/分页容器；后者统一总览卡链接、标题、等级、空状态和入口。共享组件不引用业务类型、不计算阈值；Redis 是首个完整接入者，Linux、硬盘和 MySQL 在后续相关修改时渐进迁移。新增模块必须复用这些结构，只有业务语义经设计确认确实不同时才允许增加专用结构或样式。
 
@@ -88,3 +92,7 @@ Redis 使用独立 `internal/redis` 领域、Nightingale/Mock Provider、`RedisS
 ## Elasticsearch 垂直模块
 
 Elasticsearch 使用独立 `internal/elasticsearch` 领域、Nightingale/Mock Provider、`ElasticsearchService`、显式 HTTP View 与 React 页面。Provider 的 26 组固定结果同时构建集群和节点，Service 严格分离集群来源 `availability|health|collection|normal|unknown` 与节点来源 `collection|disk|jvm|thread_pool|normal|unknown`。总览复用 `ModuleStatusCardShell`，节点页复用 `ListPage`；16 列均为单值单行，页面不横向溢出，宽表由唯一表格滚动容器承载。
+
+## RabbitMQ 垂直模块
+
+RabbitMQ 使用独立 `internal/rabbitmq` 领域、Nightingale/Mock Provider、`RabbitMQService`、显式 HTTP View 与 React 页面。Provider 的 22 组固定结果一次构建集群与节点共享快照；Service 严格分离集群通信与节点等级，节点来源固定为 `alarm|collection|memory|disk|file_descriptor|erlang_process|normal|unknown`。总览复用 `ModuleStatusCardShell`，节点页复用 `ListPage`；15 列均为单值单行，身份列超长时省略并以原生 `title` 保留完整内容，较窄视口由唯一表格滚动容器承载。

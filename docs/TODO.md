@@ -149,3 +149,23 @@
 - [x] 经明确授权提交并推送 Elasticsearch Task1–7、终审修复、密度/uptime 与总览异常节点汇总；功能基线为 `80da061`，已进入 `origin/main`。
 
 首期明确不做索引列表/详情、节点详情、历史趋势、拓扑、分片详情、慢查询、日志、追踪、Elasticsearch 直连、任意查询或任何运维操作。任何生产 Nightingale/Elasticsearch 验证永久禁止。
+
+## RabbitMQ 首期模块
+
+- [x] 实现独立 RabbitMQ 领域、不可逆集群/节点 ID、深拷贝和完全合成多集群 Mock。
+- [x] 实现 Nightingale 一次固定 22 查询即时 batch、当前/近期身份优先与连接补充发现、永久/逻辑/采集集群身份回退、安全解析及无 N+1。
+- [x] 实现共享快照 Service、集群/节点状态分离、80%/90% 资源阈值、磁盘 `<=1`/`<1.2`、明确告警、2/5 周期 freshness、15 字段排序和安全分页。
+- [x] 实现两个受认证 GET API、参数白名单、显式脱敏 View、非 null 数组、400/405/503。
+- [x] 实现总览第六卡、侧边栏、共享 `ListPage` 上的 15 列节点页、URL 恢复、单值单行、身份省略与完整 `title`。
+- [x] 新增 4 项 RabbitMQ Playwright 合成数据规格；`playwright test --list` 静态发现为 4 文件/21 项且退出 0，未启动端口。
+- [x] 完成 Task 9 fresh 全量前端/Go/安全/whitespace/无缓存镜像验证与终审；前端 14 文件/209 项、typecheck/build、Playwright 4 文件/21 项静态发现、Go gofmt/vet/普通/race/静态编译和镜像构建均退出 0，镜像未运行。
+- [x] 完成 query 7 集群聚合 Important 的 RED→GREEN 与复审，以及 Clone、query 21、overview validator、四色 E2E Minor 闭环。
+- [x] 修复同一采集目标下多个 `rabbitmq_node` 被覆盖：节点按稳定身份保存，采集键只建候选索引，带节点标签精确归并，歧义的无节点标签指标保持缺失；两条速率查询保留节点维度。
+- [x] 按 RED→GREEN 将 RabbitMQ 总览四个全零摘要统一为绿色“无异常”，非零严重/警告/未知明细保持不变。
+- [x] 完成 Task 10 Go/前端 fresh 全量、镜像内重复验证及现有 8080 原位重建；健康、唯一端口与容器安全基线通过。
+- [x] 修复近期身份缺失时节点被清单遗漏：连接指标可补充发现实例，当前与近期身份共同提供具名 inventory，仍保持固定一次 22 查询 batch。
+- [x] 彻底移除实例地址和 `ident` 节点名称回退；仅接受同批结果中唯一一致的显式 `rabbitmq_node`，否则名称为空且页面显示“暂无数据”。
+- [x] 完成 Task 11 Provider/Page RED→GREEN、前后端定向回归、镜像内前端/Go 全量与竞态验证，并再次原位重建现有 8080。
+- [x] 保持动态登录态 Chromium 授权门：该动作未执行；禁止创建额外 InfraView 端口，禁止访问生产 Nightingale/RabbitMQ，禁止读取私密环境内容。
+
+首期明确不做队列/vhost/exchange/connection/channel/consumer 清单、节点详情、历史、拓扑、RabbitMQ Management API 直连、任意 PromQL、发布/消费、清理、重启、切换、配置或任何运维操作。现有 `rabbitmq_queue_*` 没有 queue/vhost 身份标签，不能伪装为队列级数据。

@@ -118,7 +118,7 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 
 ## 目标映射
 
-共享的 `*Provider` 同时实现 Linux 主机 `internal/datasource.Provider`（`Health`、`ListHosts`、`GetHost`、`GetCurrentMetrics`、`QueryRange`、`QueryAggregateRange`）、MySQL `internal/mysql.Provider`（`MySQLSnapshot`）、硬盘 `internal/disk.Provider`（`SMARTSnapshot`）、Redis `internal/redis.Provider`（`RedisSnapshot`）与 Elasticsearch `internal/elasticsearch.Provider`（`ElasticsearchSnapshot`）。前端和服务层不接收 Nightingale 原始请求体、任意 URL 或任意查询表达式。
+共享的 `*Provider` 同时实现 Linux 主机 `internal/datasource.Provider`（`Health`、`ListHosts`、`GetHost`、`GetCurrentMetrics`、`QueryRange`、`QueryAggregateRange`）、MySQL `internal/mysql.Provider`（`MySQLSnapshot`）、硬盘 `internal/disk.Provider`（`SMARTSnapshot`）、Redis `internal/redis.Provider`（`RedisSnapshot`）、Elasticsearch `internal/elasticsearch.Provider`（`ElasticsearchSnapshot`）与 RabbitMQ `internal/rabbitmq.Provider`（`RabbitMQSnapshot`）。前端和服务层不接收 Nightingale 原始请求体、任意 URL 或任意查询表达式。
 
 ## 实施顺序
 
@@ -181,3 +181,36 @@ tlast_over_time(elasticsearch_jvm_uptime_seconds[24h])
 集群和节点共用一次快照、无 N+1，但状态与 freshness 分离。集群来源同级优先为 availability、health、collection；节点来源同级优先为 collection、disk、jvm、thread_pool。默认 15 秒周期下连续 2/5 周期未推进为 warning/critical。节点磁盘使用率 85%/90%、JVM 堆使用率 75%/85% 分别为 warning/critical；最近 5 分钟拒绝速率大于 0 为 warning。`elasticsearch_node_stats_up` 仅表达集群级采集状态，集群黄/红不传播为单节点异常。
 
 HTTP 仅暴露受认证的 `GET /api/v1/elasticsearch/overview` 和 `GET /api/v1/elasticsearch/nodes`；前端为总览第五卡和共享模板上的 16 列节点页。首期不直连 Elasticsearch，不做详情、历史、拓扑、任意查询或运维写操作。本轮只使用完全脱敏夹具完成离线验证，未访问真实 Nightingale/Elasticsearch 或现有 8080。
+
+## RabbitMQ 只读映射
+
+RabbitMQ Provider 复用同一个受限 Nightingale Client，恰好发送一次 `POST /api/n9e/query-instant-batch`，固定 22 条查询且顺序不可变：
+
+```promql
+rabbitmq_identity_info
+rabbitmq_build_info
+rabbitmq_erlang_uptime_seconds
+rabbitmq_alarms_memory_used_watermark
+rabbitmq_alarms_free_disk_space_watermark
+rabbitmq_alarms_file_descriptor_limit
+rabbitmq_unreachable_cluster_peers_count
+rabbitmq_process_resident_memory_bytes
+rabbitmq_resident_memory_limit_bytes
+rabbitmq_disk_space_available_bytes
+rabbitmq_disk_space_available_limit_bytes
+rabbitmq_process_open_fds
+rabbitmq_process_max_fds
+rabbitmq_erlang_processes_used
+rabbitmq_erlang_processes_limit
+rabbitmq_connections
+rabbitmq_queues
+rabbitmq_queue_messages
+sum by (cluster, ident, instance, rabbitmq_node) (rate(rabbitmq_global_messages_received_total[5m]))
+sum by (cluster, ident, instance, rabbitmq_node) (rate(rabbitmq_global_messages_delivered_total[5m]))
+tlast_over_time(rabbitmq_identity_info[24h])
+tlast_over_time(rabbitmq_erlang_uptime_seconds[24h])
+```
+
+第 1 组当前身份与第 21 组近期身份共同建立具名节点，第 21 组仍要求 `rabbitmq_node`；连接指标可补充发现身份结果暂缺但仍有当前连接序列的实例。`cluster + instance` 只建立采集关联索引。Provider 扫描同一次 22 组结果，只有同一采集键出现唯一一致的显式 `rabbitmq_node` 时才确定性补全名称；缺失或冲突时节点名称保持空值，页面显示“暂无数据”，禁止使用实例地址、`ident` 或名称模式猜测。普通指标带 `rabbitmq_node` 时精确归并；缺少该标签且采集键对应多个候选时保持缺失，不把歧义值复制给所有节点。集群内部身份优先 `rabbitmq_cluster_permanent_id`，缺失时回退 `rabbitmq_cluster`，再回退采集 `cluster`；API 只返回不可逆集群/节点 ID，永久身份原文和 `ident` 不离开 Provider。第 22 组是节点原始样本时间与采集推进的唯一来源。当前 `rabbitmq_queue_*` 序列没有 queue/vhost 身份标签，只能形成节点级聚合，不能支持队列清单或伪装单队列数据。
+
+集群不可达 peer 只影响集群通信，不传播为全部节点异常。节点资源使用率 80%/90% 为 warning/critical；磁盘可用空间不高于限制为 critical，高于限制但不足 1.2 倍为 warning；三类明确 RabbitMQ 告警为 critical；连续 2/5 个默认 15 秒周期未观察到原始 uptime 样本推进为 warning/critical。连接、队列、消息积压、发布/投递速率只展示。HTTP 仅暴露受认证的 `GET /api/v1/rabbitmq/overview` 与 `GET /api/v1/rabbitmq/nodes`，不接受指标名、PromQL、URL 或任意查询。本轮只使用脱敏夹具与合成 E2E route mock，未访问真实 Nightingale/RabbitMQ 或现有 8080。

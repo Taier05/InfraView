@@ -1,8 +1,28 @@
 # InfraView 项目状态
 
-最后更新：2026-08-04
+最后更新：2026-08-05
 
 ## 当前阶段
+
+### 2026-08-05 RabbitMQ Task 11（节点发现与名称真实性收口）
+
+现场反馈确认，部分实例具有连接指标但当前/近期 `rabbitmq_identity_info` 没有覆盖，原 inventory-only 集合会漏节点；连接发现补齐实例后，旧回退又把实例地址错误写入“节点名称”。最终架构改为：当前与近期身份优先建立具名节点，连接指标只补充发现缺失实例；Provider 扫描同一固定批次，只有采集键对应唯一一致的显式 `rabbitmq_node` 才补全名称，缺失或冲突时名称保持空值，页面显示“暂无数据”。实例地址和 `ident` 均不再参与名称猜测。
+
+两个 Provider 回归测试分别锁定“缺名不能冒充地址”和“其他节点级序列携带唯一标签时可确定性补全”，旧实现均得到 RED，最小修复后 GREEN；页面空名称规格同样先 RED 后 GREEN。RabbitMQ 前后端定向测试通过，随后现有 8080 原位重建；镜像内前端全量、typecheck/build、Go 普通/race/编译全部通过。容器健康、唯一 8080、错误回退源码移除及 staged/unstaged whitespace 检查通过。未访问夜莺仪表盘、未读取或输出上游正文与真实身份数据；动态登录态 Chromium 未执行。
+
+### 2026-08-05 RabbitMQ Task 10（共享采集目标多节点与零值摘要修复完成）
+
+现场反馈显示夜莺能展示多个 RabbitMQ 节点，而 InfraView 只保留一个。系统化排查确认 Provider 先以 `cluster + ident + instance` 作为唯一 inventory 键，导致同一采集目标下不同 `rabbitmq_node` 被较新样本覆盖或在同时间被当作冲突丢弃。Task 10 改为以“集群内部身份 + `rabbitmq_node`”稳定身份保存节点，并保留采集键到候选节点的二级索引；带节点标签的指标精确归并，无节点标签且候选不唯一时保持缺失。两条吞吐速率查询的 `sum by` 同步保留 `rabbitmq_node`，固定查询数量、顺序、单批次与只读边界不变。
+
+后端回归先稳定得到共享采集目标场景 `nodes=1` 的 RED，最小修复后 Provider、领域、Service、HTTP RabbitMQ 定向套件均 GREEN。用户追加要求总览四个摘要框的全零文案与其他卡一致；新增前端测试先因找不到“无异常”得到 RED，随后共享 `MetricAlert` 在总风险数为零时统一显示“无异常”，非零分级明细和颜色保持不变。Go 全仓 gofmt/vet/普通/race/静态编译通过；前端全量为 14 文件/210 项，typecheck、production build 与 Playwright 4 文件/21 项静态发现通过。既有 npm lock 仍报告 1 个 moderate 与 2 个 high，本轮未改依赖、未运行 `audit fix`。
+
+经明确授权，现有 `infraview` Compose 服务已原位重建且只保留 8080；镜像内再次通过前端 210 项、typecheck/build、Go 普通/race/编译。容器 healthy、单服务、非 root、只读根文件系统、cap drop `ALL`、禁止提权，健康接口和两个 RabbitMQ API 的未认证拒绝均通过。未创建其他端口，未读取或输出私密配置、认证信息、真实身份或上游正文；动态登录态 Chromium、commit 和 push 未执行。
+
+### 2026-08-05 RabbitMQ Task 1–9（离线全量验证与终审完成）
+
+已按批准规格实现独立 RabbitMQ 领域、完全合成 Mock、Nightingale 固定 22 查询 Provider、共享快照 `RabbitMQService`、两个认证 GET API、总览第六卡、侧边栏与固定 15 列节点页。Provider 每个快照恰好一次即时 batch、无集群/节点/指标 N+1；集群身份依次回退永久集群 ID、逻辑集群名和采集集群名，API 只返回不可逆身份。集群不可达 peer 与节点状态严格分离；内存/FD/Erlang 进程使用率 80%/90%、磁盘余量 `<=1`/`<1.2`、明确资源告警和 2/5 周期采集推进规则均由前序 Task 报告记录。连接、队列、消息积压和吞吐只展示。
+
+Task 8 新增 `web/e2e/rabbitmq.spec.ts`，所有 RabbitMQ GET route 均返回合成数据，405 规格使用共享已认证 request context。Task 9 fresh 验证完成：前端 14 文件/209 项、typecheck/build、Playwright 静态发现 4 文件/21 项（RabbitMQ 4 项），Go gofmt/vet/普通/race/静态编译，安全与 whitespace 检查，以及无缓存生产镜像构建均退出 0；镜像未运行。终审 Important 的 query 7 集群聚合已按 RED→GREEN 修复并通过复审，Clone、query 21、overview validator 与四色 E2E Minor 均已闭环。npm lock 仍报告既有 1 个 moderate 与 2 个 high，本轮未修改依赖文件，也未执行 `audit fix`。动态 Chromium 1440/1100、现有 8080 访问或重建、deploy、commit、push 均未获授权且未执行；没有读取私密环境或访问真实/生产上游。
 
 ### 2026-08-01 Elasticsearch 首期模块（离线与现有 8080 现场验收完成）
 

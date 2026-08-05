@@ -15,16 +15,25 @@ import {
   elasticsearchOverviewFixture,
   mysqlOverviewFixture,
   overviewFixture,
+  rabbitMQOverviewFixture,
   redisOverviewFixture,
   type DiskOverviewFixture,
   type ElasticsearchOverviewFixture,
   type ErrorFixture,
   type MySQLOverviewFixture,
   type OverviewFixture,
+  type RabbitMQOverviewFixture,
   type RedisOverviewFixture,
 } from '../../test/fixtures'
 import '../../app/theme.css'
+// @ts-expect-error Vitest 通过 Vite raw loader 提供 CSS 源文本。
+import themeSource from '../../app/theme.css?raw'
 import { OverviewPage } from './OverviewPage'
+
+function cssRule(selector: string) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return themeSource.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`))?.[1]
+}
 
 function renderOverview() {
   const queryClient = new QueryClient({
@@ -75,22 +84,26 @@ function mockOverviewRequests({
   mysql = mysqlOverviewFixture(),
   redis = redisOverviewFixture(),
   elasticsearch = elasticsearchOverviewFixture(),
+  rabbitmq = rabbitMQOverviewFixture(),
   hostError,
   diskError,
   mysqlError,
   redisError,
   elasticsearchError,
+  rabbitmqError,
 }: {
   host?: OverviewFixture
   disk?: DiskOverviewFixture
   mysql?: MySQLOverviewFixture
   redis?: RedisOverviewFixture
   elasticsearch?: unknown
+  rabbitmq?: unknown
   hostError?: ErrorFixture
   diskError?: ErrorFixture
   mysqlError?: ErrorFixture
   redisError?: ErrorFixture
   elasticsearchError?: ErrorFixture
+  rabbitmqError?: ErrorFixture
 } = {}) {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
@@ -120,6 +133,14 @@ function mockOverviewRequests({
         ),
       )
     }
+    if (path === '/api/v1/rabbitmq/overview') {
+      return Promise.resolve(
+        jsonResponse(
+          rabbitmqError ?? rabbitmq,
+          rabbitmqError === undefined ? 200 : 503,
+        ),
+      )
+    }
     return Promise.resolve(
       jsonResponse(hostError ?? host, hostError === undefined ? 200 : 503),
     )
@@ -136,7 +157,31 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('总览按顺序展示五张模块卡并保留四列桌面网格', async () => {
+it('共享总览样式为 unknown 卡片、等级和指标使用中性灰蓝色', () => {
+  expect(cssRule('.module-status-card[data-level="unknown"]')).toContain(
+    'border-color: #485966',
+  )
+  expect(cssRule('.module-status-card[data-level="unknown"]')).toContain(
+    'rgb(36 45 53 / 88%)',
+  )
+  expect(cssRule('.module-status-level[data-level="unknown"]')).toContain(
+    'color: #a7b0b6',
+  )
+  expect(cssRule('.module-status-level[data-level="unknown"]')).toContain(
+    'background: #252c31',
+  )
+  expect(cssRule('.module-metric-alert[data-level="unknown"]')).toContain(
+    'border-color: #46535c',
+  )
+  expect(cssRule('.module-metric-alert[data-level="unknown"]')).toContain(
+    'rgb(37 45 51 / 76%)',
+  )
+  expect(
+    cssRule('.module-metric-alert[data-level="unknown"] strong'),
+  ).toContain('color: #a7b0b6')
+})
+
+it('总览按顺序展示六张模块卡并保留四列桌面网格', async () => {
   renderOverview()
 
   const hostCard = await screen.findByRole('link', {
@@ -151,6 +196,9 @@ it('总览按顺序展示五张模块卡并保留四列桌面网格', async () =
   const redisCard = screen.getByRole('link', { name: '查看 Redis 板块' })
   const elasticsearchCard = screen.getByRole('link', {
     name: '查看 Elasticsearch 板块',
+  })
+  const rabbitMQCard = screen.getByRole('link', {
+    name: '查看 RabbitMQ 板块',
   })
   const moduleGrid = screen.getByRole('group', { name: '基础设施模块' })
   expect(moduleGrid).toHaveClass(
@@ -172,13 +220,14 @@ it('总览按顺序展示五张模块卡并保留四列桌面网格', async () =
     expect(within(redisCard).getByText(label)).toBeVisible()
   }
   const moduleCards = within(moduleGrid).getAllByRole('link')
-  expect(moduleCards).toHaveLength(5)
+  expect(moduleCards).toHaveLength(6)
   expect(moduleCards).toEqual([
     hostCard,
     diskCard,
     mysqlCard,
     redisCard,
     elasticsearchCard,
+    rabbitMQCard,
   ])
   expect(getComputedStyle(moduleGrid).gridTemplateColumns).toBe(
     'repeat(4, minmax(0, 1fr))',
@@ -209,6 +258,37 @@ it('总览按顺序展示五张模块卡并保留四列桌面网格', async () =
   ).toBeVisible()
   expect(
     within(elasticsearchSummary as HTMLElement).getByText('警告/未知 3'),
+  ).toBeVisible()
+  expect(rabbitMQCard).toHaveAttribute('href', '/rabbitmq')
+  expect(rabbitMQCard).toHaveClass(
+    'module-status-card',
+    'rabbitmq-overview-card',
+  )
+  expect(rabbitMQCard).toHaveAttribute('data-level', 'critical')
+  expect(within(rabbitMQCard).getByText('RabbitMQ')).toBeVisible()
+  for (const label of ['集群通信', '资源告警', '资源压力', '采集状态']) {
+    expect(within(rabbitMQCard).getByText(label)).toBeVisible()
+  }
+  const rabbitMQSummary = within(rabbitMQCard)
+    .getByText('异常节点')
+    .closest('.module-alert-summary')
+  expect(rabbitMQSummary).not.toBeNull()
+  expect(within(rabbitMQSummary as HTMLElement).getByText('3')).toBeVisible()
+  expect(within(rabbitMQSummary as HTMLElement).getByText('/ 4')).toBeVisible()
+  expect(
+    within(rabbitMQSummary as HTMLElement).getByText('严重 1'),
+  ).toBeVisible()
+  expect(
+    within(rabbitMQSummary as HTMLElement).getByText('警告/未知 2'),
+  ).toBeVisible()
+  const clusterConnectivity = within(rabbitMQCard)
+    .getByText('集群通信')
+    .closest('div')?.parentElement
+  expect(clusterConnectivity).not.toBeNull()
+  expect(
+    within(clusterConnectivity as HTMLElement).getByText(
+      '严重 0 · 警告 1 · 未知 1',
+    ),
   ).toBeVisible()
   expect(screen.queryAllByRole('article')).toHaveLength(0)
   expect(diskCard).toHaveAttribute('href', '/disks')
@@ -274,6 +354,402 @@ it('总览按顺序展示五张模块卡并保留四列桌面网格', async () =
     within(controls).getByText(/上次刷新 \d{2}:\d{2}:\d{2}/),
   ).toBeInTheDocument()
   expect(within(controls).getByText(/每 15 秒自动刷新/)).toBeInTheDocument()
+})
+
+it('RabbitMQ 集群和节点都为空时显示中性空状态且不渲染告警网格', async () => {
+  const fixture = rabbitMQOverviewFixture()
+  const emptyCounts = {
+    total: 0,
+    normal: 0,
+    warning: 0,
+    critical: 0,
+    unknown: 0,
+  }
+  fixture.data.status = 'normal'
+  fixture.data.clusters = { ...emptyCounts }
+  fixture.data.nodes = { ...emptyCounts }
+  fixture.data.alerts = {
+    cluster_connectivity: { warning: 0, critical: 0, unknown: 0 },
+    resource_alarms: { warning: 0, critical: 0, unknown: 0 },
+    resource_pressure: { warning: 0, critical: 0, unknown: 0 },
+    collection: { warning: 0, critical: 0, unknown: 0 },
+  }
+  mockOverviewRequests({ rabbitmq: fixture })
+
+  renderOverview()
+
+  const card = await screen.findByRole('link', {
+    name: '查看 RabbitMQ 板块',
+  })
+  expect(card).toHaveAttribute('data-level', 'empty')
+  expect(within(card).getByText('暂无 RabbitMQ 节点')).toBeVisible()
+  expect(card.querySelector('.module-metric-alert-grid')).toBeNull()
+  expect(within(card).queryByText('集群通信')).not.toBeInTheDocument()
+})
+
+it.each([
+  {
+    name: '仅集群为零',
+    mutate: (fixture: RabbitMQOverviewFixture) => {
+      fixture.data.clusters = {
+        total: 0,
+        normal: 0,
+        warning: 0,
+        critical: 0,
+        unknown: 0,
+      }
+      fixture.data.alerts.cluster_connectivity = {
+        warning: 0,
+        critical: 0,
+        unknown: 0,
+      }
+    },
+  },
+  {
+    name: '仅节点为零',
+    mutate: (fixture: RabbitMQOverviewFixture) => {
+      fixture.data.status = 'warning'
+      fixture.data.nodes = {
+        total: 0,
+        normal: 0,
+        warning: 0,
+        critical: 0,
+        unknown: 0,
+      }
+      fixture.data.alerts.resource_alarms = {
+        warning: 0,
+        critical: 0,
+        unknown: 0,
+      }
+      fixture.data.alerts.resource_pressure = {
+        warning: 0,
+        critical: 0,
+        unknown: 0,
+      }
+      fixture.data.alerts.collection = {
+        warning: 0,
+        critical: 0,
+        unknown: 0,
+      }
+    },
+  },
+])('RabbitMQ $name时仍展示另一侧汇总', async ({ mutate }) => {
+  const fixture = rabbitMQOverviewFixture()
+  mutate(fixture)
+  mockOverviewRequests({ rabbitmq: fixture })
+
+  renderOverview()
+
+  const card = await screen.findByRole('link', {
+    name: '查看 RabbitMQ 板块',
+  })
+  expect(card).not.toHaveAttribute('data-level', 'empty')
+  expect(within(card).getByText('异常节点')).toBeVisible()
+  expect(within(card).getByText('集群通信')).toBeVisible()
+})
+
+it('RabbitMQ 集群通信严重只提升卡片颜色而不混入异常节点数', async () => {
+  const fixture = rabbitMQOverviewFixture()
+  fixture.data.status = 'critical'
+  fixture.data.clusters = {
+    total: 1,
+    normal: 0,
+    warning: 0,
+    critical: 1,
+    unknown: 0,
+  }
+  fixture.data.nodes = {
+    total: 2,
+    normal: 2,
+    warning: 0,
+    critical: 0,
+    unknown: 0,
+  }
+  fixture.data.alerts = {
+    cluster_connectivity: { warning: 0, critical: 1, unknown: 0 },
+    resource_alarms: { warning: 0, critical: 0, unknown: 0 },
+    resource_pressure: { warning: 0, critical: 0, unknown: 0 },
+    collection: { warning: 0, critical: 0, unknown: 0 },
+  }
+  mockOverviewRequests({ rabbitmq: fixture })
+
+  renderOverview()
+
+  const card = await screen.findByRole('link', {
+    name: '查看 RabbitMQ 板块',
+  })
+  expect(card).toHaveAttribute('data-level', 'critical')
+  const summary = within(card)
+    .getByText('异常节点')
+    .closest('.module-alert-summary')
+  expect(summary).not.toBeNull()
+  expect(within(summary as HTMLElement).getByText('0')).toBeVisible()
+  expect(within(summary as HTMLElement).getByText('/ 2')).toBeVisible()
+  expect(within(summary as HTMLElement).getByText('无严重')).toBeVisible()
+  expect(within(summary as HTMLElement).getByText('无警告/未知')).toBeVisible()
+})
+
+it('RabbitMQ 非空集群和节点全 normal 时接受响应', async () => {
+  const fixture = rabbitMQOverviewFixture()
+  fixture.data.status = 'normal'
+  fixture.data.clusters = {
+    total: 1,
+    normal: 1,
+    warning: 0,
+    critical: 0,
+    unknown: 0,
+  }
+  fixture.data.nodes = {
+    total: 2,
+    normal: 2,
+    warning: 0,
+    critical: 0,
+    unknown: 0,
+  }
+  fixture.data.alerts = {
+    cluster_connectivity: { warning: 0, critical: 0, unknown: 0 },
+    resource_alarms: { warning: 0, critical: 0, unknown: 0 },
+    resource_pressure: { warning: 0, critical: 0, unknown: 0 },
+    collection: { warning: 0, critical: 0, unknown: 0 },
+  }
+  mockOverviewRequests({ rabbitmq: fixture })
+
+  renderOverview()
+
+  const card = await screen.findByRole('link', {
+    name: '查看 RabbitMQ 板块',
+  })
+  expect(card).toHaveAttribute('data-level', 'normal')
+  expect(within(card).getByText('全部正常')).toBeVisible()
+  expect(
+    screen.queryByRole('alert', { name: 'RabbitMQ 板块加载失败' }),
+  ).not.toBeInTheDocument()
+})
+
+const invalidRabbitMQOverviewCases = [
+  {
+    name: 'status 枚举无效',
+    body: () => {
+      const fixture = rabbitMQOverviewFixture()
+      fixture.data.status =
+        'degraded' as RabbitMQOverviewFixture['data']['status']
+      return fixture
+    },
+  },
+  {
+    name: 'status normal 但桶最高等级为 critical',
+    body: () => {
+      const fixture = rabbitMQOverviewFixture()
+      fixture.data.status = 'normal'
+      return fixture
+    },
+  },
+  {
+    name: 'status warning 但桶最高等级仅为 unknown',
+    body: () => {
+      const fixture = rabbitMQOverviewFixture()
+      fixture.data.status = 'warning'
+      fixture.data.clusters = {
+        total: 1,
+        normal: 0,
+        warning: 0,
+        critical: 0,
+        unknown: 1,
+      }
+      fixture.data.nodes = {
+        total: 1,
+        normal: 0,
+        warning: 0,
+        critical: 0,
+        unknown: 1,
+      }
+      fixture.data.alerts = {
+        cluster_connectivity: { warning: 0, critical: 0, unknown: 1 },
+        resource_alarms: { warning: 0, critical: 0, unknown: 0 },
+        resource_pressure: { warning: 0, critical: 0, unknown: 0 },
+        collection: { warning: 0, critical: 0, unknown: 1 },
+      }
+      return fixture
+    },
+  },
+  {
+    name: 'clusters 是数组',
+    body: () => {
+      const fixture = rabbitMQOverviewFixture()
+      fixture.data.clusters =
+        [] as unknown as RabbitMQOverviewFixture['data']['clusters']
+      return fixture
+    },
+  },
+  {
+    name: 'alerts 是 null',
+    body: () => {
+      const fixture = rabbitMQOverviewFixture()
+      fixture.data.alerts =
+        null as unknown as RabbitMQOverviewFixture['data']['alerts']
+      return fixture
+    },
+  },
+  {
+    name: '告警缺少 unknown',
+    body: () => {
+      const fixture = rabbitMQOverviewFixture()
+      delete (
+        fixture.data.alerts.collection as Partial<
+          RabbitMQOverviewFixture['data']['alerts']['collection']
+        >
+      ).unknown
+      return fixture
+    },
+  },
+  {
+    name: 'nodes total 不等于状态桶之和',
+    body: () => {
+      const fixture = rabbitMQOverviewFixture()
+      fixture.data.nodes.total += 1
+      return fixture
+    },
+  },
+  {
+    name: 'meta stale 不是 boolean',
+    body: () => {
+      const fixture = rabbitMQOverviewFixture()
+      fixture.meta.stale = null as unknown as boolean
+      return fixture
+    },
+  },
+] satisfies Array<{ name: string; body: () => unknown }>
+
+it.each(invalidRabbitMQOverviewCases)(
+  'RabbitMQ 成功响应拒绝$name并保持旧模块可用',
+  async ({ body }) => {
+    mockOverviewRequests({ rabbitmq: body() })
+    renderOverview()
+
+    expect(
+      await screen.findByRole('link', { name: '查看 Linux 主机板块' }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('alert', { name: 'RabbitMQ 板块加载失败' }),
+    ).toHaveTextContent('服务器响应格式无效')
+    expect(
+      screen.queryByRole('link', { name: '查看 RabbitMQ 板块' }),
+    ).not.toBeInTheDocument()
+  },
+)
+
+it('其他模块已加载时独立显示 RabbitMQ 加载状态', async () => {
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const path = requestedPath(input)
+    if (path === '/api/v1/rabbitmq/overview') {
+      return new Promise<Response>(() => undefined)
+    }
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
+    if (path === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(jsonResponse(diskOverviewFixture()))
+    }
+    if (path === '/api/v1/redis/overview') {
+      return Promise.resolve(jsonResponse(redisOverviewFixture()))
+    }
+    return Promise.resolve(jsonResponse(overviewFixture()))
+  })
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Elasticsearch 板块' }),
+  ).toBeVisible()
+  expect(
+    screen.getByRole('status', { name: 'RabbitMQ 板块加载中' }),
+  ).toBeVisible()
+})
+
+it('RabbitMQ 首次失败不阻塞旧模块且重试只刷新独立查询', async () => {
+  const pathCounts = new Map<string, number>()
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const path = requestedPath(input)
+    pathCounts.set(path, (pathCounts.get(path) ?? 0) + 1)
+    if (path === '/api/v1/rabbitmq/overview') {
+      return Promise.resolve(
+        pathCounts.get(path) === 1
+          ? jsonResponse(
+              {
+                code: 'rabbitmq_unavailable',
+                message: 'RabbitMQ 数据源暂时不可用',
+                request_id: 'req-fixture-rabbitmq-overview-error',
+                retryable: true,
+              },
+              503,
+            )
+          : jsonResponse(rabbitMQOverviewFixture()),
+      )
+    }
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
+    if (path === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(jsonResponse(diskOverviewFixture()))
+    }
+    if (path === '/api/v1/redis/overview') {
+      return Promise.resolve(jsonResponse(redisOverviewFixture()))
+    }
+    return Promise.resolve(jsonResponse(overviewFixture()))
+  })
+  const user = userEvent.setup()
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Elasticsearch 板块' }),
+  ).toBeVisible()
+  const error = screen.getByRole('alert', {
+    name: 'RabbitMQ 板块加载失败',
+  })
+  expect(error).toHaveTextContent('RabbitMQ 数据源暂时不可用')
+  await user.click(within(error).getByRole('button', { name: '重试' }))
+
+  expect(
+    await screen.findByRole('link', { name: '查看 RabbitMQ 板块' }),
+  ).toBeVisible()
+  expect(pathCounts.get('/api/v1/rabbitmq/overview')).toBe(2)
+  for (const path of [
+    '/api/v1/overview',
+    '/api/v1/disks/overview',
+    '/api/v1/mysql/overview',
+    '/api/v1/redis/overview',
+    '/api/v1/elasticsearch/overview',
+  ]) {
+    expect(pathCounts.get(path)).toBe(1)
+  }
+})
+
+it('RabbitMQ 过期数据保持可见并显示精确采集时间', async () => {
+  mockOverviewRequests({
+    rabbitmq: rabbitMQOverviewFixture({
+      meta: {
+        stale: true,
+        collected_at: '2026-08-04T07:30:00.000Z',
+      },
+    }),
+  })
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 RabbitMQ 板块' }),
+  ).toBeVisible()
+  const banner = screen.getByRole('alert', {
+    name: 'RabbitMQ 数据已过期',
+  })
+  expect(within(banner).getByRole('time')).toHaveAttribute(
+    'dateTime',
+    '2026-08-04T07:30:00.000Z',
+  )
 })
 
 it('Elasticsearch 集群和节点都为空时显示中性空状态', async () => {
@@ -711,6 +1187,49 @@ it('全正常时用绿色无异常文案展示所有零值状态', async () => {
   expect(diskCard).toHaveAttribute('data-level', 'normal')
   expect(within(diskCard).getByText('全部正常')).toBeVisible()
   expect(within(diskCard).getAllByText('无异常')).toHaveLength(4)
+})
+
+it('RabbitMQ 全正常时四个摘要框统一显示无异常', async () => {
+  mockOverviewRequests({
+    rabbitmq: rabbitMQOverviewFixture({
+      data: {
+        status: 'normal',
+        clusters: {
+          total: 1,
+          normal: 1,
+          warning: 0,
+          critical: 0,
+          unknown: 0,
+        },
+        nodes: {
+          total: 1,
+          normal: 1,
+          warning: 0,
+          critical: 0,
+          unknown: 0,
+        },
+        alerts: {
+          cluster_connectivity: { warning: 0, critical: 0, unknown: 0 },
+          resource_alarms: { warning: 0, critical: 0, unknown: 0 },
+          resource_pressure: { warning: 0, critical: 0, unknown: 0 },
+          collection: { warning: 0, critical: 0, unknown: 0 },
+        },
+      },
+    }),
+  })
+  renderOverview()
+
+  const card = await screen.findByRole('link', {
+    name: '查看 RabbitMQ 板块',
+  })
+  expect(card).toHaveAttribute('data-level', 'normal')
+  expect(within(card).getAllByText('无异常')).toHaveLength(4)
+  for (const metricAlert of card.querySelectorAll('.module-metric-alert')) {
+    expect(metricAlert).toHaveAttribute('data-level', 'normal')
+  }
+  expect(within(card).queryByText(/严重 0/)).not.toBeInTheDocument()
+  expect(within(card).queryByText(/警告 0/)).not.toBeInTheDocument()
+  expect(within(card).queryByText(/未知 0/)).not.toBeInTheDocument()
 })
 
 it('硬盘无设备时显示中性空状态', async () => {
@@ -1294,6 +1813,9 @@ it('使用固定查询范围且不显示总览时间范围控件', async () => {
     if (path === '/api/v1/redis/overview') {
       return Promise.resolve(jsonResponse(redisOverviewFixture()))
     }
+    if (path === '/api/v1/rabbitmq/overview') {
+      return Promise.resolve(jsonResponse(rabbitMQOverviewFixture()))
+    }
     requestedRanges.push(requestedRange(input))
     return Promise.resolve(jsonResponse(overviewFixture()))
   })
@@ -1307,16 +1829,16 @@ it('使用固定查询范围且不显示总览时间范围控件', async () => {
   expect(screen.queryByRole('button', { name: '7天' })).not.toBeInTheDocument()
 })
 
-it('手动刷新会同时重新请求五个总览模块', async () => {
+it('手动刷新会同时重新请求六个总览模块', async () => {
   const user = userEvent.setup()
   renderOverview()
 
   await screen.findByRole('link', { name: '查看 Linux 主机板块' })
   await screen.findByRole('link', { name: '查看主机硬盘板块' })
-  expect(globalThis.fetch).toHaveBeenCalledTimes(5)
+  expect(globalThis.fetch).toHaveBeenCalledTimes(6)
   await user.click(screen.getByRole('button', { name: '刷新' }))
 
-  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(10))
+  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(12))
   const calls = vi.mocked(globalThis.fetch).mock.calls
   expect(calls.map(([input]) => requestedPath(input))).toEqual(
     expect.arrayContaining([
@@ -1325,6 +1847,7 @@ it('手动刷新会同时重新请求五个总览模块', async () => {
       '/api/v1/mysql/overview',
       '/api/v1/redis/overview',
       '/api/v1/elasticsearch/overview',
+      '/api/v1/rabbitmq/overview',
     ]),
   )
   const hostCalls = calls.filter(
@@ -1351,6 +1874,9 @@ it('每 15 秒刷新且前一请求未完成时不发起重叠请求', async () 
     }
     if (path === '/api/v1/redis/overview') {
       return Promise.resolve(jsonResponse(redisOverviewFixture()))
+    }
+    if (path === '/api/v1/rabbitmq/overview') {
+      return Promise.resolve(jsonResponse(rabbitMQOverviewFixture()))
     }
     hostRequestCount += 1
     if (hostRequestCount === 1) {
@@ -1416,6 +1942,9 @@ it('可重试错误显示中文信息并可重试成功', async () => {
     }
     if (path === '/api/v1/redis/overview') {
       return Promise.resolve(jsonResponse(redisOverviewFixture()))
+    }
+    if (path === '/api/v1/rabbitmq/overview') {
+      return Promise.resolve(jsonResponse(rabbitMQOverviewFixture()))
     }
     attempts += 1
     if (attempts === 1) {

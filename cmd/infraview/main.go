@@ -22,6 +22,7 @@ import (
 	"github.com/Taier05/InfraView/internal/elasticsearch"
 	"github.com/Taier05/InfraView/internal/httpapi"
 	"github.com/Taier05/InfraView/internal/mysql"
+	"github.com/Taier05/InfraView/internal/rabbitmq"
 	"github.com/Taier05/InfraView/internal/redis"
 	"github.com/Taier05/InfraView/internal/service"
 )
@@ -92,6 +93,7 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 	diskProvider := withDiskUpstreamTimeout(providers.Disks, cfg.UpstreamTimeout)
 	redisProvider := withRedisUpstreamTimeout(providers.Redis, cfg.UpstreamTimeout)
 	elasticsearchProvider := withElasticsearchUpstreamTimeout(providers.Elasticsearch, cfg.UpstreamTimeout)
+	rabbitMQProvider := withRabbitMQUpstreamTimeout(providers.RabbitMQ, cfg.UpstreamTimeout)
 	store := cache.New(clock)
 	queryService := service.New(hostProvider, store, service.Options{
 		InventoryTTL:       cfg.InventoryTTL,
@@ -130,6 +132,12 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 		MaxStale:           cfg.MaxStale,
 		Clock:              clock,
 	})
+	rabbitMQService := service.NewRabbitMQ(rabbitMQProvider, store, service.RabbitMQOptions{
+		SnapshotTTL:        cfg.ExpectedCollectionInterval,
+		CollectionInterval: cfg.ExpectedCollectionInterval,
+		MaxStale:           cfg.MaxStale,
+		Clock:              clock,
+	})
 	return httpapi.New(httpapi.Dependencies{
 		Config:               cfg,
 		Auth:                 auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, clock),
@@ -139,6 +147,7 @@ func buildHandler(cfg config.Config, clock func() time.Time, logger *slog.Logger
 		DiskService:          diskService,
 		RedisService:         redisService,
 		ElasticsearchService: elasticsearchService,
+		RabbitMQService:      rabbitMQService,
 		Logger:               logger,
 	})
 }
@@ -149,6 +158,7 @@ type providerSet struct {
 	Disks         disk.Provider
 	Redis         redis.Provider
 	Elasticsearch elasticsearch.Provider
+	RabbitMQ      rabbitmq.Provider
 }
 
 func dataSourceProviders(cfg config.Config, clock func() time.Time) providerSet {
@@ -160,6 +170,7 @@ func dataSourceProviders(cfg config.Config, clock func() time.Time) providerSet 
 			Disks:         mock.NewDisk(clock),
 			Redis:         mock.NewRedis(clock),
 			Elasticsearch: mock.NewElasticsearch(),
+			RabbitMQ:      mock.NewRabbitMQ(),
 		}
 	case "nightingale":
 		provider := nightingale.New(nightingale.Options{
@@ -169,10 +180,10 @@ func dataSourceProviders(cfg config.Config, clock func() time.Time) providerSet 
 			Clock:                clock,
 			AllowInsecureHTTP:    cfg.NightingaleAllowInsecureHTTP,
 		})
-		return providerSet{Hosts: provider, MySQL: provider, Disks: provider, Redis: provider, Elasticsearch: provider}
+		return providerSet{Hosts: provider, MySQL: provider, Disks: provider, Redis: provider, Elasticsearch: provider, RabbitMQ: provider}
 	default:
 		provider := nightingale.New(nightingale.Options{})
-		return providerSet{Hosts: provider, MySQL: provider, Disks: provider, Redis: provider, Elasticsearch: provider}
+		return providerSet{Hosts: provider, MySQL: provider, Disks: provider, Redis: provider, Elasticsearch: provider, RabbitMQ: provider}
 	}
 }
 
@@ -243,6 +254,23 @@ func (p *elasticsearchTimeoutProvider) ElasticsearchSnapshot(ctx context.Context
 }
 
 var _ elasticsearch.Provider = (*elasticsearchTimeoutProvider)(nil)
+
+type rabbitMQTimeoutProvider struct {
+	provider rabbitmq.Provider
+	timeout  time.Duration
+}
+
+func withRabbitMQUpstreamTimeout(provider rabbitmq.Provider, timeout time.Duration) rabbitmq.Provider {
+	return &rabbitMQTimeoutProvider{provider: provider, timeout: timeout}
+}
+
+func (provider *rabbitMQTimeoutProvider) RabbitMQSnapshot(ctx context.Context) (rabbitmq.Snapshot, error) {
+	ctx, cancel := context.WithTimeout(ctx, provider.timeout)
+	defer cancel()
+	return provider.provider.RabbitMQSnapshot(ctx)
+}
+
+var _ rabbitmq.Provider = (*rabbitMQTimeoutProvider)(nil)
 
 type timeoutProvider struct {
 	provider datasource.Provider

@@ -16,6 +16,10 @@ import type {
   OverviewResponse,
   RedisOverviewData,
   RedisOverviewResponse,
+  RabbitMQAlertCount,
+  RabbitMQLevelCounts,
+  RabbitMQOverviewData,
+  RabbitMQOverviewResponse,
 } from '../../api/types'
 import { ModuleStatusCardShell } from '../../components/ModuleStatusCardShell'
 import { RefreshControl } from '../../components/RefreshControl'
@@ -24,6 +28,10 @@ import { useRefreshIntervalMs } from '../../app/runtime'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+function isStrictRecord(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && !Array.isArray(value)
 }
 
 function isNaturalCount(value: unknown): value is number {
@@ -102,6 +110,85 @@ async function requestElasticsearchOverview(signal: AbortSignal) {
       '',
       false,
     )
+  }
+  return response
+}
+
+function isRabbitMQLevelCounts(value: unknown): value is RabbitMQLevelCounts {
+  if (!isStrictRecord(value)) return false
+  const { total, normal, warning, critical, unknown } = value
+  return (
+    isNaturalCount(total) &&
+    isNaturalCount(normal) &&
+    isNaturalCount(warning) &&
+    isNaturalCount(critical) &&
+    isNaturalCount(unknown) &&
+    total === normal + warning + critical + unknown
+  )
+}
+
+function isRabbitMQAlertCount(value: unknown): value is RabbitMQAlertCount {
+  return (
+    isStrictRecord(value) &&
+    isNaturalCount(value.warning) &&
+    isNaturalCount(value.critical) &&
+    isNaturalCount(value.unknown)
+  )
+}
+
+function isRabbitMQOverviewResponse(
+  value: unknown,
+): value is RabbitMQOverviewResponse {
+  if (
+    !isStrictRecord(value) ||
+    !isStrictRecord(value.data) ||
+    !isStrictRecord(value.meta)
+  ) {
+    return false
+  }
+  const { data, meta } = value
+  if (
+    !isMetricLevel(data.status) ||
+    !isRabbitMQLevelCounts(data.clusters) ||
+    !isRabbitMQLevelCounts(data.nodes) ||
+    !isStrictRecord(data.alerts) ||
+    !isRabbitMQAlertCount(data.alerts.cluster_connectivity) ||
+    !isRabbitMQAlertCount(data.alerts.resource_alarms) ||
+    !isRabbitMQAlertCount(data.alerts.resource_pressure) ||
+    !isRabbitMQAlertCount(data.alerts.collection) ||
+    typeof meta.request_id !== 'string' ||
+    typeof meta.stale !== 'boolean' ||
+    (meta.collected_at !== undefined && typeof meta.collected_at !== 'string')
+  ) {
+    return false
+  }
+
+  const alertCountFits = (alerts: RabbitMQAlertCount, total: number) =>
+    alerts.warning + alerts.critical + alerts.unknown <= total
+  const derivedStatus: MetricLevel =
+    data.clusters.critical > 0 || data.nodes.critical > 0
+      ? 'critical'
+      : data.clusters.warning > 0 || data.nodes.warning > 0
+        ? 'warning'
+        : data.clusters.unknown > 0 || data.nodes.unknown > 0
+          ? 'unknown'
+          : 'normal'
+
+  return (
+    data.status === derivedStatus &&
+    alertCountFits(data.alerts.cluster_connectivity, data.clusters.total) &&
+    alertCountFits(data.alerts.resource_alarms, data.nodes.total) &&
+    alertCountFits(data.alerts.resource_pressure, data.nodes.total) &&
+    alertCountFits(data.alerts.collection, data.nodes.total)
+  )
+}
+
+async function requestRabbitMQOverview(signal: AbortSignal) {
+  const response = await apiRequest<unknown>('/api/v1/rabbitmq/overview', {
+    signal,
+  })
+  if (!isRabbitMQOverviewResponse(response)) {
+    throw new APIError(200, 'invalid_response', '服务器响应格式无效', '', false)
   }
   return response
 }
@@ -241,14 +328,29 @@ async function requestRedisOverview(signal: AbortSignal) {
   return response
 }
 
-function alertLevel(alerts: AlertCount): MetricLevel {
+type MetricAlertCount = AlertCount & { unknown?: number }
+
+function alertLevel(alerts: MetricAlertCount): MetricLevel {
   if (alerts.critical > 0) return 'critical'
   if (alerts.warning > 0) return 'warning'
+  if ((alerts.unknown ?? 0) > 0) return 'unknown'
   return 'normal'
 }
 
-function MetricAlert({ label, alerts }: { label: string; alerts: AlertCount }) {
-  const total = alerts.warning + alerts.critical
+function MetricAlert({
+  label,
+  alerts,
+}: {
+  label: string
+  alerts: MetricAlertCount
+}) {
+  const total = alerts.warning + alerts.critical + (alerts.unknown ?? 0)
+  const details =
+    total === 0
+      ? '无异常'
+      : alerts.unknown === undefined
+        ? `严重 ${alerts.critical} · 警告 ${alerts.warning}`
+      : `严重 ${alerts.critical} · 警告 ${alerts.warning} · 未知 ${alerts.unknown}`
 
   return (
     <div className="module-metric-alert" data-level={alertLevel(alerts)}>
@@ -256,11 +358,7 @@ function MetricAlert({ label, alerts }: { label: string; alerts: AlertCount }) {
         <span>{label}</span>
         <strong>{total}</strong>
       </div>
-      <span>
-        {total === 0
-          ? '无异常'
-          : `严重 ${alerts.critical} · 警告 ${alerts.warning}`}
-      </span>
+      <span>{details}</span>
     </div>
   )
 }
@@ -271,11 +369,13 @@ type ModuleLabel =
   | 'MySQL'
   | 'Redis'
   | 'Elasticsearch'
+  | 'RabbitMQ'
 
 function moduleName(label: ModuleLabel) {
   if (label === 'MySQL') return 'MySQL 板块'
   if (label === 'Redis') return 'Redis 板块'
   if (label === 'Elasticsearch') return 'Elasticsearch 板块'
+  if (label === 'RabbitMQ') return 'RabbitMQ 板块'
   if (label === '主机硬盘') return '主机硬盘板块'
   return 'Linux 主机板块'
 }
@@ -315,11 +415,13 @@ function ModuleError({
             ? '无法加载总览数据'
             : label === '主机硬盘'
               ? '无法加载主机硬盘板块'
-            : label === 'MySQL'
-              ? '无法加载 MySQL 板块'
-              : label === 'Redis'
-                ? '无法加载 Redis 板块'
-                : '无法加载 Elasticsearch 板块'}
+              : label === 'MySQL'
+                ? '无法加载 MySQL 板块'
+                : label === 'Redis'
+                  ? '无法加载 Redis 板块'
+                  : label === 'Elasticsearch'
+                    ? '无法加载 Elasticsearch 板块'
+                    : '无法加载 RabbitMQ 板块'}
         </strong>
         <p>{apiError?.message ?? '服务暂时无法处理请求'}</p>
       </div>
@@ -374,11 +476,13 @@ function ModuleStaleBanner({
       ? 'MySQL 数据已过期'
       : label === 'Redis'
         ? 'Redis 数据已过期'
-      : label === 'Elasticsearch'
-        ? 'Elasticsearch 数据已过期'
-      : label === '主机硬盘'
-        ? '主机硬盘数据已过期'
-        : 'Linux 主机数据已过期'
+        : label === 'Elasticsearch'
+          ? 'Elasticsearch 数据已过期'
+          : label === 'RabbitMQ'
+            ? 'RabbitMQ 数据已过期'
+            : label === '主机硬盘'
+              ? '主机硬盘数据已过期'
+              : 'Linux 主机数据已过期'
 
   return (
     <div
@@ -807,6 +911,107 @@ function ElasticsearchStatusCard({
   )
 }
 
+function rabbitMQOverviewLevel(data: RabbitMQOverviewData): MetricLevel {
+  if (data.clusters.critical > 0 || data.nodes.critical > 0) {
+    return 'critical'
+  }
+  if (data.clusters.warning > 0 || data.nodes.warning > 0) {
+    return 'warning'
+  }
+  if (data.clusters.unknown > 0 || data.nodes.unknown > 0) {
+    return 'unknown'
+  }
+  return 'normal'
+}
+
+function RabbitMQStatusCard({ data }: { data: RabbitMQOverviewData }) {
+  if (data.clusters.total === 0 && data.nodes.total === 0) {
+    return (
+      <ModuleStatusCardShell
+        to="/rabbitmq"
+        ariaLabel="查看 RabbitMQ 板块"
+        category="消息队列板块"
+        title="RabbitMQ"
+        level="empty"
+        levelLabel="暂无节点"
+        actionLabel="查看 RabbitMQ"
+        className="rabbitmq-overview-card"
+        emptyState={{
+          title: '暂无 RabbitMQ 节点',
+          description: '尚无可展示的集群与节点健康数据',
+        }}
+      />
+    )
+  }
+
+  const level = rabbitMQOverviewLevel(data)
+  const levelLabel =
+    level === 'critical'
+      ? '存在严重异常'
+      : level === 'warning'
+        ? '存在警告'
+        : level === 'unknown'
+          ? '存在未知'
+          : '全部正常'
+  const affectedNodes =
+    data.nodes.warning + data.nodes.critical + data.nodes.unknown
+  const warningOrUnknown = data.nodes.warning + data.nodes.unknown
+  const warningOrUnknownLevel: MetricLevel =
+    data.nodes.warning > 0
+      ? 'warning'
+      : data.nodes.unknown > 0
+        ? 'unknown'
+        : 'normal'
+
+  return (
+    <ModuleStatusCardShell
+      to="/rabbitmq"
+      ariaLabel="查看 RabbitMQ 板块"
+      category="消息队列板块"
+      title="RabbitMQ"
+      level={level}
+      levelLabel={levelLabel}
+      actionLabel="查看 RabbitMQ"
+      className="rabbitmq-overview-card"
+    >
+      <div className="module-alert-summary">
+        <div className="module-alert-total">
+          <span>异常节点</span>
+          <strong>
+            {affectedNodes}
+            <small> / {data.nodes.total}</small>
+          </strong>
+        </div>
+        <div className="module-alert-levels">
+          <StatusBadge
+            level={data.nodes.critical > 0 ? 'critical' : 'normal'}
+            label={
+              data.nodes.critical > 0 ? `严重 ${data.nodes.critical}` : '无严重'
+            }
+          />
+          <StatusBadge
+            level={warningOrUnknownLevel}
+            label={
+              warningOrUnknown > 0
+                ? `警告/未知 ${warningOrUnknown}`
+                : '无警告/未知'
+            }
+          />
+        </div>
+      </div>
+      <div className="module-metric-alert-grid">
+        <MetricAlert
+          label="集群通信"
+          alerts={data.alerts.cluster_connectivity}
+        />
+        <MetricAlert label="资源告警" alerts={data.alerts.resource_alarms} />
+        <MetricAlert label="资源压力" alerts={data.alerts.resource_pressure} />
+        <MetricAlert label="采集状态" alerts={data.alerts.collection} />
+      </div>
+    </ModuleStatusCardShell>
+  )
+}
+
 function DiskStatusCard({ data }: { data: DiskOverviewData }) {
   if (data.total === 0) {
     return (
@@ -950,18 +1155,26 @@ export function OverviewPage() {
     refetchInterval: refreshIntervalMs,
     refetchIntervalInBackground: false,
   })
+  const rabbitMQOverview = useQuery({
+    queryKey: ['rabbitmq-overview'],
+    queryFn: ({ signal }) => requestRabbitMQOverview(signal),
+    refetchInterval: refreshIntervalMs,
+    refetchIntervalInBackground: false,
+  })
   const allDataUpdatedAt =
     hostOverview.data !== undefined &&
     diskOverview.data !== undefined &&
     mysqlOverview.data !== undefined &&
     redisOverview.data !== undefined &&
-    elasticsearchOverview.data !== undefined
+    elasticsearchOverview.data !== undefined &&
+    rabbitMQOverview.data !== undefined
       ? Math.min(
           hostOverview.dataUpdatedAt,
           diskOverview.dataUpdatedAt,
           mysqlOverview.dataUpdatedAt,
           redisOverview.dataUpdatedAt,
           elasticsearchOverview.dataUpdatedAt,
+          rabbitMQOverview.dataUpdatedAt,
         )
       : 0
 
@@ -983,7 +1196,8 @@ export function OverviewPage() {
               diskOverview.isFetching ||
               mysqlOverview.isFetching ||
               redisOverview.isFetching ||
-              elasticsearchOverview.isFetching
+              elasticsearchOverview.isFetching ||
+              rabbitMQOverview.isFetching
             }
             dataUpdatedAt={allDataUpdatedAt}
             onRefresh={() => {
@@ -993,6 +1207,7 @@ export function OverviewPage() {
                 mysqlOverview.refetch(),
                 redisOverview.refetch(),
                 elasticsearchOverview.refetch(),
+                rabbitMQOverview.refetch(),
               ])
             }}
             refreshIntervalSeconds={refreshIntervalMs / 1_000}
@@ -1035,6 +1250,13 @@ export function OverviewPage() {
             collectedAt={elasticsearchOverview.data.meta.collected_at}
           />
         )}
+      {rabbitMQOverview.data?.meta.stale === true &&
+        rabbitMQOverview.data.meta.collected_at !== undefined && (
+          <ModuleStaleBanner
+            label="RabbitMQ"
+            collectedAt={rabbitMQOverview.data.meta.collected_at}
+          />
+        )}
       {hostOverview.data !== undefined && hostOverview.isError && (
         <ModuleRefreshError
           label="Linux 主机"
@@ -1071,6 +1293,13 @@ export function OverviewPage() {
             onRetry={() => void elasticsearchOverview.refetch()}
           />
         )}
+      {rabbitMQOverview.data !== undefined && rabbitMQOverview.isError && (
+        <ModuleRefreshError
+          label="RabbitMQ"
+          error={rabbitMQOverview.error}
+          onRetry={() => void rabbitMQOverview.refetch()}
+        />
+      )}
 
       <div
         className="overview-status-grid overview-compact-grid"
@@ -1145,6 +1374,20 @@ export function OverviewPage() {
           )
         ) : (
           <ElasticsearchStatusCard data={elasticsearchOverview.data.data} />
+        )}
+
+        {rabbitMQOverview.data === undefined ? (
+          rabbitMQOverview.isPending ? (
+            <ModuleLoading label="RabbitMQ" />
+          ) : (
+            <ModuleError
+              label="RabbitMQ"
+              error={rabbitMQOverview.error}
+              onRetry={() => void rabbitMQOverview.refetch()}
+            />
+          )
+        ) : (
+          <RabbitMQStatusCard data={rabbitMQOverview.data.data} />
         )}
       </div>
     </section>

@@ -23,6 +23,7 @@ type Dependencies struct {
 	DiskService          *service.DiskService
 	RedisService         *service.RedisService
 	ElasticsearchService *service.ElasticsearchService
+	RabbitMQService      *service.RabbitMQService
 	Logger               *slog.Logger
 }
 
@@ -35,6 +36,7 @@ type api struct {
 	diskService          *service.DiskService
 	redisService         *service.RedisService
 	elasticsearchService *service.ElasticsearchService
+	rabbitMQService      *service.RabbitMQService
 	logger               *slog.Logger
 	verifyLogin          func(string, string) (auth.Session, bool)
 }
@@ -64,6 +66,7 @@ func New(dependencies Dependencies) http.Handler {
 		diskService:          dependencies.DiskService,
 		redisService:         dependencies.RedisService,
 		elasticsearchService: dependencies.ElasticsearchService,
+		rabbitMQService:      dependencies.RabbitMQService,
 		logger:               dependencies.Logger,
 		verifyLogin:          dependencies.Auth.Login,
 	}
@@ -86,6 +89,8 @@ func New(dependencies Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/redis/instances", server.requireAuthentication(http.HandlerFunc(server.redisInstances)))
 	mux.Handle("GET /api/v1/elasticsearch/overview", server.requireAuthentication(http.HandlerFunc(server.elasticsearchOverview)))
 	mux.Handle("GET /api/v1/elasticsearch/nodes", server.requireAuthentication(http.HandlerFunc(server.elasticsearchNodes)))
+	mux.Handle("GET /api/v1/rabbitmq/overview", server.requireAuthentication(http.HandlerFunc(server.rabbitMQOverview)))
+	mux.Handle("GET /api/v1/rabbitmq/nodes", server.requireAuthentication(http.HandlerFunc(server.rabbitMQNodes)))
 
 	mux.HandleFunc("/api/v1/session", server.methodNotAllowed)
 	mux.HandleFunc("/api/v1/overview", server.methodNotAllowed)
@@ -100,6 +105,8 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/redis/instances", server.methodNotAllowed)
 	mux.Handle("/api/v1/elasticsearch/overview", server.requireAuthentication(http.HandlerFunc(server.methodNotAllowed)))
 	mux.Handle("/api/v1/elasticsearch/nodes", server.requireAuthentication(http.HandlerFunc(server.methodNotAllowed)))
+	mux.Handle("/api/v1/rabbitmq/overview", server.requireAuthentication(http.HandlerFunc(server.methodNotAllowed)))
+	mux.Handle("/api/v1/rabbitmq/nodes", server.requireAuthentication(http.HandlerFunc(server.methodNotAllowed)))
 	mux.HandleFunc("/api", server.notFound)
 	mux.HandleFunc("/api/", server.notFound)
 

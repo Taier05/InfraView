@@ -21,6 +21,7 @@ import (
 	"github.com/Taier05/InfraView/internal/elasticsearch"
 	"github.com/Taier05/InfraView/internal/mysql"
 	"github.com/Taier05/InfraView/internal/mysql/mysqltest"
+	"github.com/Taier05/InfraView/internal/rabbitmq"
 	"github.com/Taier05/InfraView/internal/redis"
 )
 
@@ -290,6 +291,29 @@ func TestBuildHandlerUsesInjectedClockForElasticsearchService(t *testing.T) {
 	}
 }
 
+func TestBuildHandlerWiresAuthenticatedRabbitMQAPI(t *testing.T) {
+	clock := func() time.Time { return time.Date(2026, 8, 4, 8, 0, 0, 0, time.UTC) }
+	cfg := config.Config{
+		Username: "admin", Password: "correct-password", SessionTTL: 12 * time.Hour,
+		DataSource: "mock", MockHostCount: 1, ExpectedCollectionInterval: 15 * time.Second,
+		SMARTCollectionInterval: time.Minute, MaxStale: time.Minute, UpstreamTimeout: time.Second,
+	}
+	handler := buildHandler(cfg, clock, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	loginRequest := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/session", strings.NewReader(`{"username":"admin","password":"correct-password"}`))
+	login := httptest.NewRecorder()
+	handler.ServeHTTP(login, loginRequest)
+	if login.Code != http.StatusNoContent || len(login.Result().Cookies()) != 1 {
+		t.Fatalf("login response = %d", login.Code)
+	}
+	request := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/rabbitmq/nodes", nil)
+	request.AddCookie(login.Result().Cookies()[0])
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"nodes":[`) {
+		t.Fatalf("RabbitMQ response = %d %s", response.Code, response.Body.String())
+	}
+}
+
 func TestDataSourceProvidersWiresNightingaleConfiguration(t *testing.T) {
 	const token = "fixture-main-token"
 	called := false
@@ -323,11 +347,11 @@ func TestDataSourceProvidersWiresNightingaleConfiguration(t *testing.T) {
 	}
 }
 
-func TestProviderSetUsesMockForHostsMySQLDiskAndElasticsearch(t *testing.T) {
+func TestProviderSetUsesMockForHostsMySQLDiskElasticsearchAndRabbitMQ(t *testing.T) {
 	providers := dataSourceProviders(config.Config{
 		DataSource: "mock", MockHostCount: 8,
 	}, time.Now)
-	if providers.Hosts == nil || providers.MySQL == nil || providers.Disks == nil || providers.Elasticsearch == nil {
+	if providers.Hosts == nil || providers.MySQL == nil || providers.Disks == nil || providers.Elasticsearch == nil || providers.RabbitMQ == nil {
 		t.Fatalf("providers = %#v", providers)
 	}
 	mysqltest.RunContract(t, providers.MySQL)
@@ -336,6 +360,9 @@ func TestProviderSetUsesMockForHostsMySQLDiskAndElasticsearch(t *testing.T) {
 	}
 	if _, err := providers.Elasticsearch.ElasticsearchSnapshot(context.Background()); err != nil {
 		t.Fatalf("ElasticsearchSnapshot() error = %v", err)
+	}
+	if _, err := providers.RabbitMQ.RabbitMQSnapshot(context.Background()); err != nil {
+		t.Fatalf("RabbitMQSnapshot() error = %v", err)
 	}
 }
 
@@ -351,8 +378,9 @@ func TestProviderSetSharesOneNightingaleProvider(t *testing.T) {
 			mysqlProvider, mysqlOK := providers.MySQL.(*nightingale.Provider)
 			diskProvider, diskOK := providers.Disks.(*nightingale.Provider)
 			elasticsearchProvider, elasticsearchOK := providers.Elasticsearch.(*nightingale.Provider)
-			if !hostOK || !mysqlOK || !diskOK || !elasticsearchOK ||
-				hostProvider != mysqlProvider || hostProvider != diskProvider || hostProvider != elasticsearchProvider {
+			rabbitMQProvider, rabbitMQOK := providers.RabbitMQ.(*nightingale.Provider)
+			if !hostOK || !mysqlOK || !diskOK || !elasticsearchOK || !rabbitMQOK ||
+				hostProvider != mysqlProvider || hostProvider != diskProvider || hostProvider != elasticsearchProvider || hostProvider != rabbitMQProvider {
 				t.Fatalf("providers do not share one Nightingale client")
 			}
 		})
@@ -372,6 +400,9 @@ func TestProviderSetUsesSafeUnavailableProvidersForUnknownMode(t *testing.T) {
 	}
 	if _, err := providers.Elasticsearch.ElasticsearchSnapshot(context.Background()); !errors.Is(err, elasticsearch.ErrUnavailable) {
 		t.Fatalf("Elasticsearch error = %v", err)
+	}
+	if _, err := providers.RabbitMQ.RabbitMQSnapshot(context.Background()); !errors.Is(err, rabbitmq.ErrUnavailable) {
+		t.Fatalf("RabbitMQ error = %v", err)
 	}
 }
 
@@ -413,6 +444,15 @@ func TestElasticsearchTimeoutProviderAddsDeadlineAndCancelsSlowSnapshot(t *testi
 	provider := withElasticsearchUpstreamTimeout(blockingElasticsearchProvider{}, 10*time.Millisecond)
 	started := time.Now()
 	_, err := provider.ElasticsearchSnapshot(context.Background())
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) > time.Second {
+		t.Fatalf("error = %v, elapsed = %s", err, time.Since(started))
+	}
+}
+
+func TestRabbitMQTimeoutProviderAddsDeadlineAndCancelsSlowSnapshot(t *testing.T) {
+	provider := withRabbitMQUpstreamTimeout(blockingRabbitMQProvider{}, 10*time.Millisecond)
+	started := time.Now()
+	_, err := provider.RabbitMQSnapshot(context.Background())
 	if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) > time.Second {
 		t.Fatalf("error = %v, elapsed = %s", err, time.Since(started))
 	}
@@ -615,6 +655,15 @@ func (blockingElasticsearchProvider) ElasticsearchSnapshot(ctx context.Context) 
 }
 
 var _ elasticsearch.Provider = blockingElasticsearchProvider{}
+
+type blockingRabbitMQProvider struct{}
+
+func (blockingRabbitMQProvider) RabbitMQSnapshot(ctx context.Context) (rabbitmq.Snapshot, error) {
+	<-ctx.Done()
+	return rabbitmq.Snapshot{}, ctx.Err()
+}
+
+var _ rabbitmq.Provider = blockingRabbitMQProvider{}
 
 func newControlledServer() *controlledServer {
 	return &controlledServer{

@@ -224,3 +224,36 @@ docker compose ls
 - 后续流程：每次已授权修复通过验证后自动原位重建同一测试 8080，不再逐次询问。该规则不允许读取或输出私密环境内容，不允许创建额外端口或连接生产 Nightingale。
 - 提交前范围审查发现 Redis 极端合法正页码可能使 `(page-1)*page_size` 溢出并触发切片 panic。新增 `math.MaxInt` 回归先稳定复现 RED；随后在查询规范化阶段加入与硬盘模块相同的偏移溢出保护，定向 Redis Service 测试转为 GREEN。该修复不改变正常分页、查询白名单或 API 成功响应。
 - 审查修复后的 Compose 重建退出 0：Dockerfile 内前端 11 文件/112 项、typecheck/build、Go 普通/race/编译全部通过；Playwright 2 文件/14 项静态发现通过。现有 8080 healthy、仅发布原端口，并保持非 root、只读根文件系统、cap drop `ALL` 和禁止提权；部署页面引用最新构建资源。
+
+## 2026-08-04 RabbitMQ Task 8 浏览器静态契约
+
+- 新增 `web/e2e/rabbitmq.spec.ts`，RabbitMQ overview/nodes GET 均由 `page.route` 返回合成 envelope；测试数据不含真实身份、地址、数量或指标。写请求 405 使用登录页面共享的已认证 `page.request`，不通过页面 fetch 制造控制台噪声。
+- 四项规格覆盖：侧边栏与第六卡入口、精确 15 列和 URL 恢复、无破坏控件、1440×900 页面与表格无横向溢出、所有数据格 `white-space: nowrap`、无 `<br>`、紧凑等高、三个身份值省略且 `title` 保留完整值、短值不截断，以及 1100px 附近超长合成 cluster 不撑破控制栏且只有表格滚动容器允许横向滚动。
+- 实际执行 `docker run --rm --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/npm-cache -v "$PWD:/src" -v /src/web/node_modules -w /src/web node:22-alpine sh -c 'npm ci --ignore-scripts >/dev/null && npx playwright test --list'`，退出 0，共发现 4 个文件、21 项，其中 RabbitMQ 4 项。
+- 该证据只证明 Playwright 配置能静态加载和枚举规格，不证明动态浏览器行为通过。Task 8 当时未运行测试、未启动服务或端口、未访问 8080/真实上游，也未执行 typecheck/build、Go 验证、镜像构建、部署、提交或推送；后续已完成的 Task 9 离线验证见下一节，动态浏览器与部署边界仍未改变。
+
+## 2026-08-05 RabbitMQ Task 9 fresh 全量与终审
+
+- 前端 fresh 验证退出 0：Vitest 14 个文件、209 项测试，随后 typecheck、production build 与 Playwright 静态发现 4 个文件/21 项（RabbitMQ 4 项）均退出 0。Playwright 只执行 `--list`，没有运行动态 Chromium。
+- Go fresh 验证退出 0：gofmt 无差异、`go vet ./...`、全仓普通测试、全仓 race 测试和 `CGO_ENABLED=0` Linux 静态二进制编译均通过。
+- 安全与 whitespace 检查通过；文档同步前 Git 状态为 40 个 RabbitMQ 相关文件 staged、0 个 tracked unstaged、1 个未跟踪实施计划。
+- `docker build --no-cache --tag infraview:rabbitmq-verify .` 退出 0；镜像只构建、未运行、未映射端口、未连接上游。
+- 终审 Important 的 query 7 集群聚合先得到 focused RED，再以最小修复转为 GREEN 并通过复审。Clone、query 21、overview validator 与四色 E2E Minor 均已闭环；四色规格使用合法 normal/warning/critical/unknown 组合，并比较 computed 前景/背景视觉组合而不绑定颜色常量。
+- `npm ci` 根据既有 lock 报告 1 个 moderate 与 2 个 high；本轮没有依赖文件变化，未执行 `npm audit fix` 或强制依赖变更。
+- 动态 Chromium 1440/1100、现有 8080 原位重建、deploy、commit、push 均未获授权且未执行；本节证据不能解释为现场或部署验收。
+
+## 2026-08-05 RabbitMQ Task 10 共享目标多节点与总览零值修复
+
+- 新增 `TestRabbitMQInventoryPreservesMultipleNodesBehindOneCollectionTarget`，使用完全合成标签让多个不同 `rabbitmq_node` 共享同一 `cluster + ident + instance` 且原始样本时间不同。旧实现稳定 RED，实际只保留一个节点；改为稳定节点 ID 主索引与采集键候选索引后 GREEN。
+- 回归同时锁定：带 `rabbitmq_node` 的普通指标精确归并；无节点标签且采集键关联多个节点时保持缺失；同一稳定节点的同时间不同采集身份仍冲突隔离。两条吞吐速率查询合同先在固定查询序号得到 RED，再通过 `sum by (cluster, ident, instance, rabbitmq_node)` 转为 GREEN。
+- 新增 RabbitMQ 全正常总览规格，旧实现因显式 `unknown: 0` 显示三段零值而找不到“无异常”，先取得 1 失败/其余通过的 RED；`MetricAlert` 以总风险数为零优先显示“无异常”后，整个总览测试文件 66/66 GREEN，非零三段明细仍由既有测试覆盖。
+- fresh Go 全仓验证通过：gofmt、`go vet ./...`、普通测试、race 测试和 Linux 静态编译均退出 0。fresh 前端验证为 14 文件/210 项，typecheck、production build、Playwright 4 文件/21 项静态发现均退出 0；未执行动态 Chromium。
+- 现有 8080 经授权原位重建；Dockerfile 内再次通过前端 210 项、typecheck/build、Go 普通/race/编译。重建后健康、单服务、唯一 8080、`10001:10001`、只读根文件系统、cap drop `ALL`、禁止提权、健康接口及两个 RabbitMQ API 未认证拒绝均通过。验收只输出布尔结果，未输出响应正文或现场数据。
+- npm lock 仍为既有 1 个 moderate 与 2 个 high；未修改依赖文件、未执行 `npm audit fix`。commit 和 push 未获授权、未执行。
+
+## 2026-08-05 RabbitMQ Task 11 节点发现与名称真实性修复
+
+- Provider 新增两个脱敏回归：连接发现节点不得用实例地址冒充名称；同批其他节点级序列提供唯一一致 `rabbitmq_node` 时必须确定性补全。旧实现分别以地址回退和未利用标签得到 RED，移除推测回退并增加全批唯一提示后 GREEN。
+- 当前 `rabbitmq_identity_info` 与近期 inventory 合并构建具名节点，连接指标只补充发现未覆盖实例；冲突名称保持缺失，缺名节点使用内部不可逆观察身份，不向 API 暴露原始采集身份。
+- 页面新增空名称规格，旧实现显示空白得到 RED；节点名称列改为“暂无数据”后 RabbitMQ 页面全部用例 GREEN，实例地址仍只出现在独立列。
+- RabbitMQ Provider/领域/Service/HTTP 定向套件通过；现有 8080 原位重建时镜像内前端全量、typecheck/build、Go 普通/race/编译均通过。重建后容器健康、现有 8080、错误回退移除及两层 whitespace 检查通过。

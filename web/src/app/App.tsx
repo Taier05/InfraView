@@ -13,6 +13,7 @@ import { ElasticsearchPage } from '../features/elasticsearch/ElasticsearchPage'
 import { HostListPage } from '../features/hosts/HostListPage'
 import { MySQLPage } from '../features/mysql/MySQLPage'
 import { OverviewPage } from '../features/overview/OverviewPage'
+import { RabbitMQPage } from '../features/rabbitmq/RabbitMQPage'
 import { RedisPage } from '../features/redis/RedisPage'
 import { AppShell } from './AppShell'
 import './theme.css'
@@ -71,6 +72,7 @@ export function App() {
               <Route path="mysql" element={<MySQLPage />} />
               <Route path="redis" element={<RedisPage />} />
               <Route path="elasticsearch" element={<ElasticsearchPage />} />
+              <Route path="rabbitmq" element={<RabbitMQPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

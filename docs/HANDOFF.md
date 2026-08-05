@@ -1,10 +1,14 @@
 # InfraView 开发交接
 
-最后更新：2026-08-04
+最后更新：2026-08-05
 
 ## 当前 main 恢复入口
 
-当前工作目录为 `/root/github/InfraView`、分支为 `main`，Elasticsearch 功能基线为 `80da061 feat: add read-only Elasticsearch monitoring`，此前已批准的设计提交 `6541556` 与功能提交均已推送到 `origin/main`；当前 HEAD 为随后补充的交接记录提交，正常预期为 `main...origin/main` 且工作树干净。2026-08-04 提交前 fresh 无缓存生产镜像 `infraview:elasticsearch-precommit-verify` 已完成前端 12 文件/159 项、typecheck/build、Go 全仓普通/race 和编译，均退出 0。总览异常节点汇总版本已按授权原位重建现有 8080，Chromium 3/3、唯一端口和容器安全验收通过；继续只连接测试 Nightingale。未运行会创建 18080 的动态 E2E 栈，也未连接生产 Nightingale/Elasticsearch。
+当前工作目录为 `/root/github/InfraView`、分支为 `main`。RabbitMQ Task 1–11 已在共享工作树实现并等待已授权提交：Task 1–9 提供独立领域/Mock、固定 22 查询 Nightingale Provider、共享快照 Service、两个认证 GET API、总览第六卡、侧边栏、共享 `ListPage` 上的 15 列节点页与合成 Playwright 规格；Task 10 修复同一采集目标下多个节点被覆盖并统一总览全零摘要；Task 11 用连接指标补充发现身份结果暂缺的实例，并彻底移除实例地址/`ident` 节点名称推测。恢复时必须保留全部 staged、tracked unstaged 与未跟踪计划差异，不得 reset、restore、checkout 或 clean，并先核对 `git status --short --branch`、`git diff --check` 与 `git diff --cached --check`。
+
+RabbitMQ 固定查询仍恰好一次 batch、无集群/节点/指标 N+1；当前与近期身份建立具名节点，连接指标只补充发现缺失实例，`cluster + instance` 只做候选索引。同批结果仅在显式 `rabbitmq_node` 唯一一致时补全名称，缺失或冲突时 API 名称为空且页面显示“暂无数据”；实例地址和 `ident` 不得冒充名称。带节点标签的指标精确归并，歧义的无节点标签指标保持缺失；两条吞吐查询保留节点维度。集群通信和节点状态严格分离，既有阈值、freshness、只读 API 和页面列不变。Task 11 前后端 RED→GREEN、定向测试及镜像内前端/Go 全量、race、编译均通过。现有 8080 已按授权原位重建，健康、唯一端口和错误回退移除检查通过；动态登录态 Chromium 未执行。禁止新建任何 InfraView 端口、连接生产 Nightingale/RabbitMQ、读取或输出私密环境内容、认证信息与上游正文。
+
+以下 Elasticsearch 记录属于上一已交付基线，必须保留但不是当前 RabbitMQ 工作树状态：Elasticsearch 功能基线为 `80da061 feat: add read-only Elasticsearch monitoring`，此前已批准的设计提交 `6541556` 与功能提交均已推送到 `origin/main`。2026-08-04 提交前 fresh 无缓存生产镜像 `infraview:elasticsearch-precommit-verify` 已完成前端 12 文件/159 项、typecheck/build、Go 全仓普通/race 和编译，均退出 0。总览异常节点汇总版本已按授权原位重建现有 8080，Chromium 3/3、唯一端口和容器安全验收通过；继续只连接测试 Nightingale。未运行会创建 18080 的动态 E2E 栈，也未连接生产 Nightingale/Elasticsearch。
 
 历史 Redis 功能基线为 `c3b5c7d feat: add read-only Redis monitoring`，已推送到 `origin/main`；此前交接基线 `cfe4a40` 与 SMART 功能提交 `6300413` 也均在 `origin/main`。这些 Redis/SMART 的现场验收、8080 重建和提交/推送记录只属于历史功能，不是当前 Elasticsearch 结果。继续开发前仍须先做 Git 只读检查；如实际工作区出现用户后续差异，必须保留，不得清理或回退。
 
@@ -45,13 +49,18 @@
 22. docs/superpowers/plans/2026-08-04-elasticsearch-table-density-and-uptime-fix.md
 23. docs/superpowers/specs/2026-08-04-elasticsearch-overview-node-summary-design.md
 24. docs/superpowers/plans/2026-08-04-elasticsearch-overview-node-summary.md
+25. docs/superpowers/specs/2026-08-04-rabbitmq-cluster-and-node-module-design.md
+26. docs/superpowers/plans/2026-08-04-rabbitmq-cluster-and-node-module.md
 
 先只读执行：
 git status --short --branch
 git log -3 --oneline
 git diff --check
+git diff --cached --check
 
-InfraView 始终只读。当前应看到 `main...origin/main` 且工作树干净，Elasticsearch 功能基线为 `80da061`；若出现后续用户差异必须保留，不得清理。Elasticsearch 首期为总览第五卡与 16 列节点页，固定一次 26 查询 batch、无 N+1，集群身份为 cluster，节点身份为 cluster + name；仅有两个认证 GET API。集群与节点状态严格分离，默认 15 秒周期 2/5 周期 freshness；节点磁盘 85%/90%、JVM 堆 75%/85%、拒绝速率大于 0 的阈值由测试锁定。总览卡显示“异常节点 x / 总节点”，异常节点为节点 warning、critical、unknown 之和；严重与警告/未知分徽标展示，集群健康继续单独展示，集群与节点总数同时为零才显示空状态。页面复用共享 ListPage/ModuleStatusCardShell，每格单值单行；角色超过两个时显示前两个与 `…`，`title` 保留完整值。1440×900 页面和表格均无横向滚动，更窄视口才使用表格内部滚动兜底。uptime 专用解析接受 Prometheus 有限非负小数/科学计数文本并向下取整，其他计数指标仍严格解析。提交前 fresh 全量、现有 8080 原位重建、Chromium 3/3、唯一端口和容器安全验收均已通过；8080 继续只连接测试 Nightingale。未运行会创建 18080 的动态 E2E 栈，也未连接生产 Nightingale/Elasticsearch；后续修改、提交、推送仍分别需要明确授权。禁止读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/容量/指标值或上游正文，任何生产 Nightingale/Elasticsearch 验证永久禁止。
+InfraView 始终只读。当前 RabbitMQ Task 1–11 差异是有意未提交状态，必须全部保留，不得清理。RabbitMQ 首期仍为总览第六卡与 15 列节点页，固定一次 22 查询 batch、无 N+1；连接指标补充发现身份暂缺实例，节点名称只接受唯一一致的显式标签，缺失显示“暂无数据”，并统一总览全零摘要为“无异常”。2026-08-05 fresh Go/前端验证与现有 8080 原位重建已完成，健康、唯一端口与容器安全基线通过。动态登录态 Chromium 未执行，提交和推送已获授权、尚待执行。禁止读取或输出私密环境文件、Token、Cookie、认证头、Base URL、真实标识/IP/数量/容量/指标值或上游正文，任何生产 Nightingale/RabbitMQ 验证永久禁止。
+
+Elasticsearch 历史基线为 `80da061`，其提交前 fresh 全量、现有 8080 原位重建、Chromium 3/3、唯一端口和容器安全验收均已通过。该历史证据不能用于声明当前 RabbitMQ 已全量验证或已部署。
 
 Redis 为独立垂直模块，固定 21 查询一次 batch、无 N+1，15 秒预期周期与 2/5 周期 freshness。共享 `ListPage` 与 `ModuleStatusCardShell`、Redis 首个接入和最终十一列已完成全量离线验证并原位重建至现有 8080。运行时间已纠正为主机/MySQL 的天/小时格式；Dockerfile 内前端/Go 全量验证、容器健康、唯一 8080、安全基线和部署资源匹配均通过。功能提交 `c3b5c7d` 已推送到 `origin/main`，未连接生产 Nightingale。
 
@@ -179,9 +188,9 @@ Nightingale v8.4.1 兼容功能已经快进合并并推送到 `origin/main`，�
 
 ## 新对话的第一组任务
 
-1. 先查看 `git status`、`git log -3 --oneline` 和 `git diff --check`，确认当前位于 `main`；记录预期是 `main...origin/main`、工作树干净，且历史中包含 Elasticsearch 功能基线 `80da061`。
-2. Elasticsearch 已提交并推送；若出现新的用户差异，必须保留且不得 reset/restore/checkout/clean。若实际状态不同先报告，不把历史 Redis/SMART 状态覆盖到当前工作树。
-3. 表格密度、角色省略、健康颜色、uptime 和总览异常节点汇总均已实现并原位重建至现有测试 8080。等待下一项明确开发需求；禁止动态 E2E 创建 18080、额外端口、生产 Nightingale/Elasticsearch 和私密信息输出。
+1. 先查看 `git status --short --branch`、`git log -3 --oneline`、`git diff --check` 和 `git diff --cached --check`，确认当前位于 `main`；预期为 40 个文件 staged、15 个 tracked unstaged、1 个未跟踪实施计划，历史中包含 Elasticsearch 功能基线 `80da061`。
+2. 完整阅读 RabbitMQ design/plan 与 Task 1–11 记录；保留所有现有差异，不得 reset/restore/checkout/clean。若实际文件范围不同先报告，不把历史 Redis/Elasticsearch/SMART 状态覆盖到当前工作树。
+3. RabbitMQ Task 11 fresh 全量和现有 8080 原位重建已经完成；动态登录态 Chromium 未执行，提交和推送已获授权、尚待执行。继续时严格按新的明确授权范围行动；禁止动态 E2E 创建额外端口、任何其他 InfraView 端口、生产 Nightingale/RabbitMQ 和私密信息输出。
 
 ## 安全边界
 

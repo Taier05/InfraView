@@ -50,3 +50,7 @@ Redis 复用 Nightingale 安全客户端，只允许代码固定的 21 条即时
 ## Elasticsearch 模块边界
 
 Elasticsearch 首期只展示集群健康和节点清单，不含索引/节点详情、历史、拓扑或控制能力。稳定集群 ID 只使用 `cluster`，稳定节点 ID 只使用 `cluster + name`；地址仅展示，采集身份不得进入 API。产品不包含 Elasticsearch 客户端、写 API、`_cluster/reroute`、设置修改、索引开关、forcemerge、delete-by-query、命令执行或远程控制。本轮只完成离线验证，未访问真实 Nightingale/Elasticsearch，未重建或访问现有 8080。
+
+## RabbitMQ 模块边界
+
+RabbitMQ 复用 Nightingale 安全客户端，只允许代码内顺序固定的 22 条即时查询组成一次 batch，无集群/节点/指标 N+1。集群永久身份只在 Provider 内参与不可逆哈希，API 不包含永久身份、`ident`、原始标签、PromQL、数据源信息、上游 URL 或正文。连接指标只允许补充发现实例；节点名称只能来自同批结果中唯一一致的显式 `rabbitmq_node`，缺失或冲突时保持空值，禁止以实例地址、`ident` 或命名模式推测。共享采集目标下的节点以不可逆身份分别保存；无节点标签且关联不唯一的指标保持缺失，禁止把歧义数据复制到多个节点。仅有两个受认证 GET 路由；总览拒绝查询参数，节点列表采用参数白名单，其他方法返回 405。产品不直连 RabbitMQ Management API，不包含发布/消费、队列删除、节点重启、故障转移、策略/权限/绑定配置、命令执行或远程控制。当前队列序列缺少 queue/vhost 身份标签，禁止伪造队列级清单。本轮动态浏览器仍未执行；现有 8080 只连接既有测试 Nightingale 并已原位重建，未创建其他端口，未读取或输出认证信息与上游正文。

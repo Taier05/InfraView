@@ -123,7 +123,7 @@ it('健康连接默认显示紧凑汇总并可展开 Nightingale 详情', async 
   )
 })
 
-it('按总览主机硬盘MySQLRedisElasticsearch顺序展示只读导航', async () => {
+it('按总览主机硬盘MySQLRedisElasticsearchRabbitMQ顺序展示只读导航', async () => {
   renderShell()
 
   const navigation = screen.getByRole('navigation', { name: '主导航' })
@@ -135,6 +135,7 @@ it('按总览主机硬盘MySQLRedisElasticsearch顺序展示只读导航', async
     'MySQL',
     'Redis',
     'Elasticsearch',
+    'RabbitMQ',
   ])
   expect(links.map((link) => link.getAttribute('href'))).toEqual([
     '/',
@@ -143,6 +144,7 @@ it('按总览主机硬盘MySQLRedisElasticsearch顺序展示只读导航', async
     '/mysql',
     '/redis',
     '/elasticsearch',
+    '/rabbitmq',
   ])
   expect(within(navigation).queryByRole('button')).not.toBeInTheDocument()
   expect(within(navigation).queryByText(/详情|操作/)).not.toBeInTheDocument()
