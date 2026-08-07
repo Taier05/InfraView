@@ -219,6 +219,87 @@ func TestElasticsearchServiceKeepsFreshnessBoundToTheReturnedSnapshot(t *testing
 	}
 }
 
+func TestElasticsearchServiceSuccessfulReloadAdvancesFreshnessWithoutStale(t *testing.T) {
+	now := time.Date(2026, 8, 1, 8, 0, 0, 0, time.UTC)
+	clock := &elasticsearchTestClock{now: now}
+	cluster := healthyElasticsearchCluster("fixture-cluster-a")
+	node := healthyElasticsearchNode(cluster.Name, "fixture-node-a")
+	provider := &recordingElasticsearchProvider{snapshot: elasticsearch.Snapshot{Clusters: []elasticsearch.Cluster{cluster}, Nodes: []elasticsearch.Node{node}}}
+	service := NewElasticsearch(provider, cache.New(clock.Now), ElasticsearchOptions{SnapshotTTL: time.Second, CollectionInterval: 15 * time.Second, MaxStale: time.Minute, Clock: clock.Now})
+
+	firstState, firstMeta, err := service.snapshotState(context.Background())
+	if err != nil || firstMeta.Stale {
+		t.Fatalf("first meta = %#v, err = %v", firstMeta, err)
+	}
+	firstClusterAdvancedAt, ok := firstState.clusterAdvancedAt[cluster.ID]
+	if !ok {
+		t.Fatalf("first cluster freshness is missing for %q", cluster.ID)
+	}
+	firstNodeAdvancedAt, ok := firstState.nodeAdvancedAt[node.ID]
+	if !ok {
+		t.Fatalf("first node freshness is missing for %q", node.ID)
+	}
+	clock.Advance(2 * time.Second)
+	provider.snapshot.Clusters[0].ReportedAt = firstState.snapshot.Clusters[0].ReportedAt.Add(time.Second)
+	provider.snapshot.Nodes[0].ReportedAt = firstState.snapshot.Nodes[0].ReportedAt.Add(time.Second)
+	secondState, secondMeta, err := service.snapshotState(context.Background())
+	if err != nil || secondMeta.Stale {
+		t.Fatalf("second meta = %#v, err = %v", secondMeta, err)
+	}
+	if got := service.clusterCollectionLevel(secondState.snapshot.Clusters[0], secondState.clusterAdvancedAt); got != LevelNormal {
+		t.Fatalf("cluster collection level = %q, want %q", got, LevelNormal)
+	}
+	if got := service.nodeCollectionLevel(secondState.snapshot.Nodes[0], secondState.nodeAdvancedAt); got != LevelNormal {
+		t.Fatalf("node collection level = %q, want %q", got, LevelNormal)
+	}
+	if got := secondState.clusterAdvancedAt[cluster.ID]; !got.After(firstClusterAdvancedAt) || !got.Equal(clock.Now()) {
+		t.Fatalf("cluster advanced at = %s, want after %s and equal %s", got, firstClusterAdvancedAt, clock.Now())
+	}
+	if got := secondState.nodeAdvancedAt[node.ID]; !got.After(firstNodeAdvancedAt) || !got.Equal(clock.Now()) {
+		t.Fatalf("node advanced at = %s, want after %s and equal %s", got, firstNodeAdvancedAt, clock.Now())
+	}
+	if provider.calls != 2 {
+		t.Fatalf("provider calls = %d, want 2", provider.calls)
+	}
+}
+
+func TestElasticsearchServiceProviderFailureReturnsStaleWithoutAdvancingFreshness(t *testing.T) {
+	now := time.Date(2026, 8, 1, 8, 0, 0, 0, time.UTC)
+	clock := &elasticsearchTestClock{now: now}
+	cluster := healthyElasticsearchCluster("fixture-cluster-a")
+	node := healthyElasticsearchNode(cluster.Name, "fixture-node-a")
+	provider := &recordingElasticsearchProvider{snapshot: elasticsearch.Snapshot{Clusters: []elasticsearch.Cluster{cluster}, Nodes: []elasticsearch.Node{node}}}
+	service := NewElasticsearch(provider, cache.New(clock.Now), ElasticsearchOptions{SnapshotTTL: time.Second, CollectionInterval: 15 * time.Second, MaxStale: time.Minute, Clock: clock.Now})
+
+	firstState, firstMeta, err := service.snapshotState(context.Background())
+	if err != nil || firstMeta.Stale {
+		t.Fatalf("first meta = %#v, err = %v", firstMeta, err)
+	}
+	clock.Advance(2 * time.Second)
+	provider.err = elasticsearch.ErrUnavailable
+	staleState, staleMeta, err := service.snapshotState(context.Background())
+	if err != nil || !staleMeta.Stale {
+		t.Fatalf("stale meta = %#v, err = %v", staleMeta, err)
+	}
+	if !reflect.DeepEqual(staleState.clusterAdvancedAt, firstState.clusterAdvancedAt) || !reflect.DeepEqual(staleState.nodeAdvancedAt, firstState.nodeAdvancedAt) {
+		t.Fatalf("stale freshness advanced: cluster = %#v, node = %#v; want %#v/%#v", staleState.clusterAdvancedAt, staleState.nodeAdvancedAt, firstState.clusterAdvancedAt, firstState.nodeAdvancedAt)
+	}
+	if provider.calls != 2 {
+		t.Fatalf("provider calls = %d, want 2", provider.calls)
+	}
+}
+
+func TestElasticsearchServiceInitialProviderFailureReturnsUnavailable(t *testing.T) {
+	now := time.Date(2026, 8, 1, 8, 0, 0, 0, time.UTC)
+	provider := &recordingElasticsearchProvider{err: elasticsearch.ErrUnavailable}
+	service := NewElasticsearch(provider, cache.New(func() time.Time { return now }), ElasticsearchOptions{Clock: func() time.Time { return now }})
+
+	_, _, err := service.snapshotState(context.Background())
+	if !errors.Is(err, elasticsearch.ErrUnavailable) {
+		t.Fatalf("snapshotState() error = %v, want ErrUnavailable", err)
+	}
+}
+
 func TestElasticsearchServiceFreshnessBoundariesAndTimestampRollback(t *testing.T) {
 	now := time.Date(2026, 8, 1, 8, 0, 0, 0, time.UTC)
 	clock := &elasticsearchTestClock{now: now}

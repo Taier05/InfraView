@@ -159,6 +159,7 @@ it('严格渲染十个可排序单值单行列，并使用共享列表壳', asyn
     expect(header.textContent).not.toMatch(/[⇅↑↓]/)
   }
   const table = screen.getByRole('table')
+  expect(table).toHaveClass('host-table', 'disk-table', 'observability-table')
   const scrollOwner = table.closest('.host-table-scroll')
   expect(scrollOwner).not.toBeNull()
   expect(scrollOwner?.parentElement).toHaveClass('host-table-panel')

@@ -157,6 +157,7 @@ it('桌面表格使用固定紧凑布局并为可裁剪身份保留完整提示'
   const table = await screen.findByRole('table', {
     name: 'Elasticsearch 节点列表',
   })
+  expect(table).toHaveClass('host-table', 'elasticsearch-table', 'observability-table')
   await screen.findByText('fixture-es-node-a')
   expect(getComputedStyle(table).tableLayout).toBe('fixed')
   expect(getComputedStyle(table).width).toBe('100%')

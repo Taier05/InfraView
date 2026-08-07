@@ -746,7 +746,7 @@ export function ElasticsearchPage() {
           }
         >
           <table
-            className="host-table elasticsearch-table"
+            className="host-table elasticsearch-table observability-table"
             aria-label="Elasticsearch 节点列表"
           >
             <thead>

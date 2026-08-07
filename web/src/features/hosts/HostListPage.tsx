@@ -527,7 +527,7 @@ export function HostListPage() {
           }
         >
           {hosts.data.data.total > 0 && (
-            <table className="host-table host-list-table">
+            <table className="host-table host-list-table observability-table">
                 <thead>
                   {table.getHeaderGroups().map((headerGroup) => (
                     <tr key={headerGroup.id}>

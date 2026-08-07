@@ -160,6 +160,7 @@ it('按固定顺序渲染十二个单值单行列，并使用共享列表壳', a
   }
 
   const table = screen.getByRole('table')
+  expect(table).toHaveClass('host-table', 'host-list-table', 'observability-table')
   const scrollOwner = table.closest('.host-table-scroll')
   expect(scrollOwner).not.toBeNull()
   expect(scrollOwner?.parentElement).toHaveClass('host-table-panel')

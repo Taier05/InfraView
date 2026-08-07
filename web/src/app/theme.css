@@ -1094,6 +1094,50 @@ h1 {
   line-height: normal;
 }
 
+.host-table th {
+  color: var(--text-muted);
+  background: #11181e;
+  font-size: 0.76rem;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+}
+
+.host-table.observability-table th,
+.host-table.observability-table td {
+  padding: 0.3rem 0.18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.host-table.observability-table th {
+  font-size: 0.62rem;
+  font-weight: 750;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.host-table.observability-table td {
+  font-size: 0.69rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.host-table.observability-table .status-badge,
+.host-table.observability-table .host-status {
+  gap: 0.2rem;
+  padding: 0.14rem 0.26rem;
+  font-size: 0.66rem;
+  font-weight: 750;
+}
+
+.host-table.observability-table .status-badge-dot,
+.host-table.observability-table .host-status-dot {
+  width: 0.36rem;
+  height: 0.36rem;
+  flex: 0 0 auto;
+}
+
 .host-table.host-list-table {
   min-width: 78rem;
   table-layout: fixed;
@@ -1132,19 +1176,9 @@ h1 {
 
 .host-table.elasticsearch-table th,
 .host-table.elasticsearch-table td {
-  padding: 0.3rem 0.2rem;
   overflow: hidden;
   text-overflow: clip;
   white-space: nowrap;
-}
-
-.host-table.elasticsearch-table th {
-  font-size: 0.64rem;
-  letter-spacing: 0;
-}
-
-.host-table.elasticsearch-table td {
-  font-size: 0.7rem;
 }
 
 .host-table.elasticsearch-table th:nth-child(1) { width: 7.5%; }
@@ -1184,15 +1218,10 @@ h1 {
 .elasticsearch-health,
 .elasticsearch-table td:last-child .status-badge {
   max-width: 100%;
-  gap: 0.2rem;
-  padding: 0.14rem 0.26rem;
-  font-size: 0.66rem;
 }
 
 .elasticsearch-health .status-badge-dot,
 .elasticsearch-table td:last-child .status-badge-dot {
-  width: 0.36rem;
-  height: 0.36rem;
   flex: 0 0 auto;
 }
 
@@ -1210,19 +1239,9 @@ h1 {
 
 .host-table.rabbitmq-table th,
 .host-table.rabbitmq-table td {
-  padding: 0.3rem 0.18rem;
   overflow: hidden;
   text-overflow: clip;
   white-space: nowrap;
-}
-
-.host-table.rabbitmq-table th {
-  font-size: 0.62rem;
-  letter-spacing: 0;
-}
-
-.host-table.rabbitmq-table td {
-  font-size: 0.69rem;
 }
 
 .host-table.rabbitmq-table th:nth-child(1) { width: 9%; }
@@ -1265,14 +1284,9 @@ h1 {
 
 .rabbitmq-table td:last-child .status-badge {
   max-width: 100%;
-  gap: 0.2rem;
-  padding: 0.14rem 0.26rem;
-  font-size: 0.66rem;
 }
 
 .rabbitmq-table td:last-child .status-badge-dot {
-  width: 0.36rem;
-  height: 0.36rem;
   flex: 0 0 auto;
 }
 
@@ -1284,19 +1298,9 @@ h1 {
 
 .host-table.java-table th,
 .host-table.java-table td {
-  padding: 0.3rem 0.18rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.host-table.java-table th {
-  font-size: 0.62rem;
-  letter-spacing: 0;
-}
-
-.host-table.java-table td {
-  font-size: 0.69rem;
 }
 
 .host-table.java-table th:nth-child(1) { width: 8%; }
@@ -1329,14 +1333,9 @@ h1 {
 
 .java-table td:last-child .status-badge {
   max-width: 100%;
-  gap: 0.2rem;
-  padding: 0.14rem 0.26rem;
-  font-size: 0.66rem;
 }
 
 .java-table td:last-child .status-badge-dot {
-  width: 0.36rem;
-  height: 0.36rem;
   flex: 0 0 auto;
 }
 
@@ -1346,20 +1345,8 @@ h1 {
   }
 }
 
-.mysql-table-compact th,
-.mysql-table-compact td {
-  padding: 0.32rem 0.3rem;
-}
-
 .mysql-table-compact th {
-  font-size: 0.68rem;
-  line-height: 1.1;
   white-space: nowrap;
-}
-
-.mysql-table-compact td {
-  font-size: 0.72rem;
-  line-height: 1.15;
 }
 
 .mysql-table-compact th:nth-child(1) { width: 13%; }
@@ -1397,21 +1384,6 @@ h1 {
   width: 100%;
   min-width: 0;
   table-layout: fixed;
-}
-
-.host-table.disk-table th,
-.host-table.disk-table td {
-  padding: 0.32rem 0.3rem;
-}
-
-.host-table.disk-table th {
-  font-size: 0.68rem;
-  line-height: 1.1;
-}
-
-.host-table.disk-table td {
-  font-size: 0.72rem;
-  line-height: 1.15;
 }
 
 .host-table.disk-table th:nth-child(1) { width: 11%; }
@@ -1457,7 +1429,6 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text-muted);
-  font-size: 0.75rem;
   white-space: nowrap;
 }
 
@@ -1467,7 +1438,6 @@ h1 {
 
 .disk-table .status-badge {
   max-width: 100%;
-  padding-inline: 0.3rem;
 }
 
 .disk-table .status-badge-dot {
@@ -1489,14 +1459,6 @@ h1 {
 .host-config-value {
   color: inherit;
   font: inherit;
-}
-
-.host-table th {
-  color: var(--text-muted);
-  background: #11181e;
-  font-size: 0.76rem;
-  font-weight: 750;
-  letter-spacing: 0.03em;
 }
 
 .host-table tbody tr:last-child td {
@@ -1618,13 +1580,9 @@ h1 {
 .host-status {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  font-weight: 600;
 }
 
 .host-status-dot {
-  width: 0.48rem;
-  height: 0.48rem;
   border-radius: 50%;
   background: currentColor;
 }

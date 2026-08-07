@@ -1,5 +1,15 @@
 # 测试与验收
 
+## 2026-08-07 Elasticsearch inventory 稳定性与七页共享排版
+
+- 前序 RED→GREEN 与审查修复分别锁定：cluster/node inventory 仅按有效真实上报时间选择最新候选，单条非法候选局部跳过，同一最新时间的地址冲突只清空地址；Service/HTTP 连续成功推进保持 fresh，真实 Provider 失败保持 stale/503。固定 26 查询、单次 `query-instant-batch`、缓存和 2/5 freshness 未变。
+- Go 1.24 一次性容器门禁以 exit 0 完成：gofmt 无输出、`go vet ./...`、`go test ./... -count=1`、`go test -race ./... -count=1` 与 `CGO_ENABLED=0 GOOS=linux go build -trimpath` 均通过。
+- Node 22 首次与 Go 容器并行的全量 Vitest 为 17 文件/330 项，其中 Elasticsearch 与 RabbitMQ 的两个排序白名单用例各在 5 秒超时，命令 exit 1。无并行竞争时以原样两文件定向复验为 57/57、exit 0；随后完整串行门禁为 17 文件/330 项、typecheck、production build 和 Playwright `--list` 27 项，均 exit 0。未修改代码、测试或超时配置。
+- 非阻断 warning：`npm ci` 的弃用/版本提示；只读 POST 405 契约触发的预期 MSW 未匹配 handler 日志；Vite 对第三方 `"use client"` 指令的既有忽略提示。未修改依赖或执行 audit fix。
+- 扫描确认 `elasticsearchQueryCount` 由 26 个固定查询项派生，Provider 仍只走一次即时 batch；生产 Elasticsearch 路径无 `POST`、`PUT`、`PATCH` 或 `DELETE` 命中。`retry` 命中仅为既有页面错误态 `refetch` UI，不是新增传输 retry。敏感模式命中只来自脱敏测试契约与历史文档；未记录或输出秘密、真实现场值或上游正文。`git diff --check` 和 `git diff --cached --check` 无输出。
+- 最终整包审查通过后，经用户单独授权执行 `INFRAVIEW_ENV_FILE=/root/github/InfraView/.env INFRAVIEW_PORT=8080 docker compose --project-name infraview up -d --build --force-recreate infraview`，用当前未提交工作树原位重建现有 8080。镜像内再次通过前端 17 文件/330 项、typecheck/build、Go 普通/race/编译；服务健康、仅有原 8080、运行镜像为当前构建，并保持 `10001:10001`、只读根文件系统、cap drop `ALL` 与禁止提权。健康接口通过，Elasticsearch、RabbitMQ、Java 的未认证只读 API 均拒绝为 401；未输出响应正文或现场值，未执行登录态或动态浏览器验收，未创建额外端口，未 commit、push 或 merge。
+- 用户视觉验收确认七页共享排版在强制刷新后统一。随后发现 Java“端口进程一致性”仍为普通文本；新增第 8 列徽标断言先因 `.status-badge` 缺失得到 RED，复用既有 `BinaryStatus` 后定向测试与 typecheck 转为 GREEN。再次原位重建时，镜像内前端 17 文件/330 项、typecheck/build、Go 普通/race/编译全部通过；部署后健康、唯一 8080、安全基线、当前镜像与 Java 未认证拒绝再次通过。未执行登录态或动态浏览器验收，未 commit、push 或 merge。
+
 ## 2026-08-07 数据时间与 Elasticsearch 瞬时空组修复
 
 - Elasticsearch Provider 定向测试锁定固定 26 组、仅第 25/26 组 inventory 为硬依赖，第 1–24 组逐组 `null` 均能安全构建快照；批次数和 inventory 失败契约保持不变。

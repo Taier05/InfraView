@@ -628,7 +628,7 @@ export function MySQLPage() {
             )
           }
         >
-          <table className="host-table mysql-table mysql-table-compact">
+          <table className="host-table mysql-table mysql-table-compact observability-table">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>

@@ -99,6 +99,11 @@ it('严格渲染固定顺序的十三个单值单行列', async () => {
   renderPage()
 
   await screen.findByText('fixture-business-a')
+  expect(screen.getByRole('table', { name: 'Java 业务服务列表' })).toHaveClass(
+    'host-table',
+    'java-table',
+    'observability-table',
+  )
   expect(
     screen.getAllByRole('columnheader').map((cell) => cell.textContent),
   ).toEqual(exactHeaders)
@@ -281,7 +286,7 @@ it('以中文标签展示业务端但保留业务代码作为筛选值', async (
   await waitFor(() => expect(requests.at(-1)?.searchParams.get('name')).toBe('constructor'))
 })
 
-it('以带等级的徽标展示健康端口和进程的可空二值状态', async () => {
+it('以带等级的徽标展示健康端口进程和端口进程一致性的可空二值状态', async () => {
   const base = cloneFixture().data.services[0]
   responseBody = javaServicePageFixture({
     data: {
@@ -291,6 +296,7 @@ it('以带等级的徽标展示健康端口和进程的可空二值状态', asyn
         health_up: true,
         port_up: false,
         process_up: null,
+        port_consistent: true,
         status: 'critical',
         status_source: 'port',
       }],
@@ -305,6 +311,7 @@ it('以带等级的徽标展示健康端口和进程的可空二值状态', asyn
     [2, '正常', 'normal'],
     [4, '异常', 'critical'],
     [5, '暂无数据', 'unknown'],
+    [7, '正常', 'normal'],
   ] as const) {
     const badge = cells[index].querySelector('.status-badge')
     expect(badge).toHaveTextContent(label)

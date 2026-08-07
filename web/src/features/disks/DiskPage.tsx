@@ -582,7 +582,7 @@ export function DiskPage() {
           }
         >
           {devices.data.data.total > 0 && (
-            <table className="host-table disk-table">
+            <table className="host-table disk-table observability-table">
                   <thead>
                     {table.getHeaderGroups().map((headerGroup) => (
                       <tr key={headerGroup.id}>

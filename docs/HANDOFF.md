@@ -2,13 +2,15 @@
 
 最后更新：2026-08-07
 
-## 当前隔离工作树 / 旧模块列表统一恢复入口
+## 当前隔离工作树 / 旧模块列表、七页排版与 Elasticsearch inventory 稳定性恢复入口
 
-当前工作目录为 `/root/github/InfraView/.worktrees/list-table-consistency`，分支为 `feature/list-table-consistency`。Task 1–6 实现基线为 `5a3625f test: isolate list sort page reset cases`；继续前先完整阅读本节、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/superpowers/specs/2026-08-07-list-table-consistency-and-java-presentation-design.md` 和 `docs/superpowers/plans/2026-08-07-list-table-consistency.md`，再只读执行 `git status --short --branch`、`git log -3 --oneline`、`git diff --check` 与 `git diff --cached --check`。必须以实时 Git 结果为准，不能将下方 `main` 的历史交接当作本工作树的当前状态。
+当前工作目录为 `/root/github/InfraView/.worktrees/list-table-consistency`，分支为 `feature/list-table-consistency`，当前 HEAD 为 `0672b86`。继续前先完整阅读本节、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/TESTING.md`、两份 2026-08-07 相关计划及 `.superpowers/sdd/2026-08-07-elasticsearch-inventory-stability/task-4-report.md`，再只读执行 `git status --short --branch`、`git log -3 --oneline`、`git diff --check` 与 `git diff --cached --check`。必须以实时 Git 结果为准，不能将下方 `main` 的历史交接当作本工作树的当前状态。
 
 主机、硬盘、MySQL、Redis 固定为 12、10、14、13 个紧凑单行列。主机网络发送/接收拆列；硬盘保留“错误摘要”单列；MySQL 拆开版本、角色、QPS、TPS、Buffer Pool 容量/使用率、复制状态/延迟；Redis 拆开阻塞连接、QPS、命中率、复制链路。MySQL/Redis 的连接列仍显示“当前连接/最大连接”，不再把阻塞连接塞入连接单元格。四页每个可见列均为无箭头排序按钮，实际排序始终在服务端完整筛选结果上执行；缺失值始终末置，相同主值以稳定实体 ID 升序收口，排序状态通过 URL、`aria-label`、`title` 与 `data-active` 保存，切换后回到第 1 页。
 
-Java 展示优化仍属于本工作树已保留的交付：13 列不变，健康检查、端口状态、进程状态分别复用正常/异常/暂无数据三类等级色；五项业务端仅改变中文可见标签，筛选 option 值、URL `name` 和 API 参数继续使用原始代码。不得用本次文档覆盖该契约。
+Java 展示优化仍属于本工作树已保留的交付：13 列不变，健康检查、端口状态、进程状态和端口进程一致性分别复用正常/异常/暂无数据三类等级色；五项业务端仅改变中文可见标签，筛选 option 值、URL `name` 和 API 参数继续使用原始代码。七页现在统一使用共享 `observability-table` 排版，原有业务/排序/URL/只读契约均保留。
+
+Elasticsearch inventory 已收口为以真实有效上报时间选择 cluster/node 最新候选：单条非法候选局部跳过；同一最新时间地址冲突只清空地址；更晚有效候选才可更新。Provider 仍恰好一次固定 26 查询 batch，缓存和 2/5 freshness 未变；真实 Provider 失败仍如实 stale/503，不增加 retry 或隐藏告警。
 
 已新鲜完成以下可复现的一次性容器门禁：
 
@@ -17,33 +19,48 @@ docker run --rm --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/npm-cache -v
 docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm sh -c 'files="$(find cmd internal -type f -name "*.go")"; test -z "$(gofmt -l $files)" && go vet ./... && go test ./... -count=1 && go test -race ./... -count=1 && CGO_ENABLED=0 GOOS=linux go build -trimpath -o /tmp/infraview ./cmd/infraview'
 ```
 
-前端结果为 Vitest 16 个文件/303 项、Playwright 27 项静态发现，Go 全仓普通/race 测试均通过，所有门禁 exit 0。只读/敏感扫描与 `git diff --check` 同样通过；四个生产列表页存在固定 `apiRequest` 调用：主机页依赖共享客户端的默认 `GET`，其余三页显式 `GET`；未发现写方法、命令执行、重启、删除、故障转移或任意请求能力。
+前端串行结果为 Vitest 17 个文件/330 项、typecheck、production build 与 Playwright 27 项静态发现；Go 全仓普通/race 测试、gofmt、vet 和 Linux 编译均通过，所有最终门禁 exit 0。首次与 Go 容器并行的前端全量曾有两个排序测试在 5 秒超时；空闲环境原样定向复验 57/57 通过，随后完整串行门禁通过，记录为资源竞争时序警告而非产品修复。固定查询、只读、敏感、whitespace 与 Git 范围扫描详情见 `docs/TESTING.md`；未发现新增写方法、传输 retry、命令执行、重启、删除、故障转移或任意请求能力。
 
-本 Task 仅获本地提交授权；不得 merge、push、部署、重启、启动服务/浏览器、创建端口、连接上游或读取私密环境。文档与报告不得记录 Token、Cookie、认证头、Base URL、真实标识、地址、数量、容量、指标值或上游正文。
+产品/测试、两份计划和四份状态文档当前均未提交；不得在未取得新授权时 commit、merge 或 push。最终整包审查通过后，已按用户授权用当前未提交工作树原位重建现有 8080；服务健康、唯一 8080、非 root、只读根文件系统、cap drop `ALL`、禁止提权、健康接口与未认证 API 拒绝均通过。未创建其他端口，未执行登录态或动态浏览器验收；不得连接生产上游或读取私密环境内容。文档与报告不得记录 Token、Cookie、认证头、Base URL、真实标识、地址、数量、容量、指标值或上游正文。
 
 在新账号或新对话中直接粘贴：
 
 ```text
-继续完成或审阅 InfraView 的旧模块列表统一。请始终使用简体中文回复。
+继续完成或审阅 InfraView 的七页共享观测表排版与 Elasticsearch inventory 稳定性。请始终使用简体中文回复。
 
 工作目录：/root/github/InfraView/.worktrees/list-table-consistency
 分支：feature/list-table-consistency
+当前 HEAD：0672b86
 
 先完整阅读：
 1. docs/HANDOFF.md
 2. docs/PROJECT_STATUS.md
 3. docs/TODO.md
-4. docs/superpowers/specs/2026-08-07-list-table-consistency-and-java-presentation-design.md
-5. docs/superpowers/plans/2026-08-07-list-table-consistency.md
-6. .superpowers/sdd/2026-08-07-list-table-consistency/task-7-brief.md
+4. docs/TESTING.md
+5. docs/superpowers/specs/2026-08-07-table-typography-and-elasticsearch-inventory-stability-design.md
+6. docs/superpowers/plans/2026-08-07-observability-table-typography.md
+7. docs/superpowers/plans/2026-08-07-elasticsearch-inventory-stability.md
+
+若文件存在，再读取：
+- .superpowers/sdd/2026-08-07-observability-table-typography/progress.md
+- .superpowers/sdd/2026-08-07-elasticsearch-inventory-stability/progress.md
+- .superpowers/sdd/2026-08-07-elasticsearch-inventory-stability/task-4-report.md
 
 然后只读执行：
 git status --short --branch
-git log -3 --oneline
+git log -6 --oneline
 git diff --check
 git diff --cached --check
 
-四页列表列数依次为主机 12、硬盘 10、MySQL 14、Redis 13；所有可见列均服务端排序、缺失值始终末置、稳定 ID 收口，表头无可见排序箭头。Java 13 列和中文业务端显示保持，查询仍用原始代码。产品始终只读；禁止输出或读取私密环境、认证信息、真实现场数据和上游正文。未获独立授权不得启动服务或浏览器、创建端口、连接上游、merge、push、部署或重启。
+当前未提交范围包含：七页共享排版的 16 个前端文件、Elasticsearch Provider 与 Service/HTTP 相关测试、四份状态文档、两份当前计划；不得 `git reset`、`git clean`、回退或丢弃任何既有差异。
+
+当前实现：主机、硬盘、MySQL、Redis、Elasticsearch、RabbitMQ、Java 七页共享 `observability-table` 排版；Elasticsearch 历史 cluster/node inventory 按有效真实上报时间选最新候选，单条非法候选局部跳过，同一最新时间地址冲突只清空地址。固定一次 26 查询 batch、缓存和 2/5 freshness 保持不变；真实 Provider 失败仍如实 stale/503，不增加 retry 或隐藏告警。
+
+验证：首轮 Node 全量与 Go 容器并行时，两个排序用例各在 5 秒超时；随后原样两文件定向为 57/57 通过，完整串行 Node 门禁为 Vitest 17 文件/330 项、typecheck、production build、Playwright 静态发现 27 项均通过，Go 全量门禁也通过。不要把这组观察夸大为已证实的因果；详见 `docs/TESTING.md` 和存在时的 Task 4 报告。
+
+现有 8080 已按授权用当前未提交工作树原位重建，健康、唯一端口与容器安全基线通过；未创建其他端口，未执行登录态或动态浏览器验收，也未连接生产。commit、push、merge 未获授权。
+
+产品始终只读：禁止输出或读取私密环境、Token、Cookie、认证头、Base URL、真实标识、地址、数量、容量、指标值或上游正文；不得启动服务或浏览器、访问上游、执行运维写操作、任意 PromQL 或任意代理。
 ```
 
 ## 当前数据时间与 Elasticsearch 容错恢复入口（已合并、已推送、已部署）

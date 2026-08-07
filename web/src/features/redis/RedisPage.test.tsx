@@ -233,6 +233,11 @@ it("严格渲染 Redis 十三列及拆分后的指标语义", async () => {
     await screen.findByRole("heading", { name: "Redis 实例" }),
   ).toBeVisible();
   await screen.findByTitle("192.0.2.40:6379");
+  expect(screen.getByRole("table")).toHaveClass(
+    "host-table",
+    "redis-table",
+    "observability-table",
+  );
   expect(
     screen
       .getAllByRole("columnheader")

@@ -150,22 +150,6 @@ func TestBuildElasticsearchSnapshotRejectsUnsafeInventoryShapes(t *testing.T) {
 			groups[elasticsearchNodeInventoryQuery] = nil
 			return groups
 		}},
-		{name: "invalid inventory sample timestamp", mutate: func(groups [][]instantSeries) [][]instantSeries {
-			groups[elasticsearchClusterInventoryQuery][0].Value[0] = json.RawMessage(`"invalid"`)
-			return groups
-		}},
-		{name: "invalid inventory reported value", mutate: func(groups [][]instantSeries) [][]instantSeries {
-			groups[elasticsearchNodeInventoryQuery][0].Value[1] = json.RawMessage(`"invalid"`)
-			return groups
-		}},
-		{name: "node reported time conflict", mutate: func(groups [][]instantSeries) [][]instantSeries {
-			conflict := groups[elasticsearchNodeInventoryQuery][0]
-			conflict.Metric = cloneLabels(conflict.Metric)
-			conflict.Metric["ident"] = "fixture-ident-b"
-			conflict.Value = rawInstantValue(1785200200, "1785200002")
-			groups[elasticsearchNodeInventoryQuery] = append(groups[elasticsearchNodeInventoryQuery], conflict)
-			return groups
-		}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -174,6 +158,42 @@ func TestBuildElasticsearchSnapshotRejectsUnsafeInventoryShapes(t *testing.T) {
 				t.Fatalf("error = %v, want Elasticsearch ErrUnavailable", err)
 			}
 		})
+	}
+}
+
+func TestBuildElasticsearchClusterInventoryUsesLatestReportedTime(t *testing.T) {
+	older := elasticsearchSeries(elasticsearchClusterLabels(), 1785200200, "1785200000")
+	newer := elasticsearchSeries(elasticsearchClusterLabels(), 1785200200, "1785200001")
+	invalid := elasticsearchSeries(elasticsearchClusterLabels(), 1785200200, "invalid")
+
+	for _, inventory := range [][]instantSeries{
+		{older, newer, invalid},
+		{invalid, newer, older},
+	} {
+		states, err := buildElasticsearchClusterInventory(inventory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		state := states["fixture-cluster-a"]
+		if state == nil || state.cluster.ReportedAt.Unix() != 1785200001 {
+			t.Fatalf("reported time was not selected from the latest valid inventory")
+		}
+	}
+}
+
+func TestBuildElasticsearchClusterInventoryRejectsWhenEveryCandidateIsInvalid(t *testing.T) {
+	missingIdentity := elasticsearchSeries(map[string]string{"ident": "fixture-ident-missing-cluster"}, 1785200200, "1785200000")
+	invalidTime := elasticsearchSeries(elasticsearchClusterLabels(), 1785200200, "invalid")
+
+	for _, inventory := range [][]instantSeries{
+		{missingIdentity},
+		{invalidTime},
+		{missingIdentity, invalidTime},
+	} {
+		_, err := buildElasticsearchClusterInventory(inventory)
+		if !errors.Is(err, elasticsearch.ErrUnavailable) {
+			t.Fatalf("error = %v, want Elasticsearch ErrUnavailable", err)
+		}
 	}
 }
 
@@ -219,9 +239,12 @@ func TestBuildElasticsearchSnapshotIgnoresInventoryWithoutDomainIdentity(t *test
 func TestBuildElasticsearchSnapshotMergesNodeAddressByInventoryTime(t *testing.T) {
 	withoutHost := elasticsearchNodeLabels("", "")
 	delete(withoutHost, "host")
-	older := elasticsearchSeries(elasticsearchNodeLabels("192.0.2.10", ""), 1785200100, "1785200000")
+	older := elasticsearchSeries(elasticsearchNodeLabels("192.0.2.10", ""), 1785200200, "1785200000")
 	newer := elasticsearchSeries(elasticsearchNodeLabels("192.0.2.20", ""), 1785200200, "1785200001")
-	conflict := elasticsearchSeries(elasticsearchNodeLabels("198.51.100.20", ""), 1785200200, "1785200001")
+	sameTimeConflict := elasticsearchSeries(elasticsearchNodeLabels("198.51.100.20", ""), 1785200200, "1785200001")
+	recovered := elasticsearchSeries(elasticsearchNodeLabels("203.0.113.20", ""), 1785200200, "1785200002")
+	blank := elasticsearchSeries(elasticsearchNodeLabels("", ""), 1785200200, "1785200001")
+	invalid := elasticsearchSeries(elasticsearchNodeLabels("203.0.113.10", ""), 1785200200, "invalid")
 	tests := []struct {
 		name        string
 		inventory   []instantSeries
@@ -249,9 +272,57 @@ func TestBuildElasticsearchSnapshotMergesNodeAddressByInventoryTime(t *testing.T
 			wantReport:  1785200001,
 		},
 		{
-			name:        "same latest time different addresses stay unknown",
-			inventory:   []instantSeries{newer, conflict},
+			name:        "same latest time different addresses stay unknown forward",
+			inventory:   []instantSeries{newer, sameTimeConflict},
 			wantAddress: "",
+			wantReport:  1785200001,
+		},
+		{
+			name:        "same latest time different addresses stay unknown reverse",
+			inventory:   []instantSeries{sameTimeConflict, newer},
+			wantAddress: "",
+			wantReport:  1785200001,
+		},
+		{
+			name:        "same latest time conflict cannot recover address",
+			inventory:   []instantSeries{newer, sameTimeConflict, newer},
+			wantAddress: "",
+			wantReport:  1785200001,
+		},
+		{
+			name:        "blank address conflicts with nonblank address forward",
+			inventory:   []instantSeries{blank, newer},
+			wantAddress: "",
+			wantReport:  1785200001,
+		},
+		{
+			name:        "blank address conflicts with nonblank address reverse",
+			inventory:   []instantSeries{newer, blank},
+			wantAddress: "",
+			wantReport:  1785200001,
+		},
+		{
+			name:        "later reported address resets prior conflict",
+			inventory:   []instantSeries{newer, sameTimeConflict, recovered, recovered},
+			wantAddress: "203.0.113.20",
+			wantReport:  1785200002,
+		},
+		{
+			name:        "invalid older candidate is skipped",
+			inventory:   []instantSeries{invalid, newer},
+			wantAddress: "192.0.2.20",
+			wantReport:  1785200001,
+		},
+		{
+			name:        "invalid newer candidate is skipped",
+			inventory:   []instantSeries{newer, invalid},
+			wantAddress: "192.0.2.20",
+			wantReport:  1785200001,
+		},
+		{
+			name:        "same latest time same address is deduplicated",
+			inventory:   []instantSeries{newer, newer},
+			wantAddress: "192.0.2.20",
 			wantReport:  1785200001,
 		},
 	}
@@ -271,6 +342,67 @@ func TestBuildElasticsearchSnapshotMergesNodeAddressByInventoryTime(t *testing.T
 				t.Fatalf("address/reported = %q/%d, want %q/%d", node.Address, node.ReportedAt.Unix(), test.wantAddress, test.wantReport)
 			}
 		})
+	}
+}
+
+func TestBuildElasticsearchNodeInventoryResetsAddressConflictAfterLaterReportedTime(t *testing.T) {
+	first := elasticsearchSeries(elasticsearchNodeLabels("192.0.2.20", ""), 1785200200, "1785200001")
+	conflict := elasticsearchSeries(elasticsearchNodeLabels("198.51.100.20", ""), 1785200200, "1785200001")
+	later := elasticsearchSeries(elasticsearchNodeLabels("203.0.113.20", ""), 1785200200, "1785200002")
+
+	states, err := buildElasticsearchNodeInventory([]instantSeries{first, conflict, later, later})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := states["fixture-cluster-a\x00fixture-node-a"]
+	if state == nil {
+		t.Fatal("node state was not retained")
+	}
+	if state.node.Address != "203.0.113.20" || state.node.ReportedAt.Unix() != 1785200002 || state.inventoryAddressConflict {
+		t.Fatalf("address/reported/conflict = %q/%d/%t, want %q/%d/false", state.node.Address, state.node.ReportedAt.Unix(), state.inventoryAddressConflict, "203.0.113.20", 1785200002)
+	}
+}
+
+func TestBuildElasticsearchNodeInventoryTreatsBlankAddressAsSameTimeConflict(t *testing.T) {
+	blank := elasticsearchSeries(elasticsearchNodeLabels("", ""), 1785200200, "1785200001")
+	nonblank := elasticsearchSeries(elasticsearchNodeLabels("192.0.2.20", ""), 1785200200, "1785200001")
+
+	for _, test := range []struct {
+		name      string
+		inventory []instantSeries
+	}{
+		{name: "blank then nonblank", inventory: []instantSeries{blank, nonblank}},
+		{name: "nonblank then blank", inventory: []instantSeries{nonblank, blank}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			states, err := buildElasticsearchNodeInventory(test.inventory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			state := states["fixture-cluster-a\x00fixture-node-a"]
+			if state == nil {
+				t.Fatal("node state was not retained")
+			}
+			if state.node.Address != "" || !state.inventoryAddressConflict {
+				t.Fatalf("address/conflict = %q/%t, want empty/true", state.node.Address, state.inventoryAddressConflict)
+			}
+		})
+	}
+}
+
+func TestBuildElasticsearchNodeInventoryRejectsWhenEveryCandidateIsInvalid(t *testing.T) {
+	missingIdentity := elasticsearchSeries(map[string]string{"cluster": "fixture-cluster-a"}, 1785200200, "1785200001")
+	invalidTime := elasticsearchSeries(elasticsearchNodeLabels("192.0.2.20", ""), 1785200200, "invalid")
+
+	for _, inventory := range [][]instantSeries{
+		{missingIdentity},
+		{invalidTime},
+		{missingIdentity, invalidTime},
+	} {
+		_, err := buildElasticsearchNodeInventory(inventory)
+		if !errors.Is(err, elasticsearch.ErrUnavailable) {
+			t.Fatalf("error = %v, want Elasticsearch ErrUnavailable", err)
+		}
 	}
 }
 

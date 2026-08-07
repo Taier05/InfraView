@@ -4,15 +4,17 @@
 
 ## 当前状态（唯一权威）
 
-### 2026-08-07 旧模块列表统一与 Java 展示收口（隔离工作树，已完成本地验证）
+### 2026-08-07 旧模块列表统一、七页共享排版与 Elasticsearch inventory 稳定性（隔离工作树，本地验证完成）
 
-当前工作树为 `/root/github/InfraView/.worktrees/list-table-consistency`，分支为 `feature/list-table-consistency`；最终审查基线为 `54001dc`，当前 HEAD 是该基线之上的本地 final-fix 提交，精确 SHA 以只读 `git rev-parse HEAD` 为准，避免文档自引用提交导致 SHA 永远变化。该分支尚未 push、未 merge、未部署，也未启动服务或浏览器；本节是本文件唯一权威的当前状态，以下章节均为历史记录，不能覆盖本节。
+当前工作树为 `/root/github/InfraView/.worktrees/list-table-consistency`，分支为 `feature/list-table-consistency`，HEAD 为 `0672b86`。本轮产品/测试变更、两份计划和四份状态文档均保留在未提交工作树；没有本地提交、push 或 merge。本节是本文件唯一权威的当前状态，以下章节均为历史记录，不能覆盖本节。
 
 主机、硬盘、MySQL、Redis 已统一为紧凑单行列表：固定列数依次为 12、10、14、13；主机的网络发送/接收拆列，MySQL 的版本、角色、QPS、TPS、Buffer Pool 容量/使用率、复制状态/延迟拆列，Redis 的阻塞连接、QPS、命中率与复制链路拆列。经确认保留的例外只有硬盘“错误摘要”单列，以及 MySQL/Redis 的“当前连接/最大连接”单元格。
 
-四页所有可见列均走服务端升降序，缺失值无论方向都置后，相同值以稳定实体 ID 收口；页面只保留 URL、`aria-label`、`title` 和 `data-active` 的排序状态，不显示排序箭头，切换排序会回到第 1 页。Java 的 13 列、三类状态颜色和五项业务端中文显示规则继续保留，筛选控件、URL 与 API 仍使用原始业务代码。
+四页所有可见列均走服务端升降序，缺失值无论方向都置后，相同值以稳定实体 ID 收口；页面只保留 URL、`aria-label`、`title` 和 `data-active` 的排序状态，不显示排序箭头，切换排序会回到第 1 页。Java 的 13 列继续保留，健康、端口、进程和端口进程一致性均使用正常绿色、异常红色、缺失灰色徽标；五项业务端中文显示规则不变，筛选控件、URL 与 API 仍使用原始业务代码。
 
-final-fix 已补齐主机名/IP 的忽略大小写与空白自然排序、Redis 复制链路的 slave 正常/断开/未知业务序与非 slave N/A 双向末置、四页表头统一可访问状态文本、Host/Disk 每字段独立 fresh-page reset 契约，以及 Redis `evicted` 的 Service/认证 GET 兼容验收。最终门禁结果以本地忽略报告 `.superpowers/sdd/2026-08-07-list-table-consistency/final-fix-report.md` 为准；未启动服务或浏览器、未发布端口、未访问上游、未读取私密环境，也未执行 merge、push、部署或重启。
+七页（主机、硬盘、MySQL、Redis、Elasticsearch、RabbitMQ、Java）已统一采用共享 `observability-table` 排版；原有模块语义、排序、URL 与只读边界不变。Elasticsearch 历史 cluster/node inventory 现以有效真实上报时间选择最新候选；单条非法候选局部跳过，同一最新时间的地址冲突只清空地址。固定一次 26 查询 batch、缓存和 2/5 freshness 保持不变；真实 Provider 失败仍如实返回 stale/503，不隐藏告警且不增加 retry。
+
+本轮 Go 全量与串行 Node 全量容器门禁均以 exit 0 完成，前端为 17 个文件/330 项测试、typecheck、production build 与 27 项 Playwright 静态发现；详情和非阻断并行时序警告见 `docs/TESTING.md` 与本地忽略报告 `.superpowers/sdd/2026-08-07-elasticsearch-inventory-stability/task-4-report.md`。最终整包审查通过后，已按用户授权用当前未提交工作树原位重建现有 8080；服务健康、唯一 8080、非 root、只读根文件系统、cap drop `ALL`、禁止提权、健康接口与未认证 API 拒绝均通过。未创建其他端口，未执行登录态或动态浏览器验收，未读取私密环境内容，也未连接生产上游。
 
 ## 历史记录（以下均不代表当前工作树状态）
 

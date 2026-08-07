@@ -220,6 +220,7 @@ it('只用共享列表模板在同一控制行渲染搜索筛选页数与最新�
   expect(within(controls).queryByText(/上次刷新|自动刷新/)).not.toBeInTheDocument()
   expect(controls.querySelector('.rabbitmq-search, .rabbitmq-select')).toBeNull()
   const table = await screen.findByRole('table', { name: 'RabbitMQ 节点列表' })
+  expect(table).toHaveClass('host-table', 'rabbitmq-table', 'observability-table')
   expect(table.closest('.host-table-scroll')).toHaveClass(
     'rabbitmq-table-scroll',
   )

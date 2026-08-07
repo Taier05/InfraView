@@ -715,7 +715,7 @@ export function RabbitMQPage() {
           }
         >
           <table
-            className="host-table rabbitmq-table"
+            className="host-table rabbitmq-table observability-table"
             aria-label="RabbitMQ 节点列表"
           >
             <thead>

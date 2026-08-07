@@ -246,11 +246,6 @@ function statusFilter(value: string | null): MetricLevel | '' {
   return isOneOf(value, metricLevels) ? value : ''
 }
 
-function binary(value: boolean | null) {
-  if (value === null) return '暂无数据'
-  return value ? '正常' : '异常'
-}
-
 function javaBusinessLabel(code: string) {
   return businessLabels.get(code) ?? code
 }
@@ -412,7 +407,7 @@ export function JavaPage() {
     { id: 'port', header: () => sortButton('port', '端口状态'), cell: ({ row }) => <BinaryStatus value={row.original.port_up} /> },
     { id: 'process', header: () => sortButton('process', '进程状态'), cell: ({ row }) => <BinaryStatus value={row.original.process_up} /> },
     { id: 'process-count', header: () => sortButton('process_count', '进程数'), cell: ({ row }) => <TitledValue value={integer(row.original.process_count)} /> },
-    { id: 'consistency', header: () => sortButton('consistency', '端口进程一致性'), cell: ({ row }) => <TitledValue value={binary(row.original.port_consistent)} /> },
+    { id: 'consistency', header: () => sortButton('consistency', '端口进程一致性'), cell: ({ row }) => <BinaryStatus value={row.original.port_consistent} /> },
     { id: 'cpu', header: () => sortButton('cpu', 'CPU 使用率'), cell: ({ row }) => <TitledValue value={percentage(row.original.cpu_usage_percent)} /> },
     { id: 'memory', header: () => sortButton('memory', '内存占用'), cell: ({ row }) => <TitledValue value={byteSize(row.original.memory_bytes)} /> },
     { id: 'memory-percent', header: () => sortButton('memory_percent', '内存使用率'), cell: ({ row }) => <TitledValue value={percentage(row.original.memory_usage_percent)} /> },
@@ -449,7 +444,7 @@ export function JavaPage() {
         <div><button className="secondary-button" type="button" disabled={services.data.data.total_pages === 0 || services.data.data.page <= 1} onClick={() => updateParameter('page', String(Math.max(services.data!.data.page - 1, 1)), false)}>上一页</button>
         <button className="secondary-button" type="button" disabled={services.data.data.total_pages === 0 || services.data.data.page >= services.data.data.total_pages} onClick={() => updateParameter('page', String(Math.min(services.data!.data.page + 1, services.data!.data.total_pages)), false)}>下一页</button></div>
       </>}>
-        <table className="host-table java-table" aria-label="Java 业务服务列表"><thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id} scope="col">{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead><tbody>{table.getRowModel().rows.map((row) => <tr key={row.id}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody></table>
+        <table className="host-table java-table observability-table" aria-label="Java 业务服务列表"><thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id} scope="col">{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</th>)}</tr>)}</thead><tbody>{table.getRowModel().rows.map((row) => <tr key={row.id}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody></table>
       </ListTablePanel> : null}
   </section>
 }

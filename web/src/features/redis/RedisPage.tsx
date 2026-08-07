@@ -517,7 +517,7 @@ export function RedisPage() {
             </>
           }
         >
-          <table className="host-table redis-table">
+          <table className="host-table redis-table observability-table">
             <thead>
               {table.getHeaderGroups().map((group) => (
                 <tr key={group.id}>

@@ -35,25 +35,26 @@ type elasticsearchClusterState struct {
 	unassignedShards      elasticsearchLatest[int64]
 	pendingTasks          elasticsearchLatest[int64]
 	taskMaxWaitingMillis  elasticsearchLatest[int64]
-	inventorySampleAt     time.Time
+	inventoryReportedAt   time.Time
 }
 
 type elasticsearchNodeState struct {
 	node elasticsearch.Node
 
-	roles             map[elasticsearch.Role]*elasticsearchLatest[bool]
-	heapUsed          elasticsearchLatest[int64]
-	heapMax           elasticsearchLatest[int64]
-	diskUsage         elasticsearchLatest[float64]
-	cpuUsage          elasticsearchLatest[float64]
-	indexRates        map[string]*elasticsearchLatest[float64]
-	searchRates       map[string]*elasticsearchLatest[float64]
-	documents         map[string]*elasticsearchLatest[int64]
-	storeSizes        map[string]*elasticsearchLatest[int64]
-	uptime            elasticsearchLatest[int64]
-	threadPoolQueue   elasticsearchLatest[int64]
-	rejectedRate      elasticsearchLatest[float64]
-	inventorySampleAt time.Time
+	roles                    map[elasticsearch.Role]*elasticsearchLatest[bool]
+	heapUsed                 elasticsearchLatest[int64]
+	heapMax                  elasticsearchLatest[int64]
+	diskUsage                elasticsearchLatest[float64]
+	cpuUsage                 elasticsearchLatest[float64]
+	indexRates               map[string]*elasticsearchLatest[float64]
+	searchRates              map[string]*elasticsearchLatest[float64]
+	documents                map[string]*elasticsearchLatest[int64]
+	storeSizes               map[string]*elasticsearchLatest[int64]
+	uptime                   elasticsearchLatest[int64]
+	threadPoolQueue          elasticsearchLatest[int64]
+	rejectedRate             elasticsearchLatest[float64]
+	inventoryReportedAt      time.Time
+	inventoryAddressConflict bool
 }
 
 var _ elasticsearch.Provider = (*Provider)(nil)
@@ -131,9 +132,9 @@ func buildElasticsearchClusterInventory(series []instantSeries) (map[string]*ela
 		if cluster == "" {
 			continue
 		}
-		sampleAt, reportedAt, ok := elasticsearchInventoryTimes(candidate.Value)
+		_, reportedAt, ok := elasticsearchInventoryTimes(candidate.Value)
 		if !ok {
-			return nil, elasticsearchUnavailableError()
+			continue
 		}
 		state, exists := states[cluster]
 		if !exists {
@@ -151,20 +152,17 @@ func buildElasticsearchClusterInventory(series []instantSeries) (map[string]*ela
 					CollectionTracked:     true,
 					ReportedAt:            reportedAt,
 				},
-				inventorySampleAt: sampleAt,
+				inventoryReportedAt: reportedAt,
 			}
 			continue
 		}
-		if sampleAt.Before(state.inventorySampleAt) {
-			continue
-		}
-		if sampleAt.Equal(state.inventorySampleAt) && !reportedAt.Equal(state.cluster.ReportedAt) {
-			return nil, elasticsearchUnavailableError()
-		}
-		if sampleAt.After(state.inventorySampleAt) {
-			state.inventorySampleAt = sampleAt
+		if reportedAt.After(state.inventoryReportedAt) {
+			state.inventoryReportedAt = reportedAt
 			state.cluster.ReportedAt = reportedAt
 		}
+	}
+	if len(states) == 0 {
+		return nil, elasticsearchUnavailableError()
 	}
 	return states, nil
 }
@@ -176,15 +174,15 @@ func buildElasticsearchNodeInventory(series []instantSeries) (map[string]*elasti
 			continue
 		}
 		cluster, name, address, key, ok := elasticsearchNodeIdentity(candidate.Metric)
-		sampleAt, reportedAt, validTimes := elasticsearchInventoryTimes(candidate.Value)
+		_, reportedAt, validTimes := elasticsearchInventoryTimes(candidate.Value)
 		if !ok || !validTimes {
-			return nil, elasticsearchUnavailableError()
+			continue
 		}
 		state, exists := states[key]
 		if !exists {
 			id := elasticsearch.StableNodeID(cluster, name)
 			if id == "" {
-				return nil, elasticsearchUnavailableError()
+				continue
 			}
 			states[key] = &elasticsearchNodeState{
 				node: elasticsearch.Node{
@@ -196,29 +194,33 @@ func buildElasticsearchNodeInventory(series []instantSeries) (map[string]*elasti
 					CollectionTracked: true,
 					ReportedAt:        reportedAt,
 				},
-				roles:             make(map[elasticsearch.Role]*elasticsearchLatest[bool]),
-				indexRates:        make(map[string]*elasticsearchLatest[float64]),
-				searchRates:       make(map[string]*elasticsearchLatest[float64]),
-				documents:         make(map[string]*elasticsearchLatest[int64]),
-				storeSizes:        make(map[string]*elasticsearchLatest[int64]),
-				inventorySampleAt: sampleAt,
+				roles:               make(map[elasticsearch.Role]*elasticsearchLatest[bool]),
+				indexRates:          make(map[string]*elasticsearchLatest[float64]),
+				searchRates:         make(map[string]*elasticsearchLatest[float64]),
+				documents:           make(map[string]*elasticsearchLatest[int64]),
+				storeSizes:          make(map[string]*elasticsearchLatest[int64]),
+				inventoryReportedAt: reportedAt,
 			}
 			continue
 		}
-		if sampleAt.Before(state.inventorySampleAt) {
-			continue
-		}
-		if sampleAt.Equal(state.inventorySampleAt) && !reportedAt.Equal(state.node.ReportedAt) {
-			return nil, elasticsearchUnavailableError()
-		}
-		if sampleAt.Equal(state.inventorySampleAt) && address != state.node.Address {
-			state.node.Address = ""
-		}
-		if sampleAt.After(state.inventorySampleAt) {
-			state.inventorySampleAt = sampleAt
+		switch {
+		case reportedAt.After(state.inventoryReportedAt):
+			state.inventoryReportedAt = reportedAt
+			state.inventoryAddressConflict = false
 			state.node.ReportedAt = reportedAt
 			state.node.Address = address
+		case reportedAt.Equal(state.inventoryReportedAt):
+			if state.inventoryAddressConflict {
+				continue
+			}
+			if address != state.node.Address {
+				state.inventoryAddressConflict = true
+				state.node.Address = ""
+			}
 		}
+	}
+	if len(states) == 0 {
+		return nil, elasticsearchUnavailableError()
 	}
 	return states, nil
 }

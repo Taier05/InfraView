@@ -178,6 +178,7 @@ it('renders the fourteen independent MySQL metric columns', async () => {
     'host-table',
     'mysql-table',
     'mysql-table-compact',
+    'observability-table',
   )
   expect(table.closest('.mysql-table-scroll')).not.toBeNull()
 })

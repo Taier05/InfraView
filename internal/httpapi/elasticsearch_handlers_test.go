@@ -129,6 +129,40 @@ func TestElasticsearchReturnsStaleSnapshotAfterProviderFailure(t *testing.T) {
 	}
 }
 
+func TestElasticsearchReturnsFreshSnapshotAfterSuccessfulReload(t *testing.T) {
+	clock := &elasticsearchHTTPClock{now: time.Date(2026, 8, 1, 8, 0, 0, 0, time.UTC)}
+	provider := &elasticsearchHTTPTestProvider{snapshot: elasticsearchHTTPFixture()}
+	handler, sessionCookie := newElasticsearchAPIProviderTestHandler(t, provider, clock.Now, time.Second)
+	first := request(t, handler, http.MethodGet, "/api/v1/elasticsearch/nodes", "", sessionCookie)
+	if first.Code != http.StatusOK {
+		t.Fatalf("first status = %d, body = %s", first.Code, first.Body.String())
+	}
+	if got := jsonPathValue(t, first.Body.Bytes(), "meta.stale"); got != false {
+		t.Fatalf("first meta.stale = %#v, want false", got)
+	}
+	firstCollectedAt, ok := jsonPathValue(t, first.Body.Bytes(), "meta.collected_at").(string)
+	if !ok {
+		t.Fatalf("first meta.collected_at = %#v, want string", jsonPathValue(t, first.Body.Bytes(), "meta.collected_at"))
+	}
+	clock.Advance(2 * time.Second)
+	provider.snapshot.Clusters[0].ReportedAt = provider.snapshot.Clusters[0].ReportedAt.Add(time.Second)
+	provider.snapshot.Nodes[0].ReportedAt = provider.snapshot.Nodes[0].ReportedAt.Add(time.Second)
+	wantCollectedAt := provider.snapshot.Nodes[0].ReportedAt.UTC().Format(time.RFC3339)
+	second := request(t, handler, http.MethodGet, "/api/v1/elasticsearch/nodes", "", sessionCookie)
+	if second.Code != http.StatusOK {
+		t.Fatalf("second status = %d, body = %s", second.Code, second.Body.String())
+	}
+	if got := jsonPathValue(t, second.Body.Bytes(), "meta.stale"); got != false {
+		t.Fatalf("second meta.stale = %#v, want false", got)
+	}
+	if got := jsonPathValue(t, second.Body.Bytes(), "meta.collected_at"); got != wantCollectedAt || got == firstCollectedAt {
+		t.Fatalf("second meta.collected_at = %#v, want updated %q instead of %q", got, wantCollectedAt, firstCollectedAt)
+	}
+	if provider.calls != 2 {
+		t.Fatalf("provider calls = %d, want 2", provider.calls)
+	}
+}
+
 func TestElasticsearchOverviewRejectsQueryParameters(t *testing.T) {
 	handler, sessionCookie := newElasticsearchAPITestHandler(t, elasticsearchHTTPFixture())
 	response := request(t, handler, http.MethodGet, "/api/v1/elasticsearch/overview?search=fixture", "", sessionCookie)
@@ -190,9 +224,11 @@ func TestElasticsearchRoutesRejectOtherMethodsWithAllowGet(t *testing.T) {
 type elasticsearchHTTPTestProvider struct {
 	snapshot elasticsearch.Snapshot
 	err      error
+	calls    int
 }
 
 func (provider *elasticsearchHTTPTestProvider) ElasticsearchSnapshot(context.Context) (elasticsearch.Snapshot, error) {
+	provider.calls++
 	if provider.err != nil {
 		return elasticsearch.Snapshot{}, provider.err
 	}
