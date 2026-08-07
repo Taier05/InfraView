@@ -11,6 +11,7 @@ import { LoginPage } from '../auth/LoginPage'
 import { DiskPage } from '../features/disks/DiskPage'
 import { ElasticsearchPage } from '../features/elasticsearch/ElasticsearchPage'
 import { HostListPage } from '../features/hosts/HostListPage'
+import { JavaPage } from '../features/java/JavaPage'
 import { MySQLPage } from '../features/mysql/MySQLPage'
 import { OverviewPage } from '../features/overview/OverviewPage'
 import { RabbitMQPage } from '../features/rabbitmq/RabbitMQPage'
@@ -73,6 +74,7 @@ export function App() {
               <Route path="redis" element={<RedisPage />} />
               <Route path="elasticsearch" element={<ElasticsearchPage />} />
               <Route path="rabbitmq" element={<RabbitMQPage />} />
+              <Route path="java" element={<JavaPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
