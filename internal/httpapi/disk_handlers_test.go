@@ -250,10 +250,10 @@ func TestDiskDevicesReturnsFixedViewDefaultsAndPreservesNulls(t *testing.T) {
 }
 
 func TestDiskDevicesPageSize500(t *testing.T) {
-	handler, sessionCookie := newDiskAPITestHandler(t, fixtureDiskSnapshot())
+	handler, sessionCookie := newDiskAPITestHandler(t, fixtureDiskPageSize500Snapshot())
 
 	response := request(t, handler, http.MethodGet, "/api/v1/disks/devices?page=1&page_size=500", "", sessionCookie)
-	assertListPageSize500(t, response)
+	assertListPageSize500(t, response, "devices", "devices", "total", "page", "page_size", "total_pages")
 }
 
 func TestDiskDevicesRejectsInvalidPageSize(t *testing.T) {
@@ -407,6 +407,21 @@ func fixtureDiskSnapshot() disk.Snapshot {
 			ReportedAt:  time.Date(2026, time.July, 30, 8, 0, 0, 0, time.UTC),
 		},
 	}}
+}
+
+func fixtureDiskPageSize500Snapshot() disk.Snapshot {
+	snapshot := fixtureDiskSnapshot()
+	template := snapshot.Devices[0]
+	snapshot.Devices = make([]disk.Device, 501)
+	for index := range snapshot.Devices {
+		item := template
+		suffix := strconv.Itoa(index)
+		item.ID = "page-size-500-disk-" + suffix
+		item.HostID = "page-size-500-host"
+		item.Device = "/dev/page-size-500-" + suffix
+		snapshot.Devices[index] = item
+	}
+	return snapshot
 }
 
 func assertRetryableDiskUnavailable(t *testing.T, response interface {

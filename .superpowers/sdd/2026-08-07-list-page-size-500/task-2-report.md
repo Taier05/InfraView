@@ -40,3 +40,13 @@
 
 - 没有发现 Task 2 覆盖的 `page_size` 输入会暴露额外 handler 溢出防护缺口，因此没有生产代码变更。
 - 临时 RED 依赖本地已存在、Git 忽略的 `webdist` 仅为满足 Go embed 编译；这不是产品代码差异，也未提交。
+
+## Review fix round 1
+
+- 审查发现第一轮成功 fixture 均少于 500 条，且辅助断言会根据响应自身的 `total` 推导 `total_pages`，无法证明 500 条分页边界；现已改为每个接口独立的 501 条脱敏 fixture/provider。
+- 七个成功断言现在固定验证 `total=501`、第一页列表长度为 `500`、`page_size=500`、`total_pages=2`，并分别锁定各接口完整 `data` key 集：主机、硬盘、MySQL、Redis、Elasticsearch、RabbitMQ、Java 的列表字段、分页字段和筛选选项字段均被覆盖。
+- 可逆 mutation RED 1：临时把 `internal/httpapi/mysql_handlers.go` 的 `total_pages` 固定为 `1`，运行 `go test ./internal/httpapi -run '^TestMySQLInstancesPageSize500$' -count=1` 以 exit 1 失败，关键断言为 `total/total_pages = 501/1, want 501/2`。
+- 可逆 mutation RED 2：临时把 MySQL `available_labels` 的 JSON tag 改为 `-`，运行同一命令以 exit 1 失败，关键断言为 `JSON path "data" has 5 keys, want 6`。
+- 每次 mutation 后均立即恢复生产文件；`git hash-object internal/httpapi/mysql_handlers.go` 恢复为前置 SHA `45caaaf44691985a6cfbfe307bbda607618725e5`，且 `git diff --exit-code -- internal/httpapi/mysql_handlers.go` 为 exit 0。
+- 恢复后的 focused GREEN：`go test ./internal/httpapi -run 'PageSize500|RejectsInvalidPageSize' -count=1`，exit 0。
+- 最终容器验证：`go test ./internal/httpapi -count=1`，exit 0；`go test -race ./internal/httpapi -run 'PageSize500|RejectsInvalidPageSize' -count=1`，exit 0；`git diff --check`，exit 0。

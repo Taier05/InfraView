@@ -89,11 +89,11 @@ func TestMySQLOverviewAndInstancesReturnReadOnlyViews(t *testing.T) {
 }
 
 func TestHostListPageSize500(t *testing.T) {
-	handler := newTestAPI(t, mock.New(3, testNow))
+	handler := newTestAPI(t, mock.New(501, testNow))
 	cookie := loginCookie(t, handler)
 
 	response := request(t, handler, http.MethodGet, "/api/v1/hosts?page=1&page_size=500", "", cookie)
-	assertListPageSize500(t, response)
+	assertListPageSize500(t, response, "hosts", "hosts", "total", "page", "page_size", "total_pages")
 }
 
 func TestHostListRejectsInvalidPageSize(t *testing.T) {
@@ -104,10 +104,10 @@ func TestHostListRejectsInvalidPageSize(t *testing.T) {
 }
 
 func TestMySQLInstancesPageSize500(t *testing.T) {
-	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
+	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLPageSize500Snapshot())
 
 	response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances?page=1&page_size=500", "", sessionCookie)
-	assertListPageSize500(t, response)
+	assertListPageSize500(t, response, "instances", "instances", "available_labels", "total", "page", "page_size", "total_pages")
 }
 
 func TestMySQLInstancesRejectsInvalidPageSize(t *testing.T) {
@@ -1051,6 +1051,21 @@ func fixtureMySQLSnapshot() mysql.Snapshot {
 	}}}
 }
 
+func fixtureMySQLPageSize500Snapshot() mysql.Snapshot {
+	snapshot := fixtureMySQLSnapshot()
+	template := snapshot.Instances[0]
+	snapshot.Instances = make([]mysql.Instance, 501)
+	for index := range snapshot.Instances {
+		item := template
+		suffix := strconv.Itoa(index)
+		item.Name = "page-size-500-mysql-" + suffix
+		item.Address = "page-size-500-mysql-address-" + suffix
+		item.ID = mysql.StableInstanceID(item.Host, item.Name, item.Address)
+		snapshot.Instances[index] = item
+	}
+	return snapshot
+}
+
 func jsonPathIsNumber(t *testing.T, body []byte, path string) bool {
 	t.Helper()
 	_, ok := jsonPathValue(t, body, path).(float64)
@@ -1120,7 +1135,7 @@ func jsonPathValue(t *testing.T, body []byte, path string) any {
 	return value
 }
 
-func assertListPageSize500(t *testing.T, response *httptest.ResponseRecorder) {
+func assertListPageSize500(t *testing.T, response *httptest.ResponseRecorder, listKey string, dataKeys ...string) {
 	t.Helper()
 	if response.Code != http.StatusOK {
 		t.Fatalf("page_size=500 status = %d, want %d", response.Code, http.StatusOK)
@@ -1129,6 +1144,7 @@ func assertListPageSize500(t *testing.T, response *httptest.ResponseRecorder) {
 	body := response.Body.Bytes()
 	assertJSONObjectKeys(t, body, "", "data", "meta")
 	assertJSONObjectKeys(t, body, "meta", "request_id", "stale", "collected_at")
+	assertJSONObjectKeys(t, body, "data", dataKeys...)
 	var payload struct {
 		Data struct {
 			Total      int `json:"total"`
@@ -1143,15 +1159,12 @@ func assertListPageSize500(t *testing.T, response *httptest.ResponseRecorder) {
 	if payload.Data.Page != 1 || payload.Data.PageSize != 500 {
 		t.Fatalf("page/page_size = %d/%d, want 1/500", payload.Data.Page, payload.Data.PageSize)
 	}
-	if payload.Data.Total < 1 {
-		t.Fatal("page_size=500 fixture returned no list data")
+	if payload.Data.Total != 501 || payload.Data.TotalPages != 2 {
+		t.Fatalf("total/total_pages = %d/%d, want 501/2", payload.Data.Total, payload.Data.TotalPages)
 	}
-	wantTotalPages := 0
-	if payload.Data.Total > 0 {
-		wantTotalPages = (payload.Data.Total + 499) / 500
-	}
-	if payload.Data.TotalPages != wantTotalPages {
-		t.Fatalf("total_pages = %d, want %d", payload.Data.TotalPages, wantTotalPages)
+	items, ok := jsonPathValue(t, body, "data."+listKey).([]any)
+	if !ok || len(items) != 500 {
+		t.Fatalf("%s length = %d, want 500", listKey, len(items))
 	}
 }
 

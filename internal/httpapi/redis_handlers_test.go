@@ -1,10 +1,12 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/Taier05/InfraView/internal/auth"
 	"github.com/Taier05/InfraView/internal/cache"
 	"github.com/Taier05/InfraView/internal/config"
+	"github.com/Taier05/InfraView/internal/redis"
 	"github.com/Taier05/InfraView/internal/service"
 )
 
@@ -94,10 +97,10 @@ func TestRedisInstancesAPIAcceptsEvictedCompatibilitySortForAuthenticatedGET(t *
 }
 
 func TestRedisInstancesPageSize500(t *testing.T) {
-	handler, cookie := newRedisAPIHandler(t)
+	handler, cookie := newRedisAPIProviderTestHandler(t, redisPageSize500Provider(t))
 
 	response := request(t, handler, http.MethodGet, "/api/v1/redis/instances?page=1&page_size=500", "", cookie)
-	assertListPageSize500(t, response)
+	assertListPageSize500(t, response, "instances", "instances", "total", "page", "page_size", "total_pages")
 }
 
 func TestRedisInstancesRejectsInvalidPageSize(t *testing.T) {
@@ -132,6 +135,11 @@ func TestRedisAPIsRejectInvalidQueriesAndWriteMethods(t *testing.T) {
 
 func newRedisAPIHandler(t *testing.T) (http.Handler, *http.Cookie) {
 	t.Helper()
+	return newRedisAPIProviderTestHandler(t, mock.NewRedis(testNow))
+}
+
+func newRedisAPIProviderTestHandler(t *testing.T, provider redis.Provider) (http.Handler, *http.Cookie) {
+	t.Helper()
 	cfg := config.Config{
 		Username:          "admin",
 		Password:          "correct-password",
@@ -146,7 +154,7 @@ func newRedisAPIHandler(t *testing.T) (http.Handler, *http.Cookie) {
 		Auth:    auth.NewManager(cfg.Username, cfg.Password, cfg.SessionTTL, nil, testNow),
 		Limiter: auth.NewLimiter(5, time.Minute, testNow),
 		RedisService: service.NewRedis(
-			mock.NewRedis(testNow),
+			provider,
 			store,
 			service.RedisOptions{
 				SnapshotTTL:        15 * time.Second,
@@ -158,4 +166,28 @@ func newRedisAPIHandler(t *testing.T) (http.Handler, *http.Cookie) {
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	return handler, loginCookie(t, handler)
+}
+
+type redisHTTPProvider struct{ snapshot redis.Snapshot }
+
+func (provider redisHTTPProvider) RedisSnapshot(context.Context) (redis.Snapshot, error) {
+	return provider.snapshot.Clone(), nil
+}
+
+func redisPageSize500Provider(t *testing.T) redis.Provider {
+	t.Helper()
+	snapshot, err := mock.NewRedis(testNow).RedisSnapshot(context.Background())
+	if err != nil {
+		t.Fatalf("load Redis test fixture: %v", err)
+	}
+	template := snapshot.Instances[0]
+	snapshot.Instances = make([]redis.Instance, 501)
+	for index := range snapshot.Instances {
+		item := template
+		suffix := strconv.Itoa(index)
+		item.Address = "page-size-500-redis-address-" + suffix
+		item.ID = redis.StableInstanceID("page-size-500-redis-ident-"+suffix, "page-size-500-redis-instance-"+suffix, item.Address)
+		snapshot.Instances[index] = item
+	}
+	return redisHTTPProvider{snapshot: snapshot}
 }

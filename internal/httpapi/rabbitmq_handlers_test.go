@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -109,10 +110,10 @@ func TestRabbitMQNodesEncodesEmptyCollectionsAsArrays(t *testing.T) {
 }
 
 func TestRabbitMQNodesPageSize500(t *testing.T) {
-	handler, cookie := newRabbitMQAPITestHandler(t, mock.NewRabbitMQ())
+	handler, cookie := newRabbitMQAPITestHandler(t, rabbitMQPageSize500Provider(t))
 
 	response := request(t, handler, http.MethodGet, "/api/v1/rabbitmq/nodes?page=1&page_size=500", "", cookie)
-	assertListPageSize500(t, response)
+	assertListPageSize500(t, response, "nodes", "nodes", "available_clusters", "total", "page", "page_size", "total_pages")
 }
 
 func TestRabbitMQNodesRejectsInvalidPageSize(t *testing.T) {
@@ -227,6 +228,24 @@ type rabbitMQHTTPProvider struct {
 	snapshot rabbitmq.Snapshot
 	err      error
 	calls    *int
+}
+
+func rabbitMQPageSize500Provider(t *testing.T) rabbitmq.Provider {
+	t.Helper()
+	snapshot, err := mock.NewRabbitMQ().RabbitMQSnapshot(context.Background())
+	if err != nil {
+		t.Fatalf("load RabbitMQ test fixture: %v", err)
+	}
+	template := snapshot.Nodes[0]
+	snapshot.Nodes = make([]rabbitmq.Node, 501)
+	for index := range snapshot.Nodes {
+		item := template
+		suffix := strconv.Itoa(index)
+		item.Name = "page-size-500-rabbitmq-node-" + suffix
+		item.ID = rabbitmq.StableNodeID(item.Cluster, item.Name)
+		snapshot.Nodes[index] = item
+	}
+	return rabbitMQHTTPProvider{snapshot: snapshot}
 }
 
 func (provider rabbitMQHTTPProvider) RabbitMQSnapshot(context.Context) (rabbitmq.Snapshot, error) {

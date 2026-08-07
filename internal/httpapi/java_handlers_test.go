@@ -136,10 +136,10 @@ func TestJavaServicesEncodesEmptyCollectionsAsArrays(t *testing.T) {
 }
 
 func TestJavaServicesPageSize500(t *testing.T) {
-	handler, cookie := newJavaAPITestHandler(t, mock.NewJava(time.Now))
+	handler, cookie := newJavaAPITestHandler(t, javaPageSize500Provider(t))
 
 	response := request(t, handler, http.MethodGet, "/api/v1/java/services?page=1&page_size=500", "", cookie)
-	assertListPageSize500(t, response)
+	assertListPageSize500(t, response, "services", "services", "available_names", "total", "page", "page_size", "total_pages")
 }
 
 func TestJavaServicesRejectsInvalidPageSize(t *testing.T) {
@@ -328,6 +328,25 @@ type javaHTTPProvider struct {
 	snapshot javaapp.Snapshot
 	err      error
 	calls    int
+}
+
+func javaPageSize500Provider(t *testing.T) javaapp.Provider {
+	t.Helper()
+	snapshot, err := mock.NewJava(time.Now).JavaSnapshot(context.Background())
+	if err != nil {
+		t.Fatalf("load Java test fixture: %v", err)
+	}
+	template := snapshot.Services[0]
+	snapshot.Services = make([]javaapp.Service, 501)
+	for index := range snapshot.Services {
+		item := template
+		suffix := strconv.Itoa(index)
+		item.Name = "page-size-500-java-service-" + suffix
+		item.Address = "page-size-500-java-address-" + suffix
+		item.ID = javaapp.StableServiceID(item.Name, item.Address)
+		snapshot.Services[index] = item
+	}
+	return &javaHTTPProvider{snapshot: snapshot}
 }
 
 func (provider *javaHTTPProvider) JavaSnapshot(context.Context) (javaapp.Snapshot, error) {

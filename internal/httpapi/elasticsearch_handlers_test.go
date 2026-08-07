@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -92,10 +93,10 @@ func TestElasticsearchNodesEncodesEmptyCollectionsAsArrays(t *testing.T) {
 }
 
 func TestElasticsearchNodesPageSize500(t *testing.T) {
-	handler, sessionCookie := newElasticsearchAPITestHandler(t, elasticsearchHTTPFixture())
+	handler, sessionCookie := newElasticsearchAPITestHandler(t, elasticsearchPageSize500Fixture())
 
 	response := request(t, handler, http.MethodGet, "/api/v1/elasticsearch/nodes?page=1&page_size=500", "", sessionCookie)
-	assertListPageSize500(t, response)
+	assertListPageSize500(t, response, "nodes", "nodes", "available_clusters", "available_roles", "total", "page", "page_size", "total_pages")
 }
 
 func TestElasticsearchNodesRejectsInvalidPageSize(t *testing.T) {
@@ -325,6 +326,20 @@ func elasticsearchHTTPFixture() elasticsearch.Snapshot {
 			ReportedAt:       reportedAt,
 		}},
 	}
+}
+
+func elasticsearchPageSize500Fixture() elasticsearch.Snapshot {
+	snapshot := elasticsearchHTTPFixture()
+	template := snapshot.Nodes[0]
+	snapshot.Nodes = make([]elasticsearch.Node, 501)
+	for index := range snapshot.Nodes {
+		item := template
+		suffix := strconv.Itoa(index)
+		item.ID = "page-size-500-elasticsearch-" + suffix
+		item.Name = "page-size-500-elasticsearch-node-" + suffix
+		snapshot.Nodes[index] = item
+	}
+	return snapshot
 }
 
 func assertElasticsearchResponseHasNoSensitiveKeys(t *testing.T, body []byte) {
