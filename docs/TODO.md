@@ -1,6 +1,14 @@
 # InfraView TODO
 
-最后更新：2026-08-07
+最后更新：2026-08-08
+
+## 列表单页最多 500 条（隔离 feature 分支本地交付）
+
+- [x] 七个只读列表将固定 `page_size` 白名单扩展为 `20|50|100|500`，保持完整结果先服务端排序后分页、溢出保护和既有响应结构。
+- [x] 共享分页控件新增“全部（最多500条）”，七页 URL/请求/响应校验均支持 500；超过上限继续分页，不截断、不拼接页面。
+- [x] 完成 Node 22 全量测试、typecheck、production build、Playwright `--list`，以及 Go 1.24 gofmt/vet、全仓普通/race、Linux 编译、whitespace 和只读/敏感扫描；未启动服务或浏览器，未访问上游或私密环境。
+- [x] 经授权创建本地文档提交 `docs: record 500-row list delivery`，仅在 `feature/list-duration-disk-errors`；未 merge、push、deploy 或 restart。
+- [ ] 共享运行时长格式化与硬盘错误摘要/命令超时属于独立后续范围，尚未实施，不得因本分页交付标记完成。
 
 ## 数据时间与 Elasticsearch 瞬时过期修复
 

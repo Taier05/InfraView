@@ -1,6 +1,16 @@
 # InfraView 开发交接
 
-最后更新：2026-08-07
+最后更新：2026-08-08
+
+## 列表单页最多 500 条恢复入口（隔离 feature 分支本地交付，未合并/未推送/未部署）
+
+恢复目录为 `/root/github/InfraView/.worktrees/list-duration-disk-errors`，分支为 `feature/list-duration-disk-errors`。本分支已完成七个只读列表的单页最多 500 条：允许值固定为 `20|50|100|500`，共享控件显示“全部（最多500条）”，切换回第 1 页且 URL 可恢复；完整筛选结果始终先在服务端排序、再分页。超过 500 条继续正常翻页，不截断、不客户端逐页拼接、不增加请求或虚拟滚动；响应结构、15 秒刷新和只读边界保持不变。
+
+本轮仅交付分页。共享运行时长格式化、硬盘错误摘要和命令超时均未实施或验证，后续不得据此声称完成。一次性容器 Node 22 全量测试、typecheck、production build、Playwright `--list`，以及 Go 1.24 gofmt 检查、vet、全仓普通/race 和 Linux 编译均已通过；whitespace、固定查询、只读和敏感静态扫描也已通过。未启动服务、端口或浏览器，未访问 Nightingale、上游或私密环境。
+
+本节对应的文档提交 `docs: record 500-row list delivery` 仅存在于该 feature 分支；未 merge、push、deploy 或 restart。编辑前只读 Git 核对：本地 `main` 为 `7ff1cea`，`origin/main` 为 `4b9f9f7`，均不包含本 feature 分支基线；继续前必须以实时 Git 结果为准。
+
+继续时先完整阅读本节、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/superpowers/specs/2026-08-07-list-all-duration-and-disk-error-summary-design.md`、`docs/superpowers/plans/2026-08-07-list-page-size-500.md` 和 `.superpowers/sdd/2026-08-07-list-page-size-500/progress.md`，再只读运行 `git status --short --branch`、`git log -6 --oneline`、`git diff --check` 与 `git diff --cached --check`。保留任何新差异，不得 reset、clean 或把本 feature 分支的本地状态写成 main/远端状态。
 
 ## 当前 main / 旧模块列表、七页排版与 Elasticsearch inventory 稳定性恢复入口
 
