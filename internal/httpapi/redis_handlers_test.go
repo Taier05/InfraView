@@ -93,6 +93,19 @@ func TestRedisInstancesAPIAcceptsEvictedCompatibilitySortForAuthenticatedGET(t *
 	}
 }
 
+func TestRedisInstancesPageSize500(t *testing.T) {
+	handler, cookie := newRedisAPIHandler(t)
+
+	response := request(t, handler, http.MethodGet, "/api/v1/redis/instances?page=1&page_size=500", "", cookie)
+	assertListPageSize500(t, response)
+}
+
+func TestRedisInstancesRejectsInvalidPageSize(t *testing.T) {
+	handler, cookie := newRedisAPIHandler(t)
+
+	assertRejectsInvalidListPageSizes(t, handler, cookie, "/api/v1/redis/instances")
+}
+
 func TestRedisAPIsRejectInvalidQueriesAndWriteMethods(t *testing.T) {
 	handler, cookie := newRedisAPIHandler(t)
 	for _, path := range []string{

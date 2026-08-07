@@ -88,6 +88,34 @@ func TestMySQLOverviewAndInstancesReturnReadOnlyViews(t *testing.T) {
 	}
 }
 
+func TestHostListPageSize500(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	cookie := loginCookie(t, handler)
+
+	response := request(t, handler, http.MethodGet, "/api/v1/hosts?page=1&page_size=500", "", cookie)
+	assertListPageSize500(t, response)
+}
+
+func TestHostListRejectsInvalidPageSize(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	cookie := loginCookie(t, handler)
+
+	assertRejectsInvalidListPageSizes(t, handler, cookie, "/api/v1/hosts")
+}
+
+func TestMySQLInstancesPageSize500(t *testing.T) {
+	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
+
+	response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances?page=1&page_size=500", "", sessionCookie)
+	assertListPageSize500(t, response)
+}
+
+func TestMySQLInstancesRejectsInvalidPageSize(t *testing.T) {
+	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
+
+	assertRejectsInvalidListPageSizes(t, handler, sessionCookie, "/api/v1/mysql/instances")
+}
+
 func TestMySQLViewsExposeCompleteSchemaAndPreserveNullMetrics(t *testing.T) {
 	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
 
@@ -1090,6 +1118,60 @@ func jsonPathValue(t *testing.T, body []byte, path string) any {
 		}
 	}
 	return value
+}
+
+func assertListPageSize500(t *testing.T, response *httptest.ResponseRecorder) {
+	t.Helper()
+	if response.Code != http.StatusOK {
+		t.Fatalf("page_size=500 status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	body := response.Body.Bytes()
+	assertJSONObjectKeys(t, body, "", "data", "meta")
+	assertJSONObjectKeys(t, body, "meta", "request_id", "stale", "collected_at")
+	var payload struct {
+		Data struct {
+			Total      int `json:"total"`
+			Page       int `json:"page"`
+			PageSize   int `json:"page_size"`
+			TotalPages int `json:"total_pages"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatalf("decode page_size=500 response: %v", err)
+	}
+	if payload.Data.Page != 1 || payload.Data.PageSize != 500 {
+		t.Fatalf("page/page_size = %d/%d, want 1/500", payload.Data.Page, payload.Data.PageSize)
+	}
+	if payload.Data.Total < 1 {
+		t.Fatal("page_size=500 fixture returned no list data")
+	}
+	wantTotalPages := 0
+	if payload.Data.Total > 0 {
+		wantTotalPages = (payload.Data.Total + 499) / 500
+	}
+	if payload.Data.TotalPages != wantTotalPages {
+		t.Fatalf("total_pages = %d, want %d", payload.Data.TotalPages, wantTotalPages)
+	}
+}
+
+func assertRejectsInvalidListPageSizes(t *testing.T, handler http.Handler, cookie *http.Cookie, path string) {
+	t.Helper()
+	for _, pageSize := range []string{"499", "501", "0", "-1", ""} {
+		t.Run("page_size="+pageSize, func(t *testing.T) {
+			response := request(t, handler, http.MethodGet, path+"?page=1&page_size="+pageSize, "", cookie)
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("page_size=%q status = %d, want %d", pageSize, response.Code, http.StatusBadRequest)
+			}
+			var body ErrorBody
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode invalid page_size response: %v", err)
+			}
+			if body.Code != "invalid_query" || body.Message != "查询参数无效" || body.RequestID == "" {
+				t.Fatal("invalid page_size response is not the safe invalid-query envelope")
+			}
+		})
+	}
 }
 
 func assertJSONObjectKeys(t *testing.T, body []byte, path string, want ...string) {

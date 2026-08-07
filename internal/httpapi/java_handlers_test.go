@@ -135,6 +135,19 @@ func TestJavaServicesEncodesEmptyCollectionsAsArrays(t *testing.T) {
 	}
 }
 
+func TestJavaServicesPageSize500(t *testing.T) {
+	handler, cookie := newJavaAPITestHandler(t, mock.NewJava(time.Now))
+
+	response := request(t, handler, http.MethodGet, "/api/v1/java/services?page=1&page_size=500", "", cookie)
+	assertListPageSize500(t, response)
+}
+
+func TestJavaServicesRejectsInvalidPageSize(t *testing.T) {
+	handler, cookie := newJavaAPITestHandler(t, mock.NewJava(time.Now))
+
+	assertRejectsInvalidListPageSizes(t, handler, cookie, "/api/v1/java/services")
+}
+
 func TestJavaOverviewRejectsEveryQueryParameter(t *testing.T) {
 	handler, cookie := newJavaAPITestHandler(t, mock.NewJava(time.Now))
 	for _, rawQuery := range []string{"search=fixture", "search=", "search=a&search=b", "search=%ZZ"} {

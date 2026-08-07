@@ -91,6 +91,19 @@ func TestElasticsearchNodesEncodesEmptyCollectionsAsArrays(t *testing.T) {
 	}
 }
 
+func TestElasticsearchNodesPageSize500(t *testing.T) {
+	handler, sessionCookie := newElasticsearchAPITestHandler(t, elasticsearchHTTPFixture())
+
+	response := request(t, handler, http.MethodGet, "/api/v1/elasticsearch/nodes?page=1&page_size=500", "", sessionCookie)
+	assertListPageSize500(t, response)
+}
+
+func TestElasticsearchNodesRejectsInvalidPageSize(t *testing.T) {
+	handler, sessionCookie := newElasticsearchAPITestHandler(t, elasticsearchHTTPFixture())
+
+	assertRejectsInvalidListPageSizes(t, handler, sessionCookie, "/api/v1/elasticsearch/nodes")
+}
+
 func TestElasticsearchMissingServiceReturnsSafeUnavailable(t *testing.T) {
 	handler := newElasticsearchAPIHandler(t, nil, testNow)
 	sessionCookie := loginCookie(t, handler)

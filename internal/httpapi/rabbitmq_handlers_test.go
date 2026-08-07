@@ -108,6 +108,19 @@ func TestRabbitMQNodesEncodesEmptyCollectionsAsArrays(t *testing.T) {
 	}
 }
 
+func TestRabbitMQNodesPageSize500(t *testing.T) {
+	handler, cookie := newRabbitMQAPITestHandler(t, mock.NewRabbitMQ())
+
+	response := request(t, handler, http.MethodGet, "/api/v1/rabbitmq/nodes?page=1&page_size=500", "", cookie)
+	assertListPageSize500(t, response)
+}
+
+func TestRabbitMQNodesRejectsInvalidPageSize(t *testing.T) {
+	handler, cookie := newRabbitMQAPITestHandler(t, mock.NewRabbitMQ())
+
+	assertRejectsInvalidListPageSizes(t, handler, cookie, "/api/v1/rabbitmq/nodes")
+}
+
 func TestRabbitMQOverviewRejectsEveryQueryParameter(t *testing.T) {
 	handler, cookie := newRabbitMQAPITestHandler(t, mock.NewRabbitMQ())
 	for _, rawQuery := range []string{"search=fixture", "search=", "search=a&search=b", "search=%ZZ"} {

@@ -249,6 +249,19 @@ func TestDiskDevicesReturnsFixedViewDefaultsAndPreservesNulls(t *testing.T) {
 	}
 }
 
+func TestDiskDevicesPageSize500(t *testing.T) {
+	handler, sessionCookie := newDiskAPITestHandler(t, fixtureDiskSnapshot())
+
+	response := request(t, handler, http.MethodGet, "/api/v1/disks/devices?page=1&page_size=500", "", sessionCookie)
+	assertListPageSize500(t, response)
+}
+
+func TestDiskDevicesRejectsInvalidPageSize(t *testing.T) {
+	handler, sessionCookie := newDiskAPITestHandler(t, fixtureDiskSnapshot())
+
+	assertRejectsInvalidListPageSizes(t, handler, sessionCookie, "/api/v1/disks/devices")
+}
+
 func TestDiskDevicesAcceptsEverySupportedSortAndOrder(t *testing.T) {
 	for _, sortField := range []string{"host", "device", "model", "capacity", "smart", "temperature", "lifetime", "power_on_hours", "errors", "status"} {
 		for _, order := range []string{"asc", "desc"} {
