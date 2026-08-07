@@ -10,7 +10,7 @@
 
 四页所有可见列均走服务端升降序，缺失值无论方向都置后，相同值以稳定实体 ID 收口；页面只保留 URL、`aria-label`、`title` 和 `data-active` 的排序状态，不显示排序箭头，切换排序会回到第 1 页。Java 的 13 列、三类状态颜色和五项业务端中文显示规则继续保留，筛选控件、URL 与 API 仍使用原始业务代码。
 
-新鲜容器门禁已完成：前端 Vitest 16 个文件、303 项测试，typecheck、production build 和 Playwright 27 项静态发现均 exit 0；Go 的 gofmt、vet、全仓普通/race 测试和 Linux 编译均 exit 0。源码扫描未发现生产页面直接 `fetch/apiRequest`、写方法、运维控件或任意 PromQL；初始关键词命中仅是拒绝写操作的测试断言。未启动服务或浏览器、未发布端口、未访问上游、未读取私密环境，也未执行 merge、push、部署或重启。
+新鲜容器门禁已完成：前端 Vitest 16 个文件、303 项测试，typecheck、production build 和 Playwright 27 项静态发现均 exit 0；Go 的 gofmt、vet、全仓普通/race 测试和 Linux 编译均 exit 0。泛型兼容源码扫描确认四个生产列表页均有固定 `apiRequest` 调用：主机页使用共享客户端默认 `GET`，其余三页显式 `GET`；未发现写方法、运维控件、任意请求能力或任意 PromQL。未启动服务或浏览器、未发布端口、未访问上游、未读取私密环境，也未执行 merge、push、部署或重启。
 
 ### 2026-08-07 Java 展示优化（隔离工作树，本地验证完成）
 

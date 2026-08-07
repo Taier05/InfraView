@@ -17,7 +17,7 @@ docker run --rm --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/npm-cache -v
 docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm sh -c 'files="$(find cmd internal -type f -name "*.go")"; test -z "$(gofmt -l $files)" && go vet ./... && go test ./... -count=1 && go test -race ./... -count=1 && CGO_ENABLED=0 GOOS=linux go build -trimpath -o /tmp/infraview ./cmd/infraview'
 ```
 
-前端结果为 Vitest 16 个文件/303 项、Playwright 27 项静态发现，Go 全仓普通/race 测试均通过，所有门禁 exit 0。只读/敏感扫描与 `git diff --check` 同样通过；生产页面没有直接 `fetch/apiRequest`、写方法、命令执行、重启、删除、故障转移或任意 PromQL。
+前端结果为 Vitest 16 个文件/303 项、Playwright 27 项静态发现，Go 全仓普通/race 测试均通过，所有门禁 exit 0。只读/敏感扫描与 `git diff --check` 同样通过；四个生产列表页存在固定 `apiRequest` 调用：主机页依赖共享客户端的默认 `GET`，其余三页显式 `GET`；未发现写方法、命令执行、重启、删除、故障转移或任意请求能力。
 
 本 Task 仅获本地提交授权；不得 merge、push、部署、重启、启动服务/浏览器、创建端口、连接上游或读取私密环境。文档与报告不得记录 Token、Cookie、认证头、Base URL、真实标识、地址、数量、容量、指标值或上游正文。
 

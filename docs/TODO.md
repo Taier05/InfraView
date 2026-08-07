@@ -35,7 +35,7 @@
 - [x] 所有展示列接入固定 URL/HTTP/Service 排序白名单，在完整筛选结果上服务端排序；升降序缺失值始终末置，稳定实体 ID 收口，表头不渲染排序箭头。
 - [x] 继续保留 Java 13 列、健康/端口/进程的三类等级色，以及五项业务端的中文显示和原始筛选代码契约。
 - [x] 完成一次性 Docker 前端全量门禁：Vitest 16 文件/303 项、typecheck、production build、Playwright 27 项静态发现均 exit 0；未执行浏览器或动态 E2E。
-- [x] 完成一次性 Docker Go 全量门禁：gofmt、vet、普通/race 全仓测试及 Linux 编译均 exit 0；静态扫描确认无新增写 API、运维控件、任意 PromQL 或生产页面直接请求调用。
+- [x] 完成一次性 Docker Go 全量门禁：gofmt、vet、普通/race 全仓测试及 Linux 编译均 exit 0；泛型兼容静态扫描确认生产列表页仅有固定 `GET`/默认 `GET` API 调用，无新增写 API、运维控件、任意请求能力或任意 PromQL。
 - [x] 按 Task 7 授权仅创建本地文档提交；不 merge、不 push、不部署、不重启，也不访问上游或私密环境。
 
 ## Mock MVP
