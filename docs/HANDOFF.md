@@ -2,6 +2,14 @@
 
 最后更新：2026-08-07
 
+## 当前隔离工作树 / Java 展示优化恢复入口
+
+当前工作目录为 `/root/github/InfraView/.worktrees/list-table-consistency`，分支为 `feature/list-table-consistency`。Java 展示功能基准为 `4b564b8 feat: polish Java status presentation`；继续前先读取本节与 `docs/PROJECT_STATUS.md`、`docs/TODO.md`，再执行 `git status --short --branch`、`git log -3 --oneline`、`git diff --check` 和 `git diff --cached --check`，以实时 Git 结果为准，不能把下方 `main` 的历史交接当作本工作树的当前状态。
+
+本次仅完成离线展示验证与文档交接：健康检查、端口状态、进程状态分别用绿色“正常”、红色“异常”、灰色“暂无数据”三类徽标；`tikbee`、`rider`、`mch`、`saas`、`mch_saas` 显示为“用户端、骑手端、商家端、管理后台端、商家 PC 端”。未知业务端原样显示，筛选选项及 URL/API 参数仍传递原始代码，保证已有链接和筛选兼容。容器门禁通过 16 个前端测试文件、275 项测试、typecheck、生产构建和 Playwright 27 项静态清单；Java 页面静态扫描仅见固定 `GET`，未发现写方法、命令执行、重启、删除或任意 PromQL，whitespace 检查无输出。
+
+未启动服务或浏览器，未发布端口，未部署、推送、访问上游或读取私密环境；文档不记录真实标识与现场数据。后续若要进行动态浏览器、部署、推送或任何远端操作，均需取得独立明确授权。
+
 ## 当前数据时间与 Elasticsearch 容错恢复入口（已合并、已推送、已部署）
 
 功能提交 `ad6f01b fix: show sample times and tolerate sparse Elasticsearch data` 已从隔离分支快进合并到 `main` 并推送至 `origin/main`。恢复时使用主工作区 `/root/github/InfraView`，先读本节、对应 design/plan、`docs/PROJECT_STATUS.md`、`docs/TODO.md` 和 `docs/datasources/NIGHTINGALE.md`，再以 Git 只读检查为准。
