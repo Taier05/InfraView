@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -68,6 +69,53 @@ func TestJavaServicesReturnsExplicitSafeViewAndArrays(t *testing.T) {
 		t.Fatal("Java list fields must be arrays")
 	}
 	assertJavaResponseHasNoSensitiveKeys(t, body)
+}
+
+func TestJavaServiceViewEncodesExactInt64FieldsAsCanonicalDecimalStrings(t *testing.T) {
+	beyondSafeInteger := int64(9_007_199_254_740_993)
+	maximum := int64(math.MaxInt64)
+	body, err := json.Marshal(javaServiceViewFrom(service.JavaServiceSummary{
+		ProcessCount:  &beyondSafeInteger,
+		MemoryBytes:   &maximum,
+		UptimeSeconds: &maximum,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]string{
+		"process_count":  "9007199254740993",
+		"memory_bytes":   "9223372036854775807",
+		"uptime_seconds": "9223372036854775807",
+	} {
+		if got := jsonPathValue(t, body, path); got != want {
+			t.Fatalf("%s = %#v, want canonical decimal string %q", path, got, want)
+		}
+	}
+
+	nullBody, err := json.Marshal(javaServiceViewFrom(service.JavaServiceSummary{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"process_count", "memory_bytes", "uptime_seconds"} {
+		if got := jsonPathValue(t, nullBody, path); got != nil {
+			t.Fatalf("%s = %#v, want null", path, got)
+		}
+	}
+
+	negative := int64(-1)
+	negativeBody, err := json.Marshal(javaServiceViewFrom(service.JavaServiceSummary{
+		ProcessCount:  &negative,
+		MemoryBytes:   &negative,
+		UptimeSeconds: &negative,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"process_count", "memory_bytes", "uptime_seconds"} {
+		if got := jsonPathValue(t, negativeBody, path); got != nil {
+			t.Fatalf("%s = %#v, want null for negative domain value", path, got)
+		}
+	}
 }
 
 func TestJavaServicesEncodesEmptyCollectionsAsArrays(t *testing.T) {

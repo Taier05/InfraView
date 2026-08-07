@@ -44,6 +44,8 @@ const javaStatusSources = [
   'normal',
   'unknown',
 ] as const
+const maxInt64 = 9_223_372_036_854_775_807n
+const canonicalNonNegativeInteger = /^(?:0|[1-9][0-9]*)$/
 
 type PageSize = (typeof pageSizes)[number]
 type JavaSort = (typeof sortFields)[number]
@@ -80,8 +82,16 @@ function isNonNegativeFiniteNumberOrNull(value: unknown) {
   return value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0)
 }
 
-function isNonNegativeIntegerOrNull(value: unknown) {
-  return value === null || (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0)
+function isPercentageOrNull(value: unknown) {
+  return value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100)
+}
+
+function isCanonicalInt64OrNull(value: unknown) {
+  return value === null || (
+    typeof value === 'string' &&
+    canonicalNonNegativeInteger.test(value) &&
+    BigInt(value) <= maxInt64
+  )
 }
 
 function isStringArray(value: unknown): value is string[] {
@@ -168,12 +178,12 @@ function isJavaService(value: unknown): value is JavaService {
     isNonNegativeFiniteNumberOrNull(value.health_latency_ms) &&
     (typeof value.port_up === 'boolean' || value.port_up === null) &&
     (typeof value.process_up === 'boolean' || value.process_up === null) &&
-    isNonNegativeIntegerOrNull(value.process_count) &&
+    isCanonicalInt64OrNull(value.process_count) &&
     (typeof value.port_consistent === 'boolean' || value.port_consistent === null) &&
-    isNonNegativeFiniteNumberOrNull(value.cpu_usage_percent) &&
-    isNonNegativeIntegerOrNull(value.memory_bytes) &&
-    isNonNegativeFiniteNumberOrNull(value.memory_usage_percent) &&
-    isNonNegativeIntegerOrNull(value.uptime_seconds) &&
+    isPercentageOrNull(value.cpu_usage_percent) &&
+    isCanonicalInt64OrNull(value.memory_bytes) &&
+    isPercentageOrNull(value.memory_usage_percent) &&
+    isCanonicalInt64OrNull(value.uptime_seconds) &&
     isOneOf(value.status, metricLevels) &&
     isOneOf(value.status_source, javaStatusSources) &&
     isOneOf(value.collection_level, metricLevels) &&
@@ -181,7 +191,7 @@ function isJavaService(value: unknown): value is JavaService {
   )
 }
 
-function isJavaServicePageResponse(value: unknown): value is JavaServicePageResponse {
+export function isJavaServicePageResponse(value: unknown): value is JavaServicePageResponse {
   if (!isRecord(value) || !isRecord(value.data) || !isRecord(value.meta)) return false
   const { data, meta } = value
   return (
@@ -241,32 +251,37 @@ function percentage(value: number | null) {
   return value === null ? '暂无数据' : `${value.toFixed(1)}%`
 }
 
-function integer(value: number | null) {
-  return value === null ? '暂无数据' : numberFormatter.format(value)
+function integer(value: string | null) {
+  return value === null ? '暂无数据' : numberFormatter.format(BigInt(value))
 }
 
 function latency(value: number | null) {
   return value === null ? '暂无数据' : `${decimal(value)} ms`
 }
 
-function byteSize(value: number | null) {
+function byteSize(value: string | null) {
   if (value === null) return '暂无数据'
-  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']
-  let size = value
+  const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB']
+  const bytes = BigInt(value)
+  let divisor = 1n
   let unitIndex = 0
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024
+  while (bytes >= divisor * 1024n && unitIndex < units.length - 1) {
+    divisor *= 1024n
     unitIndex += 1
   }
-  return `${decimal(size)} ${units[unitIndex]}`
+  const scaledHundredths = (bytes * 100n + divisor / 2n) / divisor
+  const whole = scaledHundredths / 100n
+  const fraction = String(scaledHundredths % 100n).padStart(2, '0').replace(/0+$/, '')
+  return `${numberFormatter.format(whole)}${fraction === '' ? '' : `.${fraction}`} ${units[unitIndex]}`
 }
 
-function uptime(value: number | null) {
+function uptime(value: string | null) {
   if (value === null) return '暂无数据'
-  const days = Math.floor(value / 86_400)
-  const hours = Math.floor((value % 86_400) / 3_600)
-  if (days > 0 && hours > 0) return `${days}天 ${hours}小时`
-  if (days > 0) return `${days}天`
+  const seconds = BigInt(value)
+  const days = seconds / 86_400n
+  const hours = (seconds % 86_400n) / 3_600n
+  if (days > 0n && hours > 0n) return `${days}天 ${hours}小时`
+  if (days > 0n) return `${days}天`
   return `${hours}小时`
 }
 

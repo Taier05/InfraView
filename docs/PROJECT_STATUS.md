@@ -1,6 +1,6 @@
 # InfraView 项目状态
 
-最后更新：2026-08-05
+最后更新：2026-08-07
 
 ## 当前阶段
 
@@ -8,9 +8,9 @@
 
 Java 服务 Task 1–8 已在 `feature/java-service-status` 完成：独立 `internal/javaapp` 领域、脱敏 Mock、固定 11 查询 Nightingale Provider、共享 `JavaService`、两个认证只读 GET API、总览第七卡、侧边栏与共享 `ListPage` 的 13 列 `/java` 页面均已交付。Provider 每个共享快照恰好一次 `query-instant-batch`，稳定业务实例只由 `name + server_ip` 建立；`ident` 仅用于 Provider 内部归并，不进入任何领域对外 View、HTTP 响应或页面。`tikbee`、`rider`、`mch`、`saas`、`mch_saas` 分别精确映射为“用户端、骑手端、商家端、管理后台端、商家 PC 端”，未知值保持原值。
 
-状态仍为 `critical > warning > unknown > normal`，采集推进按默认 15 秒预期周期的 2/5 周期升级；资源、进程数、运行时间和健康延迟只展示。服务页固定 13 列、每格单值单行、缺失统一“暂无数据”；合成 Playwright 契约覆盖侧边栏/第七卡入口、精确列/URL、映射、stale/error/empty、原生 `title`、宽窄布局、认证共享 request context 的 POST 405 和无破坏性控件。
+状态仍为 `critical > warning > unknown > normal`，采集推进按默认 15 秒预期周期的 2/5 周期升级；资源、进程数、运行时间和健康延迟只展示。领域/Service 的进程数、内存字节数和运行时间保持 nullable `int64` 及后端无损排序；HTTP 对应三个字段改用规范十进制字符串或 `null`，前端以 BigInt 无损校验和格式化，已覆盖 `2^53+1` 与 `MaxInt64`。CPU/内存百分比响应严格限制为有限 `0..100` 或 `null`。服务页固定 13 列、每格单值单行、缺失统一“暂无数据”；合成 Playwright 契约覆盖侧边栏/第七卡入口、精确列/URL、映射、stale/error/empty、原生 `title`、宽窄布局、认证共享 request context 的 POST 405 和无破坏性控件。
 
-本地提交已完成。容器化静态验证包括前端 16 文件/253 项、typecheck、production build、Java Playwright 静态发现 1 文件/6 项、Go gofmt/vet/普通/race/编译、E2E 安全脚本、安全/whitespace 扫描和无缓存生产镜像构建；镜像不运行。npm 的锁文件审计提示和 Vite 第三方 `"use client"` 提示为预存依赖警告，未修改依赖或执行 audit fix。未 push、未合并 `main`、未重建或部署 8080、未运行动态 Playwright/浏览器验收、未读取私密环境，也未连接外部或生产数据源；这些动作均需新的单独授权。
+本地提交已完成。最终修复后的容器化静态验证包括前端 16 文件/273 项、typecheck、production build、Java Playwright 静态发现 1 文件/6 项、Go gofmt/vet/普通/race/编译和安全/whitespace/diff 扫描。原 Task 8 的 E2E safety 与无缓存生产镜像构建仍是历史通过证据；最终修复波按边界未重新运行会间接调用 `scripts/e2e.sh` 的 safety 脚本，也未重建镜像。npm 的锁文件审计提示和 Vite 第三方 `"use client"` 提示为预存依赖警告，未修改依赖或执行 audit fix。未 push、未合并 `main`、未重建或部署 8080、未运行动态 Playwright/浏览器验收、未读取私密环境，也未连接外部或生产数据源；这些动作均需新的单独授权。
 
 ### 2026-08-05 RabbitMQ Task 11（节点发现与名称真实性收口）
 

@@ -10,7 +10,8 @@
 - [x] 实现两个认证只读 GET API、参数白名单、显式脱敏 View、400/405/503 和 stale 语义。
 - [x] 实现总览第七卡、侧边栏和共享 `ListPage` 的固定 13 列 `/java` 页面；五项业务端精确映射，未知原样展示，空值为“暂无数据”。
 - [x] 新增 6 项合成 Java Playwright 静态契约，覆盖入口、URL、映射、状态、布局、405 和无破坏性控件；未运行动态浏览器。
-- [x] 完成容器化前端 253 项、typecheck/build、Go gofmt/vet/普通/race/编译、E2E 安全脚本、敏感/whitespace 扫描与无缓存镜像构建；镜像未运行。
+- [x] 最终修复后完成容器化前端 273 项、typecheck/build、Go gofmt/vet/普通/race/编译、Playwright 6 项静态发现与敏感/只读/whitespace/diff 扫描；原 Task 8 的 E2E safety 与无缓存镜像仍为历史通过证据，本轮按边界未重跑。
+- [x] 收口精确 `int64` 字符串 transport、前端 BigInt 展示、单次响应 UTC Clock、百分比严格范围、fixture 扩展敏感扫描，以及 process/consistency/collection 总览组合测试。
 - [x] 按明确授权完成本地提交；提交信息为 `docs: record Java service monitoring delivery`。
 - [ ] push、合并 `main`、现有 8080 重建/部署与动态 Playwright/浏览器验收均未执行，分别需要新的明确授权。
 

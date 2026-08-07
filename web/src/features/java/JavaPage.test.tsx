@@ -21,7 +21,7 @@ import {
   type JavaServicePageFixture,
 } from '../../test/fixtures'
 import { server } from '../../test/server'
-import { JavaPage } from './JavaPage'
+import { isJavaServicePageResponse, JavaPage } from './JavaPage'
 
 const exactHeaders = [
   '业务端', '服务地址', '健康检查', '健康延迟', '端口状态',
@@ -175,11 +175,11 @@ it('按约定格式化延迟百分比 IEC 字节进程数与运行时间', async
       services: [{
         ...base,
         health_latency_ms: 12.5,
-        process_count: 12_345,
+        process_count: '12345',
         cpu_usage_percent: 72.55,
-        memory_bytes: 2 * 1024 ** 3,
+        memory_bytes: '2147483648',
         memory_usage_percent: 36,
-        uptime_seconds: 90_000,
+        uptime_seconds: '90000',
       }],
       total: 1,
       total_pages: 1,
@@ -192,6 +192,28 @@ it('按约定格式化延迟百分比 IEC 字节进程数与运行时间', async
     'fixture-business-a', 'fixture-address-a', '正常', '12.5 ms', '正常',
     '正常', '12,345', '正常', '72.5%', '2 GiB', '36.0%', '1天 1小时', '正常',
   ])
+})
+
+it('无损校验并格式化超过 JS 安全整数和 MaxInt64 边界', async () => {
+  const base = cloneFixture().data.services[0]
+  responseBody = javaServicePageFixture({
+    data: {
+      services: [{
+        ...base,
+        process_count: '9007199254740993',
+        memory_bytes: '9223372036854775807',
+        uptime_seconds: '9223372036854775807',
+      }],
+      total: 1,
+      total_pages: 1,
+    },
+  })
+  renderPage()
+
+  const cells = within((await screen.findAllByRole('row'))[1]).getAllByRole('cell')
+  expect(cells[6]).toHaveTextContent('9,007,199,254,740,993')
+  expect(cells[9]).toHaveTextContent('8 EiB')
+  expect(cells[11]).toHaveTextContent('106751991167300天 15小时')
 })
 
 it('从白名单 URL 恢复筛选排序分页并规范非法参数', async () => {
@@ -329,7 +351,12 @@ describe('严格响应校验', () => {
   const malformedResponses: Array<[string, (fixture: JavaServicePageFixture) => unknown]> = [
     ['services 非数组', (fixture) => ({ ...fixture, data: { ...fixture.data, services: null } })],
     ['未知状态等级', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], status: 'offline' }] } })],
-    ['负数指标', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], process_count: -1 }] } })],
+    ['整数仍使用 JSON number', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], process_count: 1 }] } })],
+    ['负数字符串', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], process_count: '-1' }] } })],
+    ['科学计数法字符串', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], memory_bytes: '1e3' }] } })],
+    ['带符号字符串', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], uptime_seconds: '+1' }] } })],
+    ['非规范前导零', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], process_count: '01' }] } })],
+    ['超过 MaxInt64', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], process_count: '9223372036854775808' }] } })],
     ['分页缺失', (fixture) => { const { total_pages: _omitted, ...data } = fixture.data; return { ...fixture, data } }],
     ['页内服务超出页大小', (fixture) => ({ ...fixture, data: { ...fixture.data, services: Array.from({ length: 21 }, (_, index) => ({ ...fixture.data.services[0], id: `java-${index}` })), total: 21, page_size: 20, total_pages: 2 } })],
     ['未知状态来源', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], status_source: 'future_source' }] } })],
@@ -350,5 +377,27 @@ describe('严格响应校验', () => {
     renderPage()
     expect(await screen.findByRole('alert')).toHaveTextContent('服务器响应格式无效')
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['CPU 负数', { cpu_usage_percent: -1 }],
+    ['CPU 超过 100', { cpu_usage_percent: 101 }],
+    ['内存负数', { memory_usage_percent: -1 }],
+    ['内存超过 100', { memory_usage_percent: 101 }],
+  ])('%s', (_name, override) => {
+    const fixture = cloneFixture()
+    fixture.data.services[0] = { ...fixture.data.services[0], ...override }
+    expect(isJavaServicePageResponse(fixture)).toBe(false)
+  })
+
+  it.each([
+    ['CPU NaN', { cpu_usage_percent: Number.NaN }],
+    ['CPU Infinity', { cpu_usage_percent: Number.POSITIVE_INFINITY }],
+    ['内存 NaN', { memory_usage_percent: Number.NaN }],
+    ['内存 Infinity', { memory_usage_percent: Number.NEGATIVE_INFINITY }],
+  ])('%s', (_name, override) => {
+    const fixture = cloneFixture()
+    fixture.data.services[0] = { ...fixture.data.services[0], ...override }
+    expect(isJavaServicePageResponse(fixture)).toBe(false)
   })
 })

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/Taier05/InfraView/internal/javaapp"
@@ -47,12 +48,12 @@ type javaServiceView struct {
 	HealthLatencyMilliseconds *float64                 `json:"health_latency_ms"`
 	PortUp                    *bool                    `json:"port_up"`
 	ProcessUp                 *bool                    `json:"process_up"`
-	ProcessCount              *int64                   `json:"process_count"`
+	ProcessCount              *string                  `json:"process_count"`
 	PortConsistent            *bool                    `json:"port_consistent"`
 	CPUUsagePercent           *float64                 `json:"cpu_usage_percent"`
-	MemoryBytes               *int64                   `json:"memory_bytes"`
+	MemoryBytes               *string                  `json:"memory_bytes"`
 	MemoryUsagePercent        *float64                 `json:"memory_usage_percent"`
-	UptimeSeconds             *int64                   `json:"uptime_seconds"`
+	UptimeSeconds             *string                  `json:"uptime_seconds"`
 	Status                    service.Level            `json:"status"`
 	StatusSource              service.JavaStatusSource `json:"status_source"`
 	CollectionLevel           service.Level            `json:"collection_level"`
@@ -199,14 +200,22 @@ func javaServiceViewFrom(value service.JavaServiceSummary) javaServiceView {
 		HealthLatencyMilliseconds: value.HealthLatencyMilliseconds,
 		PortUp:                    value.PortUp,
 		ProcessUp:                 value.ProcessUp,
-		ProcessCount:              value.ProcessCount,
+		ProcessCount:              canonicalJavaInt64(value.ProcessCount),
 		PortConsistent:            value.PortConsistent,
 		CPUUsagePercent:           value.CPUUsagePercent,
-		MemoryBytes:               value.MemoryBytes,
+		MemoryBytes:               canonicalJavaInt64(value.MemoryBytes),
 		MemoryUsagePercent:        value.MemoryUsagePercent,
-		UptimeSeconds:             value.UptimeSeconds,
+		UptimeSeconds:             canonicalJavaInt64(value.UptimeSeconds),
 		Status:                    value.Status,
 		StatusSource:              value.StatusSource,
 		CollectionLevel:           value.CollectionLevel,
 	}
+}
+
+func canonicalJavaInt64(value *int64) *string {
+	if value == nil || *value < 0 {
+		return nil
+	}
+	formatted := strconv.FormatInt(*value, 10)
+	return &formatted
 }

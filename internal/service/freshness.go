@@ -32,7 +32,11 @@ func newFreshnessTracker(clock func() time.Time, interval time.Duration) *freshn
 }
 
 func (t *freshnessTracker) Observe(samples map[string]time.Time) {
-	now := t.clock().UTC()
+	t.ObserveAt(samples, t.clock().UTC())
+}
+
+func (t *freshnessTracker) ObserveAt(samples map[string]time.Time, now time.Time) {
+	now = now.UTC()
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for key, sampleAt := range samples {

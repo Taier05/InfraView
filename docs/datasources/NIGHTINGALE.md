@@ -190,7 +190,7 @@ Java Provider 复用受限 Nightingale Client，每个共享快照恰好一次 `
 
 名称映射仅作完整值精确匹配：`tikbee`→`用户端`、`rider`→`骑手端`、`mch`→`商家端`、`saas`→`管理后台端`、`mch_saas`→`商家 PC 端`；未知代码原样展示。健康、端口、进程和端口进程一致性为必需二值字段；缺失或冲突不伪造为零。状态来源为 `health|port|process|consistency|collection|normal|unknown`，等级为 `critical > warning > unknown > normal`。采集 freshness 只按查询 11 原始样本是否推进的本地观察计算：默认 15 秒预期周期，连续 2/5 周期未推进为 warning/critical；首次观察与样本时间回退重新建立基线。CPU、内存、健康延迟、进程数和运行时间仅展示，不设推测阈值。
 
-HTTP 只提供认证的 `GET /api/v1/java/overview` 与 `GET /api/v1/java/services`，后者只接受固定搜索、名称、状态、13 个排序字段、方向和分页参数；其他方法为 405。页面固定 13 列，缺失值显示“暂无数据”。本地验证仅使用脱敏 Go/前端夹具和合成 Playwright route fixture；未读取私密环境、未连接真实或生产 Java 服务/Nightingale、未部署 8080，也未运行动态浏览器。任何 push、`main` 合并、8080 重建/部署和动态验收均须新的单独授权。
+HTTP 只提供认证的 `GET /api/v1/java/overview` 与 `GET /api/v1/java/services`，后者只接受固定搜索、名称、状态、13 个排序字段、方向和分页参数；其他方法为 405。领域与 Service 内的进程数、内存字节数和运行时间保持 nullable `int64`，后端排序不变；服务列表的 `process_count`、`memory_bytes`、`uptime_seconds` 则固定传输为规范非负十进制字符串或 `null`，上限为 `MaxInt64`，禁止符号、科学计数和非规范前导零。前端使用 BigInt 无损校验与格式化，不能转成 JavaScript `number`。页面固定 13 列，缺失值显示“暂无数据”。本地验证仅使用脱敏 Go/前端夹具和合成 Playwright route fixture；未读取私密环境、未连接真实或生产 Java 服务/Nightingale、未部署 8080，也未运行动态浏览器。任何 push、`main` 合并、8080 重建/部署和动态验收均须新的单独授权。
 
 ## RabbitMQ 只读映射
 

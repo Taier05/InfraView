@@ -416,12 +416,12 @@ export interface JavaService {
   health_latency_ms: number | null
   port_up: boolean | null
   process_up: boolean | null
-  process_count: number | null
+  process_count: string | null
   port_consistent: boolean | null
   cpu_usage_percent: number | null
-  memory_bytes: number | null
+  memory_bytes: string | null
   memory_usage_percent: number | null
-  uptime_seconds: number | null
+  uptime_seconds: string | null
   status: MetricLevel
   status_source: JavaStatusSource
   collection_level: MetricLevel

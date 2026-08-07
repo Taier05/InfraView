@@ -51,6 +51,10 @@ func NewJava(provider javaapp.Provider, store *cache.Store, options JavaOptions)
 }
 
 func (service *JavaService) snapshotState(ctx context.Context) (javaSnapshotState, Meta, error) {
+	return service.snapshotStateAt(ctx, service.options.Clock().UTC())
+}
+
+func (service *JavaService) snapshotStateAt(ctx context.Context, now time.Time) (javaSnapshotState, Meta, error) {
 	result, err := service.store.GetOrLoad(
 		ctx,
 		javaSnapshotCacheKey,
@@ -67,7 +71,7 @@ func (service *JavaService) snapshotState(ctx context.Context) (javaSnapshotStat
 					samples[item.ID] = item.ReportedAt
 				}
 			}
-			service.freshness.Observe(samples)
+			service.freshness.ObserveAt(samples, now)
 			return javaSnapshotState{
 				snapshot:          snapshot.Clone(),
 				serviceAdvancedAt: captureJavaProgress(service.freshness, samples),
@@ -105,7 +109,7 @@ func cloneJavaSnapshotState(source javaSnapshotState) javaSnapshotState {
 	return javaSnapshotState{snapshot: source.snapshot.Clone(), serviceAdvancedAt: progress}
 }
 
-func (service *JavaService) collectionLevel(item javaapp.Service, advancedAt map[string]time.Time) Level {
+func (service *JavaService) collectionLevel(item javaapp.Service, advancedAt map[string]time.Time, now time.Time) Level {
 	if !item.CollectionTracked {
 		return LevelUnknown
 	}
@@ -113,11 +117,12 @@ func (service *JavaService) collectionLevel(item javaapp.Service, advancedAt map
 	if !exists || item.ReportedAt.IsZero() {
 		return LevelUnknown
 	}
-	return collectionLevelAt(service.options.Clock().UTC(), advanced, service.options.CollectionInterval)
+	return collectionLevelAt(now, advanced, service.options.CollectionInterval)
 }
 
 func (service *JavaService) Overview(ctx context.Context) (JavaOverview, Meta, error) {
-	state, meta, err := service.snapshotState(ctx)
+	now := service.options.Clock().UTC()
+	state, meta, err := service.snapshotStateAt(ctx, now)
 	if err != nil {
 		return JavaOverview{}, Meta{}, err
 	}
@@ -126,8 +131,8 @@ func (service *JavaService) Overview(ctx context.Context) (JavaOverview, Meta, e
 		Services: JavaLevelCounts{Total: len(state.snapshot.Services)},
 	}
 	for _, item := range state.snapshot.Services {
-		collection := service.collectionLevel(item, state.serviceAdvancedAt)
-		summary := summarizeJavaService(item, collection, service.options.Clock())
+		collection := service.collectionLevel(item, state.serviceAdvancedAt, now)
+		summary := summarizeJavaService(item, collection, now)
 		addJavaLevel(&overview.Services, summary.Status)
 		overview.Status = higherJavaLevel(overview.Status, summary.Status)
 		addJavaAlert(&overview.Alerts.Health, javaBinaryLevel(item.HealthUp))
@@ -143,7 +148,8 @@ func (service *JavaService) Services(ctx context.Context, query JavaQuery) (Java
 	if err != nil {
 		return JavaPage{}, Meta{}, err
 	}
-	state, meta, err := service.snapshotState(ctx)
+	now := service.options.Clock().UTC()
+	state, meta, err := service.snapshotStateAt(ctx, now)
 	if err != nil {
 		return JavaPage{}, Meta{}, err
 	}
@@ -162,7 +168,7 @@ func (service *JavaService) Services(ctx context.Context, query JavaQuery) (Java
 	search := strings.ToLower(query.Search)
 	items := make([]JavaServiceSummary, 0, len(state.snapshot.Services))
 	for _, item := range state.snapshot.Services {
-		summary := summarizeJavaService(item, service.collectionLevel(item, state.serviceAdvancedAt), service.options.Clock())
+		summary := summarizeJavaService(item, service.collectionLevel(item, state.serviceAdvancedAt, now), now)
 		if query.Name != "" && summary.Name != query.Name || query.Status != "" && summary.Status != query.Status {
 			continue
 		}

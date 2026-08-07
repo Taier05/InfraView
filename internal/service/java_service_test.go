@@ -202,6 +202,116 @@ func TestJavaServiceFreshnessBoundariesCacheHitsAndProgress(t *testing.T) {
 	}
 }
 
+func TestJavaCollectionLevelUsesExactCycleBoundaries(t *testing.T) {
+	baseline := time.Date(2026, time.August, 5, 0, 0, 0, 0, time.UTC)
+	interval := 15 * time.Second
+	tests := []struct {
+		name string
+		age  time.Duration
+		want Level
+	}{
+		{"just before warning", 2*interval - time.Nanosecond, LevelNormal},
+		{"warning boundary", 2 * interval, LevelWarning},
+		{"just before critical", 5*interval - time.Nanosecond, LevelWarning},
+		{"critical boundary", 5 * interval, LevelCritical},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := collectionLevelAt(baseline.Add(test.age), baseline, interval); got != test.want {
+				t.Fatalf("collection level at %s = %q, want %q", test.age, got, test.want)
+			}
+		})
+	}
+}
+
+func TestJavaResponsesReadUTCClockOnceAndReuseIt(t *testing.T) {
+	now := time.Date(2026, time.August, 5, 0, 0, 30, 0, time.FixedZone("fixture-zone", 8*60*60))
+	for _, test := range []struct {
+		name string
+		call func(*JavaService) error
+	}{
+		{"overview", func(service *JavaService) error { _, _, err := service.Overview(context.Background()); return err }},
+		{"services", func(service *JavaService) error {
+			_, _, err := service.Services(context.Background(), JavaQuery{})
+			return err
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			provider := &recordingJavaProvider{snapshot: javaapp.Snapshot{Services: []javaapp.Service{
+				healthyJavaService("id-a", "tikbee", "fixture-address-a", now),
+				healthyJavaService("id-b", "rider", "fixture-address-b", now),
+			}}}
+			clockCalls := 0
+			clock := func() time.Time {
+				clockCalls++
+				return now.Add(time.Duration(clockCalls-1) * time.Second)
+			}
+			service := NewJava(provider, cache.New(func() time.Time { return now }), JavaOptions{
+				SnapshotTTL: time.Minute, CollectionInterval: 15 * time.Second, MaxStale: 5 * time.Minute, Clock: clock,
+			})
+			if err := test.call(service); err != nil {
+				t.Fatal(err)
+			}
+			if clockCalls != 1 {
+				t.Fatalf("Clock calls = %d, want exactly 1 UTC response timestamp", clockCalls)
+			}
+		})
+	}
+}
+
+func TestJavaOverviewDeduplicatesProcessConsistencyAndCombinesCollection(t *testing.T) {
+	now := time.Date(2026, time.August, 5, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name           string
+		processUp      *bool
+		consistent     *bool
+		collection     Level
+		wantStatus     Level
+		wantSource     JavaStatusSource
+		wantProcess    JavaAlertCount
+		wantCollection JavaAlertCount
+	}{
+		{"process and consistency critical count once", javaBool(false), javaBool(false), LevelNormal, LevelCritical, JavaStatusProcess, JavaAlertCount{Critical: 1}, JavaAlertCount{}},
+		{"process critical with collection warning", javaBool(false), javaBool(true), LevelWarning, LevelCritical, JavaStatusProcess, JavaAlertCount{Critical: 1}, JavaAlertCount{Warning: 1}},
+		{"consistency critical with collection critical", javaBool(true), javaBool(false), LevelCritical, LevelCritical, JavaStatusConsistency, JavaAlertCount{Critical: 1}, JavaAlertCount{Critical: 1}},
+		{"process unknown with collection warning", nil, javaBool(true), LevelWarning, LevelWarning, JavaStatusCollection, JavaAlertCount{Unknown: 1}, JavaAlertCount{Warning: 1}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			item := healthyJavaService("fixture-id", "tikbee", "fixture-address-a", now)
+			item.ProcessUp = test.processUp
+			item.PortConsistent = test.consistent
+			service := newJavaServiceWithSnapshot(now, javaapp.Snapshot{Services: []javaapp.Service{item}})
+			state, _, err := service.snapshotState(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			advanced := state.serviceAdvancedAt[item.ID]
+			service.options.Clock = func() time.Time {
+				switch test.collection {
+				case LevelWarning:
+					return advanced.Add(2 * service.options.CollectionInterval)
+				case LevelCritical:
+					return advanced.Add(5 * service.options.CollectionInterval)
+				default:
+					return advanced
+				}
+			}
+			overview, _, err := service.Overview(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if overview.Status != test.wantStatus || overview.Alerts.Process != test.wantProcess || overview.Alerts.Collection != test.wantCollection {
+				t.Fatalf("overview = %#v, want status=%q process=%#v collection=%#v", overview, test.wantStatus, test.wantProcess, test.wantCollection)
+			}
+			page := mustJavaPage(t, service, JavaQuery{})
+			if page.Services[0].StatusSource != test.wantSource {
+				t.Fatalf("status source = %q, want %q", page.Services[0].StatusSource, test.wantSource)
+			}
+		})
+	}
+}
+
 func TestJavaServiceStaleFallbackKeepsSnapshotAndContinuesAging(t *testing.T) {
 	now := time.Date(2026, time.August, 5, 0, 0, 0, 0, time.UTC)
 	clock := &javaTestClock{now: now}

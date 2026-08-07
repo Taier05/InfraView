@@ -18,6 +18,7 @@
 - 稳定服务身份只能由原始 `name + server_ip` 生成不可逆哈希；不能用 `ident` 或地址猜测名称。
 - `tikbee`、`rider`、`mch`、`saas`、`mch_saas` 只做完整值精确映射；未知代码展示原值。
 - CPU、内存、健康延迟、进程数和运行时间只展示，不设置推测阈值。
+- `internal/javaapp`/`internal/service` 的进程数、内存字节数和运行时间保持 nullable `int64` 并由后端无损排序；HTTP `process_count`、`memory_bytes`、`uptime_seconds` 必须为规范十进制 `string|null`，前端以 BigInt 或等价无损逻辑校验和展示，禁止通过 TypeScript `number` 中转。
 - 新页面必须复用 `ListPage` 与 `ModuleStatusCardShell`；13 列顺序固定，每格一个单行值，1440×900 无页面或表格横向滚动。
 - 真实身份、IP、数量、容量、指标值、Token、Cookie、认证头、Base URL 和上游正文不得进入测试日志、文档或提交信息。
 - 所有实现与验证使用 Docker/容器化工具；不在宿主机安装依赖或运行项目服务。
@@ -408,12 +409,12 @@ type javaServiceView struct {
     HealthLatencyMilliseconds *float64 `json:"health_latency_ms"`
     PortUp *bool `json:"port_up"`
     ProcessUp *bool `json:"process_up"`
-    ProcessCount *int64 `json:"process_count"`
+    ProcessCount *string `json:"process_count"`
     PortConsistent *bool `json:"port_consistent"`
     CPUUsagePercent *float64 `json:"cpu_usage_percent"`
-    MemoryBytes *int64 `json:"memory_bytes"`
+    MemoryBytes *string `json:"memory_bytes"`
     MemoryUsagePercent *float64 `json:"memory_usage_percent"`
-    UptimeSeconds *int64 `json:"uptime_seconds"`
+    UptimeSeconds *string `json:"uptime_seconds"`
     Status service.Level `json:"status"`
     StatusSource service.JavaStatusSource `json:"status_source"`
     CollectionLevel service.Level `json:"collection_level"`
@@ -421,6 +422,8 @@ type javaServiceView struct {
 ```
 
 Overview View exposes only `status`、`services` level counts and `alerts.{health,port,process,collection}`. Services View exposes `services`、`available_names`、`total`、`page`、`page_size`、derived `total_pages`. Always allocate arrays as `[]`, never `null`.
+
+`javaServiceViewFrom` converts only the three nullable nonnegative domain `int64` values with base-10 `strconv.FormatInt`. The resulting JSON values must be canonical strings matching `0|[1-9][0-9]*` and bounded by `MaxInt64`; nil remains `null`. Add HTTP JSON regression cases for `9007199254740993` and `9223372036854775807`.
 
 - [ ] **Step 4: Wire routes, providers, timeout wrapper and service construction**
 
@@ -502,19 +505,19 @@ export interface JavaService {
   health_latency_ms: number | null
   port_up: boolean | null
   process_up: boolean | null
-  process_count: number | null
+  process_count: string | null
   port_consistent: boolean | null
   cpu_usage_percent: number | null
-  memory_bytes: number | null
+  memory_bytes: string | null
   memory_usage_percent: number | null
-  uptime_seconds: number | null
+  uptime_seconds: string | null
   status: MetricLevel
   status_source: JavaStatusSource
   collection_level: MetricLevel
 }
 ```
 
-Define level counts and alert counts including `unknown`, then `JavaOverviewData{status,services,alerts}` and `JavaServicePageData{services,available_names,total,page,page_size,total_pages}`. Fixtures use documentation-only reserved addresses such as `fixture-address-a`, never live values.
+Define level counts and alert counts including `unknown`, then `JavaOverviewData{status,services,alerts}` and `JavaServicePageData{services,available_names,total,page,page_size,total_pages}`. Runtime validation accepts the three exact-integer fields only as canonical nonnegative decimal strings up to `MaxInt64` or `null`, and CPU/memory percentages only as finite numbers in `0..100` or `null`. Fixtures use documentation-only reserved addresses such as `fixture-address-a`, never live values.
 
 - [ ] **Step 4: Run GREEN, typecheck and existing contract regressions**
 
@@ -583,17 +586,18 @@ function binary(value: boolean | null) {
   return value ? '正常' : '异常'
 }
 
-function uptime(value: number | null) {
+function uptime(value: string | null) {
   if (value === null) return '暂无数据'
-  const days = Math.floor(value / 86_400)
-  const hours = Math.floor((value % 86_400) / 3_600)
-  if (days > 0 && hours > 0) return `${days}天 ${hours}小时`
-  if (days > 0) return `${days}天`
+  const seconds = BigInt(value)
+  const days = seconds / 86_400n
+  const hours = (seconds % 86_400n) / 3_600n
+  if (days > 0n && hours > 0n) return `${days}天 ${hours}小时`
+  if (days > 0n) return `${days}天`
   return `${hours}小时`
 }
 ```
 
-Format latency as `x ms`, CPU/memory as one-decimal percent, memory bytes with IEC units and process count as localized integer. `name` is the filter/query code; `business` is the displayed first column.
+Format latency as `x ms`, CPU/memory as one-decimal percent, memory bytes with BigInt-based IEC units and process count as localized BigInt. `name` is the filter/query code; `business` is the displayed first column。前端不得把三个精确整数字符串转成 `number`。
 
 - [ ] **Step 5: Add narrowly scoped 13-column density styles**
 

@@ -19,6 +19,18 @@ import {
 } from './fixtures'
 import { server } from './server'
 
+const javaFixtureSensitivePatterns = [
+  /ident|password|token|authorization|cookie|promql|base.?url|upstream/i,
+  /\b(?:\d{1,3}\.){3}\d{1,3}\b/,
+  /\[(?=[0-9a-f:]*:)[0-9a-f:]+\]|(?:[0-9a-f]{1,4}:){3,}[0-9a-f:]+|::[0-9a-f]+/i,
+  /(?:https?|wss?):\/\//i,
+  /\b(?!fixture-[a-z0-9-]+\b)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.(?:com|net|org|io|cn|local|internal)\b/i,
+]
+
+function containsSensitiveJavaFixtureValue(value: string) {
+  return javaFixtureSensitivePatterns.some((pattern) => pattern.test(value))
+}
+
 it('两个固定 GET 返回 Java envelope，并保留全部服务状态与未知空值', async () => {
   const [overview, services] = await Promise.all([
     apiRequest<JavaOverviewResponse>('/api/v1/java/overview'),
@@ -166,9 +178,20 @@ it('Java fixtures 仅含脱敏文档值，不含标识、凭据、地址或查�
     malformedServices: javaServicePageMalformedFixture(),
   }).toLowerCase()
 
-  expect(fixtureText).not.toMatch(/ident|password|token|authorization|promql/)
-  expect(fixtureText).not.toMatch(/\b(?:\d{1,3}\.){3}\d{1,3}\b/)
+  expect(containsSensitiveJavaFixtureValue(fixtureText)).toBe(false)
   expect(fixtureText).toContain('fixture-address-a')
+})
+
+it.each([
+  ['IPv6', '2001:db8::10'],
+  ['非保留 hostname', 'private.example.com'],
+  ['URL', 'https://private.example.com/java'],
+  ['Cookie', 'session_cookie'],
+  ['Base URL', 'base_url'],
+  ['upstream', 'upstream_body'],
+])('敏感扫描规则覆盖 %s', (_name, forbidden) => {
+  const fixtureText = JSON.stringify({ ...javaServicePageFixture(), forbidden }).toLowerCase()
+  expect(containsSensitiveJavaFixtureValue(fixtureText)).toBe(true)
 })
 
 it('Java POST 没有注册写 handler，并由全局严格 MSW 策略拒绝', async () => {
