@@ -4,9 +4,9 @@
 
 ## 当前状态（唯一权威）
 
-### 2026-08-07 旧模块列表统一、七页共享排版与 Elasticsearch inventory 稳定性（隔离工作树，本地验证完成）
+### 2026-08-07 旧模块列表统一、七页共享排版与 Elasticsearch inventory 稳定性（已合并、推送并部署）
 
-当前工作树为 `/root/github/InfraView/.worktrees/list-table-consistency`，分支为 `feature/list-table-consistency`，HEAD 为 `0672b86`。本轮产品/测试变更、两份计划和四份状态文档均保留在未提交工作树；没有本地提交、push 或 merge。本节是本文件唯一权威的当前状态，以下章节均为历史记录，不能覆盖本节。
+当前恢复工作树为 `/root/github/InfraView`，分支为 `main`。产品功能提交 `05656d5 feat: unify observability tables and stabilize Elasticsearch inventory` 已从 `feature/list-table-consistency` 快进合并并推送到 `origin/main`；本节是本文件唯一权威的当前状态，以下章节均为历史记录，不能覆盖本节。
 
 主机、硬盘、MySQL、Redis 已统一为紧凑单行列表：固定列数依次为 12、10、14、13；主机的网络发送/接收拆列，MySQL 的版本、角色、QPS、TPS、Buffer Pool 容量/使用率、复制状态/延迟拆列，Redis 的阻塞连接、QPS、命中率与复制链路拆列。经确认保留的例外只有硬盘“错误摘要”单列，以及 MySQL/Redis 的“当前连接/最大连接”单元格。
 
@@ -14,7 +14,7 @@
 
 七页（主机、硬盘、MySQL、Redis、Elasticsearch、RabbitMQ、Java）已统一采用共享 `observability-table` 排版；原有模块语义、排序、URL 与只读边界不变。Elasticsearch 历史 cluster/node inventory 现以有效真实上报时间选择最新候选；单条非法候选局部跳过，同一最新时间的地址冲突只清空地址。固定一次 26 查询 batch、缓存和 2/5 freshness 保持不变；真实 Provider 失败仍如实返回 stale/503，不隐藏告警且不增加 retry。
 
-本轮 Go 全量与串行 Node 全量容器门禁均以 exit 0 完成，前端为 17 个文件/330 项测试、typecheck、production build 与 27 项 Playwright 静态发现；详情和非阻断并行时序警告见 `docs/TESTING.md` 与本地忽略报告 `.superpowers/sdd/2026-08-07-elasticsearch-inventory-stability/task-4-report.md`。最终整包审查通过后，已按用户授权用当前未提交工作树原位重建现有 8080；服务健康、唯一 8080、非 root、只读根文件系统、cap drop `ALL`、禁止提权、健康接口与未认证 API 拒绝均通过。未创建其他端口，未执行登录态或动态浏览器验收，未读取私密环境内容，也未连接生产上游。
+本轮 Go 全量与串行 Node 全量容器门禁均以 exit 0 完成，前端为 17 个文件/330 项测试、typecheck、production build 与 27 项 Playwright 静态发现；合并到 `main` 后又完整复验同一门禁并通过。详情和非阻断并行时序警告见 `docs/TESTING.md`。最终整包审查通过后，已按用户授权用产品提交 `05656d5` 原位重建现有 8080；服务健康、唯一 8080、非 root、只读根文件系统、cap drop `ALL`、禁止提权、健康接口与未认证 API 拒绝均通过。用户视觉验收确认七页排版统一，Java 端口进程一致性颜色遗漏也已补齐并再次部署。未创建其他端口，未读取私密环境内容，也未连接生产上游。
 
 ## 历史记录（以下均不代表当前工作树状态）
 

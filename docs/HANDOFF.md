@@ -2,9 +2,9 @@
 
 最后更新：2026-08-07
 
-## 当前隔离工作树 / 旧模块列表、七页排版与 Elasticsearch inventory 稳定性恢复入口
+## 当前 main / 旧模块列表、七页排版与 Elasticsearch inventory 稳定性恢复入口
 
-当前工作目录为 `/root/github/InfraView/.worktrees/list-table-consistency`，分支为 `feature/list-table-consistency`，当前 HEAD 为 `0672b86`。继续前先完整阅读本节、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/TESTING.md`、两份 2026-08-07 相关计划及 `.superpowers/sdd/2026-08-07-elasticsearch-inventory-stability/task-4-report.md`，再只读执行 `git status --short --branch`、`git log -3 --oneline`、`git diff --check` 与 `git diff --cached --check`。必须以实时 Git 结果为准，不能将下方 `main` 的历史交接当作本工作树的当前状态。
+当前恢复目录为 `/root/github/InfraView`，分支为 `main`。本轮产品功能提交为 `05656d5 feat: unify observability tables and stabilize Elasticsearch inventory`，已从 `feature/list-table-consistency` 快进合并并推送到 `origin/main`。继续前先完整阅读本节、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/TESTING.md`、2026-08-07 设计与两份相关计划，再只读执行 `git status --short --branch`、`git log -3 --oneline`、`git diff --check` 与 `git diff --cached --check`；当前提交和远端状态始终以实时 Git 结果为准。
 
 主机、硬盘、MySQL、Redis 固定为 12、10、14、13 个紧凑单行列。主机网络发送/接收拆列；硬盘保留“错误摘要”单列；MySQL 拆开版本、角色、QPS、TPS、Buffer Pool 容量/使用率、复制状态/延迟；Redis 拆开阻塞连接、QPS、命中率、复制链路。MySQL/Redis 的连接列仍显示“当前连接/最大连接”，不再把阻塞连接塞入连接单元格。四页每个可见列均为无箭头排序按钮，实际排序始终在服务端完整筛选结果上执行；缺失值始终末置，相同主值以稳定实体 ID 升序收口，排序状态通过 URL、`aria-label`、`title` 与 `data-active` 保存，切换后回到第 1 页。
 
@@ -21,16 +21,16 @@ docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACH
 
 前端串行结果为 Vitest 17 个文件/330 项、typecheck、production build 与 Playwright 27 项静态发现；Go 全仓普通/race 测试、gofmt、vet 和 Linux 编译均通过，所有最终门禁 exit 0。首次与 Go 容器并行的前端全量曾有两个排序测试在 5 秒超时；空闲环境原样定向复验 57/57 通过，随后完整串行门禁通过，记录为资源竞争时序警告而非产品修复。固定查询、只读、敏感、whitespace 与 Git 范围扫描详情见 `docs/TESTING.md`；未发现新增写方法、传输 retry、命令执行、重启、删除、故障转移或任意请求能力。
 
-产品/测试、两份计划和四份状态文档当前均未提交；不得在未取得新授权时 commit、merge 或 push。最终整包审查通过后，已按用户授权用当前未提交工作树原位重建现有 8080；服务健康、唯一 8080、非 root、只读根文件系统、cap drop `ALL`、禁止提权、健康接口与未认证 API 拒绝均通过。未创建其他端口，未执行登录态或动态浏览器验收；不得连接生产上游或读取私密环境内容。文档与报告不得记录 Token、Cookie、认证头、Base URL、真实标识、地址、数量、容量、指标值或上游正文。
+产品、测试、规格、计划和状态文档均已进入 `main` 并推送。最终整包审查通过后，已按用户授权用产品提交 `05656d5` 原位重建现有 8080；服务健康、唯一 8080、非 root、只读根文件系统、cap drop `ALL`、禁止提权、健康接口与未认证 API 拒绝均通过，用户视觉验收确认七页排版统一。Java“端口进程一致性”颜色遗漏随后在同一提交前补齐并再次原位重建。未创建其他端口，未执行登录态动态浏览器验收；不得连接生产上游或读取私密环境内容。隔离 worktree 与 feature 分支暂为当前 8080 的 Compose 工作目录连续性保留，不代表存在未交付代码。
 
 在新账号或新对话中直接粘贴：
 
 ```text
 继续完成或审阅 InfraView 的七页共享观测表排版与 Elasticsearch inventory 稳定性。请始终使用简体中文回复。
 
-工作目录：/root/github/InfraView/.worktrees/list-table-consistency
-分支：feature/list-table-consistency
-当前 HEAD：0672b86
+工作目录：/root/github/InfraView
+分支：main
+产品功能基线：05656d5
 
 先完整阅读：
 1. docs/HANDOFF.md
@@ -41,24 +41,19 @@ docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACH
 6. docs/superpowers/plans/2026-08-07-observability-table-typography.md
 7. docs/superpowers/plans/2026-08-07-elasticsearch-inventory-stability.md
 
-若文件存在，再读取：
-- .superpowers/sdd/2026-08-07-observability-table-typography/progress.md
-- .superpowers/sdd/2026-08-07-elasticsearch-inventory-stability/progress.md
-- .superpowers/sdd/2026-08-07-elasticsearch-inventory-stability/task-4-report.md
-
 然后只读执行：
 git status --short --branch
 git log -6 --oneline
 git diff --check
 git diff --cached --check
 
-当前未提交范围包含：七页共享排版的 16 个前端文件、Elasticsearch Provider 与 Service/HTTP 相关测试、四份状态文档、两份当前计划；不得 `git reset`、`git clean`、回退或丢弃任何既有差异。
+正常预期为 `main...origin/main` 且工作树干净；若实时检查出现新差异，必须先识别并保留，不得 `git reset`、`git clean`、回退或丢弃用户改动。
 
 当前实现：主机、硬盘、MySQL、Redis、Elasticsearch、RabbitMQ、Java 七页共享 `observability-table` 排版；Elasticsearch 历史 cluster/node inventory 按有效真实上报时间选最新候选，单条非法候选局部跳过，同一最新时间地址冲突只清空地址。固定一次 26 查询 batch、缓存和 2/5 freshness 保持不变；真实 Provider 失败仍如实 stale/503，不增加 retry 或隐藏告警。
 
 验证：首轮 Node 全量与 Go 容器并行时，两个排序用例各在 5 秒超时；随后原样两文件定向为 57/57 通过，完整串行 Node 门禁为 Vitest 17 文件/330 项、typecheck、production build、Playwright 静态发现 27 项均通过，Go 全量门禁也通过。不要把这组观察夸大为已证实的因果；详见 `docs/TESTING.md` 和存在时的 Task 4 报告。
 
-现有 8080 已按授权用当前未提交工作树原位重建，健康、唯一端口与容器安全基线通过；未创建其他端口，未执行登录态或动态浏览器验收，也未连接生产。commit、push、merge 未获授权。
+功能提交 `05656d5` 已快进合并并推送到 `origin/main`。现有 8080 已按授权用该产品提交原位重建，健康、唯一端口与容器安全基线通过；未创建其他端口，未执行登录态动态浏览器验收，也未连接生产。
 
 产品始终只读：禁止输出或读取私密环境、Token、Cookie、认证头、Base URL、真实标识、地址、数量、容量、指标值或上游正文；不得启动服务或浏览器、访问上游、执行运维写操作、任意 PromQL 或任意代理。
 ```
