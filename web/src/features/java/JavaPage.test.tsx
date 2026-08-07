@@ -249,6 +249,79 @@ it('服务端暂缺当前业务端时仍保留筛选选项', async () => {
   expect(within(select).getByRole('option', { name: 'fixture-service-removed' })).toBeVisible()
 })
 
+it('以中文标签展示业务端但保留业务代码作为筛选值', async () => {
+  responseBody = javaServicePageFixture({
+    data: {
+      available_names: [
+        'tikbee', 'rider', 'mch', 'saas', 'mch_saas', 'future_business',
+      ],
+    },
+  })
+  const user = userEvent.setup()
+  renderPage()
+
+  await screen.findByText('fixture-business-a')
+  const select = screen.getByRole('combobox', { name: '业务端' })
+  const expectedOptions = [
+    ['用户端', 'tikbee'], ['骑手端', 'rider'], ['商家端', 'mch'],
+    ['管理后台端', 'saas'], ['商家 PC 端', 'mch_saas'],
+    ['future_business', 'future_business'],
+  ]
+  for (const [label, value] of expectedOptions) {
+    expect(within(select).getByRole('option', { name: label })).toHaveValue(value)
+  }
+
+  await user.selectOptions(select, 'rider')
+  await waitFor(() => expect(new URLSearchParams(window.location.search).get('name')).toBe('rider'))
+  await waitFor(() => expect(requests.at(-1)?.searchParams.get('name')).toBe('rider'))
+})
+
+it('以带等级的徽标展示健康端口和进程的可空二值状态', async () => {
+  const base = cloneFixture().data.services[0]
+  responseBody = javaServicePageFixture({
+    data: {
+      services: [
+        { ...base, id: 'normal' },
+        {
+          ...base,
+          id: 'critical',
+          health_up: false,
+          port_up: false,
+          process_up: false,
+          status: 'critical',
+          status_source: 'health',
+        },
+        {
+          ...base,
+          id: 'unknown',
+          health_up: null,
+          port_up: null,
+          process_up: null,
+          status: 'unknown',
+          status_source: 'unknown',
+          collection_level: 'unknown',
+        },
+      ],
+      total: 3,
+      total_pages: 1,
+    },
+  })
+  renderPage()
+
+  const rows = (await screen.findAllByRole('row')).slice(1)
+  for (const [row, label, level] of [
+    [rows[0], '正常', 'normal'],
+    [rows[1], '异常', 'critical'],
+    [rows[2], '暂无数据', 'unknown'],
+  ] as const) {
+    for (const index of [2, 4, 5]) {
+      const badge = within(row).getAllByRole('cell')[index].querySelector('.status-badge')
+      expect(badge).toHaveTextContent(label)
+      expect(badge).toHaveAttribute('data-level', level)
+    }
+  }
+})
+
 it('搜索精确等待 300ms 后写入 URL 并重置页码', async () => {
   respondWithRequestedPage()
   renderPage('/java?page=3')

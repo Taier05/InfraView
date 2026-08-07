@@ -66,6 +66,14 @@ const sourceText: Record<string, string> = {
   collection: '采集状态',
 }
 
+const businessLabels: Readonly<Record<string, string>> = {
+  tikbee: '用户端',
+  rider: '骑手端',
+  mch: '商家端',
+  saas: '管理后台端',
+  mch_saas: '商家 PC 端',
+}
+
 const numberFormatter = new Intl.NumberFormat('zh-CN', {
   maximumFractionDigits: 2,
 })
@@ -243,6 +251,16 @@ function binary(value: boolean | null) {
   return value ? '正常' : '异常'
 }
 
+function javaBusinessLabel(code: string) {
+  return businessLabels[code] ?? code
+}
+
+function BinaryStatus({ value }: { value: boolean | null }) {
+  const level: MetricLevel = value === null ? 'unknown' : value ? 'normal' : 'critical'
+  const label = value === null ? '暂无数据' : value ? '正常' : '异常'
+  return <StatusBadge level={level} label={label} />
+}
+
 function decimal(value: number) {
   return numberFormatter.format(value)
 }
@@ -389,10 +407,10 @@ export function JavaPage() {
   const columns: ColumnDef<JavaService>[] = [
     { id: 'business', header: () => sortButton('business', '业务端'), cell: ({ row }) => <TitledValue value={row.original.business || '暂无数据'} className="java-identity" /> },
     { id: 'address', header: () => sortButton('address', '服务地址'), cell: ({ row }) => <TitledValue value={row.original.address || '暂无数据'} className="java-identity" /> },
-    { id: 'health', header: () => sortButton('health', '健康检查'), cell: ({ row }) => <TitledValue value={binary(row.original.health_up)} /> },
+    { id: 'health', header: () => sortButton('health', '健康检查'), cell: ({ row }) => <BinaryStatus value={row.original.health_up} /> },
     { id: 'health-latency', header: () => sortButton('health_latency', '健康延迟'), cell: ({ row }) => <TitledValue value={latency(row.original.health_latency_ms)} /> },
-    { id: 'port', header: () => sortButton('port', '端口状态'), cell: ({ row }) => <TitledValue value={binary(row.original.port_up)} /> },
-    { id: 'process', header: () => sortButton('process', '进程状态'), cell: ({ row }) => <TitledValue value={binary(row.original.process_up)} /> },
+    { id: 'port', header: () => sortButton('port', '端口状态'), cell: ({ row }) => <BinaryStatus value={row.original.port_up} /> },
+    { id: 'process', header: () => sortButton('process', '进程状态'), cell: ({ row }) => <BinaryStatus value={row.original.process_up} /> },
     { id: 'process-count', header: () => sortButton('process_count', '进程数'), cell: ({ row }) => <TitledValue value={integer(row.original.process_count)} /> },
     { id: 'consistency', header: () => sortButton('consistency', '端口进程一致性'), cell: ({ row }) => <TitledValue value={binary(row.original.port_consistent)} /> },
     { id: 'cpu', header: () => sortButton('cpu', 'CPU 使用率'), cell: ({ row }) => <TitledValue value={percentage(row.original.cpu_usage_percent)} /> },
@@ -417,7 +435,7 @@ export function JavaPage() {
     <ListPageHeader eyebrow="Java 业务观测" title="Java 业务服务" description="只读展示业务服务健康、进程资源与采集状态。" titleId="java-title" />
     <ListPageControls collectedAt={services.data?.meta.collected_at}>
       <ListSearchField label="搜索业务端、服务名称或地址" value={searchText} onChange={(event) => setSearchText(event.target.value)} />
-      <ListSelectField label="业务端" value={name} onChange={(event) => updateParameter('name', event.target.value)} options={[{ value: '', label: '全部业务端' }, ...nameOptions.map((value) => ({ value, label: value }))]} />
+      <ListSelectField label="业务端" value={name} onChange={(event) => updateParameter('name', event.target.value)} options={[{ value: '', label: '全部业务端' }, ...nameOptions.map((value) => ({ value, label: javaBusinessLabel(value) }))]} />
       <ListSelectField label="服务状态" value={status} onChange={(event) => updateParameter('status', event.target.value)} options={[{ value: '', label: '全部服务状态' }, ...metricLevels.map((value) => ({ value, label: levelText[value] }))]} />
       <ListPageSizeField value={size} onChange={(event) => updateParameter('page_size', event.target.value)} pageSizes={pageSizes} />
     </ListPageControls>
