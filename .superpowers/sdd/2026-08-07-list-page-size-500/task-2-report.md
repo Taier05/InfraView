@@ -7,7 +7,7 @@
 ## 覆盖范围
 
 - 七个认证 GET 列表都覆盖 `?page=1&page_size=500`：主机、硬盘、MySQL、Redis、Elasticsearch、RabbitMQ、Java。
-- 成功断言验证根包络仍为 `data`/`meta`、`page=1`、`page_size=500`，并以响应 `total` 计算验证 `total_pages=ceil(total/500)`。
+- 成功断言验证根包络仍为 `data`/`meta`、每个接口完整 `data` key 集，以及固定边界 `total=501`、首列表长度 `500`、`page=1`、`page_size=500`、`total_pages=2`。
 - 七个列表均覆盖 `page_size=499`、`501`、`0`、`-1` 与空白，确认返回安全的 `400 invalid_query` 包络。
 - 测试使用现有认证 request helper；新增断言不输出响应正文、Cookie、Token、认证头或数据标识。
 
