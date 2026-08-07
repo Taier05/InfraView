@@ -86,79 +86,53 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('renders the ten compact MySQL columns with QPS and TPS combined', async () => {
+it('renders the fourteen independent MySQL metric columns', async () => {
   renderMySQLPage('/mysql')
   expect(
     await screen.findByRole('heading', { name: 'MySQL 实例' }),
   ).toBeVisible()
-  const headers = [
-    ['实例地址', 'MySQL 实例地址'],
-    ['版本 / 角色', 'MySQL 版本 / 角色'],
-    ['连接', '连接使用'],
-    ['线程', '活跃线程'],
-    ['QPS / TPS', '每秒查询数 / 显式事务数（按 QPS 排序）'],
-    ['慢查询', '慢查询速率'],
-    ['Buffer Pool', 'Buffer Pool 容量 / 使用率'],
-    ['复制 / 延迟', '复制状态 / 延迟'],
-    ['运行时间', '运行时间'],
-    ['状态', '实例状态'],
-  ]
-  expect(screen.getAllByRole('columnheader')).toHaveLength(10)
-  for (const [heading, title] of headers) {
-    const header = screen.getByRole('columnheader', {
-      name: new RegExp(`^${heading}(排序|$)`),
-    })
-    expect(header).toBeVisible()
-    const titleElement = within(header).getByTitle(title)
-    expect(titleElement).toBeVisible()
-    expect(titleElement).toHaveAttribute('title', title)
-  }
-
-  for (const title of [
-    'MySQL 实例地址',
-    '连接使用',
+  await screen.findByText('192.0.2.101:3306')
+  expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+    '实例地址',
+    '版本',
+    '角色',
+    '连接',
     '活跃线程',
-    '每秒查询数 / 显式事务数（按 QPS 排序）',
-    '慢查询速率',
-    'Buffer Pool 容量 / 使用率',
-    '复制状态 / 延迟',
+    'QPS',
+    'TPS',
+    '慢查询',
+    'Buffer Pool 容量',
+    'Buffer Pool 使用率',
+    '复制状态',
+    '复制延迟',
     '运行时间',
-    '实例状态',
-  ]) {
-    expect(screen.getByTitle(title)).toHaveClass('host-sort-button')
-  }
-  expect(screen.getByTitle('实例状态')).toHaveClass(
-    'status-align-header',
-    'mysql-status-align-header',
-  )
+    '状态',
+  ])
 
   const instance = (await screen.findByText('192.0.2.101:3306')).closest('tr')
   expect(instance).not.toBeNull()
   const cells = within(instance!).getAllByRole('cell')
-  expect(cells).toHaveLength(10)
+  expect(cells).toHaveLength(14)
   expect(cells[0]).toHaveTextContent('192.0.2.101:3306')
   expect(cells[0]).not.toHaveTextContent('fixture-mysql-a')
   expect(cells[0].querySelector('.host-cell-text')).toHaveAttribute(
     'title',
     '192.0.2.101:3306',
   )
-  expect(cells[1]).toHaveTextContent('8.4.1 · 读写')
-  expect(cells[2]).toHaveTextContent('32/200 · 16.0%')
-  expect(cells[3]).toHaveTextContent('5')
-  expect(cells[4]).toHaveTextContent('123.46 / 45.25')
-  expect(cells[5]).toHaveTextContent('0.13')
-  expect(cells[6]).toHaveTextContent('8 GiB / 82.3%')
-  expect(cells[7]).toHaveTextContent('正常 · 2s')
-  expect(cells[7].querySelector('.host-metric')).toHaveAttribute(
-    'title',
-    '正常 · 2s',
-  )
-  expect(cells[8]).toHaveTextContent('2天 3小时')
-  expect(cells[8].querySelector('.mysql-uptime')).toHaveAttribute(
-    'title',
-    '2天 3小时',
-  )
-  expect(within(cells[9]).getByText('正常')).toHaveAttribute(
+  expect(cells[1]).toHaveTextContent('8.4.1')
+  expect(cells[2]).toHaveTextContent('读写')
+  expect(cells[3]).toHaveTextContent('32/200')
+  expect(cells[3]).not.toHaveTextContent('16.0%')
+  expect(cells[4]).toHaveTextContent('5')
+  expect(cells[5]).toHaveTextContent('123.46')
+  expect(cells[6]).toHaveTextContent('45.25')
+  expect(cells[7]).toHaveTextContent('0.13')
+  expect(cells[8]).toHaveTextContent('8 GiB')
+  expect(cells[9]).toHaveTextContent('82.3%')
+  expect(cells[10]).toHaveTextContent('正常')
+  expect(cells[11]).toHaveTextContent('2s')
+  expect(cells[12]).toHaveTextContent('2天 3小时')
+  expect(within(cells[13]).getByText('正常')).toHaveAttribute(
     'data-level',
     'normal',
   )
@@ -192,21 +166,51 @@ it('renders the ten compact MySQL columns with QPS and TPS combined', async () =
   expect(table.closest('.mysql-table-scroll')).not.toBeNull()
 })
 
-it('renders missing and unknown versions as Chinese unknown with the role', async () => {
+it('sorts every MySQL header without rendering arrows', async () => {
+  const user = userEvent.setup()
+  renderMySQLPage()
+  await screen.findByText('192.0.2.101:3306')
+
+  const expectations = [
+    ['实例地址', 'instance'],
+    ['版本', 'version'],
+    ['角色', 'role'],
+    ['连接', 'connections'],
+    ['活跃线程', 'threads_running'],
+    ['QPS', 'qps'],
+    ['TPS', 'tps'],
+    ['慢查询', 'slow_queries'],
+    ['Buffer Pool 容量', 'buffer_pool_size'],
+    ['Buffer Pool 使用率', 'buffer_pool_usage'],
+    ['复制状态', 'replication_state'],
+    ['复制延迟', 'replication_lag'],
+    ['运行时间', 'uptime'],
+    ['状态', 'status'],
+  ] as const
+
+  for (const [label, sort] of expectations) {
+    const button = screen.getByRole('button', { name: `${label}排序` })
+    expect(button).not.toHaveTextContent(/[⇅↑↓]/)
+    await user.click(button)
+    expect(window.location.search).toContain(`sort=${sort}`)
+  }
+})
+
+it('renders missing and unknown versions as Chinese unknown in their own column', async () => {
   renderMySQLPage()
 
   const missingVersionRow = (
     await screen.findByText('192.0.2.104:3306')
   ).closest('tr')
   expect(missingVersionRow).not.toBeNull()
-  const missingVersionCell = within(missingVersionRow!).getAllByRole('cell')[1]
-  expect(missingVersionCell).toHaveTextContent('未知 · 只读')
-  expect(missingVersionCell).not.toHaveTextContent(/^\s*·/)
+  const missingVersionCells = within(missingVersionRow!).getAllByRole('cell')
+  expect(missingVersionCells[1]).toHaveTextContent('未知')
+  expect(missingVersionCells[2]).toHaveTextContent('只读')
 
   const unknownVersionRow = screen.getByText('192.0.2.105:3306').closest('tr')
   expect(unknownVersionRow).not.toBeNull()
   expect(within(unknownVersionRow!).getAllByRole('cell')[1]).toHaveTextContent(
-    '未知 · 只读',
+    '未知',
   )
 })
 
@@ -270,7 +274,7 @@ it('writes filters sort and pagination to the URL', async () => {
   )
   await user.click(
     screen.getByRole('button', {
-      name: /^每秒查询数 \/ 显式事务数（按 QPS 排序）排序/,
+      name: 'QPS排序',
     }),
   )
   expect(window.location.search).toContain('status=warning')
@@ -416,8 +420,10 @@ it('renders missing metrics as 暂无数据', async () => {
   renderMySQLPage()
   const row = (await screen.findByText('192.0.2.101:3306')).closest('tr')
   expect(row).not.toBeNull()
-  expect(within(row!).getAllByText('暂无数据')).toHaveLength(5)
-  expect(within(row!).getAllByRole('cell')[6]).toHaveTextContent('—')
+  expect(within(row!).getAllByText('暂无数据')).toHaveLength(8)
+  const cells = within(row!).getAllByRole('cell')
+  expect(cells[8]).toHaveTextContent('暂无数据')
+  expect(cells[9]).toHaveTextContent('暂无数据')
 })
 
 it('renders all Buffer Pool capacity and usage availability combinations', async () => {
@@ -468,18 +474,20 @@ it('renders all Buffer Pool capacity and usage availability combinations', async
   vi.mocked(globalThis.fetch).mockResolvedValue(jsonResponse(fixture))
   renderMySQLPage()
 
-  for (const [address, value] of [
-    ['192.0.2.101:3306', '1 GiB / 50.0%'],
-    ['192.0.2.102:3306', '1 B / —'],
-    ['192.0.2.103:3306', '— / 25.0%'],
-    ['192.0.2.104:3306', '—'],
-    ['192.0.2.105:3306', '1 KiB / 75.0%'],
-    ['192.0.2.106:3306', '1 MiB / 80.0%'],
-    ['192.0.2.107:3306', '1 TiB / 90.0%'],
+  for (const [address, capacity, usage] of [
+    ['192.0.2.101:3306', '1 GiB', '50.0%'],
+    ['192.0.2.102:3306', '1 B', '暂无数据'],
+    ['192.0.2.103:3306', '暂无数据', '25.0%'],
+    ['192.0.2.104:3306', '暂无数据', '暂无数据'],
+    ['192.0.2.105:3306', '1 KiB', '75.0%'],
+    ['192.0.2.106:3306', '1 MiB', '80.0%'],
+    ['192.0.2.107:3306', '1 TiB', '90.0%'],
   ]) {
     const row = (await screen.findByText(address)).closest('tr')
     expect(row).not.toBeNull()
-    expect(within(row!).getAllByRole('cell')[6]).toHaveTextContent(value)
+    const cells = within(row!).getAllByRole('cell')
+    expect(cells[8]).toHaveTextContent(capacity)
+    expect(cells[9]).toHaveTextContent(usage)
   }
 })
 
@@ -495,8 +503,8 @@ it('preserves available connection values without inventing zeroes', async () =>
   renderMySQLPage()
   const row = (await screen.findByText('192.0.2.101:3306')).closest('tr')
   expect(row).not.toBeNull()
-  const connectionCell = within(row!).getAllByRole('cell')[2]
-  expect(connectionCell).toHaveTextContent('7')
+  const connectionCell = within(row!).getAllByRole('cell')[3]
+  expect(connectionCell).toHaveTextContent('7/暂无数据')
   expect(connectionCell).not.toHaveTextContent('0')
 })
 
@@ -526,12 +534,12 @@ it('renders replication states and explicit collection delay states', async () =
   const unknownRow = screen.getByText('192.0.2.104:3306').closest('tr')
   expect(stoppedRow).not.toBeNull()
   expect(unknownRow).not.toBeNull()
-  expect(within(stoppedRow!).getAllByRole('cell')[7]).toHaveTextContent(
-    '线程异常 · 35s',
-  )
-  expect(within(unknownRow!).getAllByRole('cell')[7]).toHaveTextContent(
-    '状态未知 · 7s',
-  )
+  const stoppedCells = within(stoppedRow!).getAllByRole('cell')
+  const unknownCells = within(unknownRow!).getAllByRole('cell')
+  expect(stoppedCells[10]).toHaveTextContent('线程异常')
+  expect(stoppedCells[11]).toHaveTextContent('35s')
+  expect(unknownCells[10]).toHaveTextContent('状态未知')
+  expect(unknownCells[11]).toHaveTextContent('7s')
   for (const [label, level] of [
     ['正常', 'normal'],
     ['严重', 'critical'],

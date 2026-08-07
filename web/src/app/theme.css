@@ -1030,10 +1030,15 @@ h1 {
 
 .redis-table {
   width: 100%;
-  min-width: 72rem;
+  min-width: 0;
   table-layout: fixed;
 }
 
+.redis-table-scroll {
+  overflow-x: hidden;
+}
+
+.mysql-table-compact,
 .redis-table th,
 .redis-table td {
   overflow: hidden;
@@ -1041,17 +1046,19 @@ h1 {
   white-space: nowrap;
 }
 
-.host-table.redis-table th:nth-child(1) { width: 9.5rem; }
-.host-table.redis-table th:nth-child(2) { width: 4rem; }
-.host-table.redis-table th:nth-child(3) { width: 7rem; }
-.host-table.redis-table th:nth-child(4) { width: 7rem; }
-.host-table.redis-table th:nth-child(5) { width: 7.5rem; }
-.host-table.redis-table th:nth-child(6) { width: 7.5rem; }
-.host-table.redis-table th:nth-child(7) { width: 5.5rem; }
-.host-table.redis-table th:nth-child(8) { width: 6rem; }
-.host-table.redis-table th:nth-child(9) { width: 5.5rem; }
-.host-table.redis-table th:nth-child(10) { width: 6.5rem; }
-.host-table.redis-table th:nth-child(11) { width: 5rem; }
+.host-table.redis-table th:nth-child(1) { width: 13%; }
+.host-table.redis-table th:nth-child(2) { width: 6%; }
+.host-table.redis-table th:nth-child(3) { width: 9%; }
+.host-table.redis-table th:nth-child(4) { width: 8%; }
+.host-table.redis-table th:nth-child(5) { width: 8%; }
+.host-table.redis-table th:nth-child(6) { width: 7%; }
+.host-table.redis-table th:nth-child(7) { width: 5.5%; }
+.host-table.redis-table th:nth-child(8) { width: 6.5%; }
+.host-table.redis-table th:nth-child(9) { width: 6%; }
+.host-table.redis-table th:nth-child(10) { width: 8%; }
+.host-table.redis-table th:nth-child(11) { width: 7%; }
+.host-table.redis-table th:nth-child(12) { width: 7%; }
+.host-table.redis-table th:nth-child(13) { width: 9%; }
 
 .mysql-table-compact {
   width: 100%;
@@ -1354,16 +1361,32 @@ h1 {
   line-height: 1.15;
 }
 
-.mysql-table-compact th:nth-child(1) { width: 15%; }
-.mysql-table-compact th:nth-child(2) { width: 10%; }
-.mysql-table-compact th:nth-child(3) { width: 10%; }
+.mysql-table-compact th:nth-child(1) { width: 13%; }
+.mysql-table-compact th:nth-child(2) { width: 6%; }
+.mysql-table-compact th:nth-child(3) { width: 5%; }
 .mysql-table-compact th:nth-child(4) { width: 7%; }
-.mysql-table-compact th:nth-child(5) { width: 10%; }
-.mysql-table-compact th:nth-child(6) { width: 7%; }
-.mysql-table-compact th:nth-child(7) { width: 14%; }
-.mysql-table-compact th:nth-child(8) { width: 12%; }
-.mysql-table-compact th:nth-child(9) { width: 7%; }
-.mysql-table-compact th:nth-child(10) { width: 8%; }
+.mysql-table-compact th:nth-child(5) { width: 7%; }
+.mysql-table-compact th:nth-child(6) { width: 5.5%; }
+.mysql-table-compact th:nth-child(7) { width: 5.5%; }
+.mysql-table-compact th:nth-child(8) { width: 6%; }
+.mysql-table-compact th:nth-child(9) { width: 9%; }
+.mysql-table-compact th:nth-child(10) { width: 9%; }
+.mysql-table-compact th:nth-child(11) { width: 8%; }
+.mysql-table-compact th:nth-child(12) { width: 7%; }
+.mysql-table-compact th:nth-child(13) { width: 7%; }
+.mysql-table-compact th:nth-child(14) { width: 5%; }
+
+.mysql-value,
+.mysql-connection,
+.mysql-uptime,
+.mysql-table td > .host-metric,
+.redis-table td > span:not(.status-badge) {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .disk-table-scroll {
   max-width: 100%;
@@ -1679,7 +1702,15 @@ h1 {
     overflow-x: auto;
   }
 
+  .redis-table-scroll {
+    overflow-x: auto;
+  }
+
   .mysql-table-compact {
+    min-width: 68rem;
+  }
+
+  .redis-table {
     min-width: 68rem;
   }
 

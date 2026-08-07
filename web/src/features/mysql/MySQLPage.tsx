@@ -18,18 +18,30 @@ import type {
 } from '../../api/types'
 import { useRefreshIntervalMs } from '../../app/runtime'
 import { ErrorPanel } from '../../components/ErrorPanel'
-import { DataTime } from '../../components/DataTime'
+import {
+  ListPageControls,
+  ListPageHeader,
+  ListPageSizeField,
+  ListSearchField,
+  ListSelectField,
+  ListTablePanel,
+} from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
 
 const pageSizes = [20, 50, 100] as const
 type PageSize = (typeof pageSizes)[number]
 const sortFields = [
   'instance',
+  'version',
+  'role',
   'connections',
   'threads_running',
   'qps',
+  'tps',
   'slow_queries',
-  'buffer_pool',
+  'buffer_pool_size',
+  'buffer_pool_usage',
+  'replication_state',
   'replication_lag',
   'uptime',
   'status',
@@ -92,12 +104,10 @@ function mysqlRole(value: string | null): MySQLRole | '' {
 
 function decimal(value: number | null, digits = 2) {
   if (value === null) return '暂无数据'
-  return value.toFixed(digits).replace(/\.?0+$/, '')
-}
-
-function qpsTps(instance: MySQLInstance) {
-  if (instance.qps === null && instance.tps === null) return '暂无数据'
-  return `${decimal(instance.qps)} / ${decimal(instance.tps)}`
+  return value
+    .toFixed(digits)
+    .replace(/(\.\d*?)0+$/, '$1')
+    .replace(/\.$/, '')
 }
 
 function percentage(value: number | null) {
@@ -116,46 +126,16 @@ function byteSize(value: number | null) {
   return `${size.toFixed(1).replace(/\.0$/, '')} ${units[unitIndex]}`
 }
 
-function bufferPool(instance: MySQLInstance) {
-  const size = byteSize(instance.buffer_pool_size_bytes)
-  const usage =
-    instance.buffer_pool_usage_percent === null
-      ? null
-      : percentage(instance.buffer_pool_usage_percent)
-  if (size !== null && usage !== null) return `${size} / ${usage}`
-  if (size !== null) return `${size} / —`
-  if (usage !== null) return `— / ${usage}`
-  return '—'
-}
-
-function connectionUsage(instance: MySQLInstance) {
-  const { connections, max_connections: maximum, connection_usage_percent } =
-    instance
-  if (
-    connections === null &&
-    maximum === null &&
-    connection_usage_percent === null
-  ) {
+function connectionCount(instance: MySQLInstance) {
+  if (instance.connections === null && instance.max_connections === null) {
     return '暂无数据'
   }
-  const values =
-    connections !== null && maximum !== null
-      ? `${decimal(connections)}/${decimal(maximum)}`
-      : connections !== null
-        ? decimal(connections)
-        : maximum !== null
-          ? `最大 ${decimal(maximum)}`
-          : '暂无数据'
-  return connection_usage_percent === null
-    ? values
-    : `${values} · ${connection_usage_percent.toFixed(1)}%`
+  return `${decimal(instance.connections, 0)}/${decimal(instance.max_connections, 0)}`
 }
 
-function versionRole(instance: MySQLInstance) {
+function version(instance: MySQLInstance) {
   const version = instance.version.trim()
-  const versionLabel =
-    version === '' || version.toLowerCase() === 'unknown' ? '未知' : version
-  return `${versionLabel} · ${roleLabels[instance.role]}`
+  return version === '' || version.toLowerCase() === 'unknown' ? '未知' : version
 }
 
 function uptime(seconds: number | null) {
@@ -167,21 +147,14 @@ function uptime(seconds: number | null) {
   return `${hours}小时`
 }
 
-function ReplicationText({
+function ReplicationStateText({
   state,
-  lagSeconds,
   level,
 }: {
   state: MySQLReplicationState
-  lagSeconds: number | null
   level: MetricLevel
 }) {
-  const text =
-    lagSeconds !== null
-      ? `${replicationLabels[state]} · ${decimal(lagSeconds)}s`
-      : state === 'normal'
-        ? `${replicationLabels[state]} · 暂无数据`
-        : replicationLabels[state]
+  const text = replicationLabels[state]
   return (
     <span className="host-metric" data-level={level} title={text}>
       {text}
@@ -356,10 +329,8 @@ export function MySQLPage() {
   function sortButton(
     field: MySQLSort,
     label: string,
-    title: string,
     className?: string,
   ) {
-    const state = sort === field ? (order === 'asc' ? '升序' : '降序') : '未排序'
     return (
       <button
         className={
@@ -369,14 +340,11 @@ export function MySQLPage() {
         }
         type="button"
         data-active={sort === field}
-        aria-label={`${title}排序，当前${state}`}
-        title={title}
+        aria-label={`${label}排序`}
+        title={label}
         onClick={() => changeSort(field)}
       >
-        <span>{label}</span>
-        <span className="host-sort-indicator" aria-hidden="true">
-          {sort === field ? (order === 'asc' ? '↑' : '↓') : '⇅'}
-        </span>
+        {label}
       </button>
     )
   }
@@ -384,7 +352,7 @@ export function MySQLPage() {
   const columns: ColumnDef<MySQLInstance>[] = [
     {
       id: 'instance',
-      header: () => sortButton('instance', '实例地址', 'MySQL 实例地址'),
+      header: () => sortButton('instance', '实例地址'),
       cell: ({ row }) => {
         const value = row.original.address
         return (
@@ -395,22 +363,27 @@ export function MySQLPage() {
       },
     },
     {
-      id: 'version-role',
-      header: () => <span title="MySQL 版本 / 角色">版本 / 角色</span>,
+      id: 'version',
+      header: () => sortButton('version', '版本'),
       cell: ({ row }) => {
-        const value = versionRole(row.original)
+        const value = version(row.original)
         return (
-          <span className="mysql-version-role" title={value}>
+          <span className="mysql-value" title={value}>
             {value}
           </span>
         )
       },
     },
     {
+      id: 'role',
+      header: () => sortButton('role', '角色'),
+      cell: ({ row }) => roleLabels[row.original.role],
+    },
+    {
       id: 'connections',
-      header: () => sortButton('connections', '连接', '连接使用'),
+      header: () => sortButton('connections', '连接'),
       cell: ({ row }) => {
-        const value = connectionUsage(row.original)
+        const value = connectionCount(row.original)
         return (
           <span className="mysql-connection" title={value}>
             {value}
@@ -420,51 +393,62 @@ export function MySQLPage() {
     },
     {
       id: 'threads-running',
-      header: () => sortButton('threads_running', '线程', '活跃线程'),
+      header: () => sortButton('threads_running', '活跃线程'),
       cell: ({ row }) => decimal(row.original.threads_running),
     },
     {
       id: 'qps',
-      header: () =>
-        sortButton(
-          'qps',
-          'QPS / TPS',
-          '每秒查询数 / 显式事务数（按 QPS 排序）',
-        ),
-      cell: ({ row }) => qpsTps(row.original),
+      header: () => sortButton('qps', 'QPS'),
+      cell: ({ row }) => decimal(row.original.qps),
+    },
+    {
+      id: 'tps',
+      header: () => sortButton('tps', 'TPS'),
+      cell: ({ row }) => decimal(row.original.tps),
     },
     {
       id: 'slow-queries',
-      header: () => sortButton('slow_queries', '慢查询', '慢查询速率'),
+      header: () => sortButton('slow_queries', '慢查询'),
       cell: ({ row }) => decimal(row.original.slow_queries_per_second),
     },
     {
-      id: 'buffer-pool',
-      header: () =>
-        sortButton('buffer_pool', 'Buffer Pool', 'Buffer Pool 容量 / 使用率'),
+      id: 'buffer-pool-size',
+      header: () => sortButton('buffer_pool_size', 'Buffer Pool 容量'),
       cell: ({ row }) => {
-        const value = bufferPool(row.original)
+        const value = byteSize(row.original.buffer_pool_size_bytes) ?? '暂无数据'
         return (
-          <span className="host-metric" title={value}>
+          <span className="mysql-value" title={value}>
             {value}
           </span>
         )
       },
     },
     {
-      id: 'replication',
-      header: () => sortButton('replication_lag', '复制 / 延迟', '复制状态 / 延迟'),
+      id: 'buffer-pool-usage',
+      header: () => sortButton('buffer_pool_usage', 'Buffer Pool 使用率'),
+      cell: ({ row }) => percentage(row.original.buffer_pool_usage_percent),
+    },
+    {
+      id: 'replication-state',
+      header: () => sortButton('replication_state', '复制状态'),
       cell: ({ row }) => (
-        <ReplicationText
+        <ReplicationStateText
           state={row.original.replication.state}
-          lagSeconds={row.original.replication.lag_seconds}
           level={row.original.replication.level}
         />
       ),
     },
     {
+      id: 'replication-lag',
+      header: () => sortButton('replication_lag', '复制延迟'),
+      cell: ({ row }) =>
+        row.original.replication.lag_seconds === null
+          ? '暂无数据'
+          : `${decimal(row.original.replication.lag_seconds)}s`,
+    },
+    {
       id: 'uptime',
-      header: () => sortButton('uptime', '运行时间', '运行时间'),
+      header: () => sortButton('uptime', '运行时间'),
       cell: ({ row }) => {
         const value = uptime(row.original.uptime_seconds)
         return (
@@ -478,10 +462,7 @@ export function MySQLPage() {
       id: 'status',
       header: () =>
         sortButton(
-          'status',
-          '状态',
-          '实例状态',
-          'status-align-header mysql-status-align-header',
+          'status', '状态', 'status-align-header mysql-status-align-header',
         ),
       cell: ({ row }) => (
         <StatusText
@@ -504,82 +485,62 @@ export function MySQLPage() {
 
   return (
     <section aria-labelledby="mysql-title">
-      <p className="eyebrow">数据库观测</p>
-      <h1 id="mysql-title">MySQL 实例</h1>
-      <p className="page-description">查看 MySQL 实例的只读运行状态与指标。</p>
+      <ListPageHeader
+        eyebrow="数据库观测"
+        title="MySQL 实例"
+        description="查看 MySQL 实例的只读运行状态与指标。"
+        titleId="mysql-title"
+      />
 
-      <div className="host-list-controls mysql-list-controls">
-        <label className="host-search">
-          <span>搜索实例地址</span>
-          <input
-            type="search"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-          />
-        </label>
-        <label className="host-status-filter">
-          <span>实例标签</span>
-          <select
-            value={label}
-            onChange={(event) => updateParameters({ label: event.target.value })}
-          >
-            <option value="">全部标签</option>
-            {labelOptions.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="host-status-filter">
-          <span>实例状态</span>
-          <select
-            value={status}
-            onChange={(event) =>
-              updateParameters({ status: event.target.value })
-            }
-          >
-            <option value="">全部状态</option>
-            <option value="normal">正常</option>
-            <option value="warning">警告</option>
-            <option value="critical">严重</option>
-            <option value="unknown">未知</option>
-          </select>
-        </label>
-        <label className="host-status-filter">
-          <span>读写属性</span>
-          <select
-            value={role}
-            onChange={(event) =>
-              updateParameters({ role: event.target.value })
-            }
-          >
-            <option value="">全部属性</option>
-            <option value="writable">读写</option>
-            <option value="read_only">只读</option>
-            <option value="unknown">未知</option>
-          </select>
-        </label>
-        <label className="host-page-size">
-          <span>每页数量</span>
-          <select
-            value={pageSize}
-            onChange={(event) =>
-              updateParameters({ page_size: event.target.value })
-            }
-          >
-            {pageSizes.map((value) => (
-              <option key={value} value={value}>
-                {value} 条
-              </option>
-            ))}
-          </select>
-        </label>
-        <DataTime
-          collectedAt={instances.data?.meta.collected_at}
-          className="data-time"
+      <ListPageControls
+        className="mysql-list-controls"
+        collectedAt={instances.data?.meta.collected_at}
+      >
+        <ListSearchField
+          label="搜索实例地址"
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
         />
-      </div>
+        <ListSelectField
+          label="实例标签"
+          value={label}
+          onChange={(event) => updateParameters({ label: event.target.value })}
+          options={[
+            { value: '', label: '全部标签' },
+            ...labelOptions.map((value) => ({ value, label: value })),
+          ]}
+        />
+        <ListSelectField
+          label="实例状态"
+          value={status}
+          onChange={(event) => updateParameters({ status: event.target.value })}
+          options={[
+            { value: '', label: '全部状态' },
+            { value: 'normal', label: '正常' },
+            { value: 'warning', label: '警告' },
+            { value: 'critical', label: '严重' },
+            { value: 'unknown', label: '未知' },
+          ]}
+        />
+        <ListSelectField
+          label="读写属性"
+          value={role}
+          onChange={(event) => updateParameters({ role: event.target.value })}
+          options={[
+            { value: '', label: '全部属性' },
+            { value: 'writable', label: '读写' },
+            { value: 'read_only', label: '只读' },
+            { value: 'unknown', label: '未知' },
+          ]}
+        />
+        <ListPageSizeField
+          value={pageSize}
+          onChange={(event) =>
+            updateParameters({ page_size: event.target.value })
+          }
+          pageSizes={pageSizes}
+        />
+      </ListPageControls>
 
       {instances.data?.meta.stale === true &&
         instances.data.meta.collected_at !== undefined && (
@@ -598,8 +559,72 @@ export function MySQLPage() {
         </div>
       )}
 
-      <div className="host-table-panel">
-        <div className="host-table-scroll mysql-table-scroll">
+      {instances.data === undefined && instances.isPending ? (
+        <div className="host-list-loading" role="status">
+          正在加载 MySQL 实例列表…
+        </div>
+      ) : instances.data === undefined ? (
+        <ErrorPanel
+          title="无法加载 MySQL 实例列表"
+          message={apiError?.message ?? '服务暂时无法处理请求'}
+          retryable={apiError?.retryable ?? false}
+          retryLabel="重试 MySQL 实例列表"
+          onRetry={() => void instances.refetch()}
+        />
+      ) : responseNeedsPageNormalization ? (
+        <div className="host-list-loading" role="status">
+          正在调整 MySQL 实例列表页码…
+        </div>
+      ) : (
+        <ListTablePanel
+          scrollClassName="mysql-table-scroll"
+          emptyState={
+            instances.data.data.total === 0 ? (
+              <div className="host-empty">没有符合条件的 MySQL 实例</div>
+            ) : undefined
+          }
+          paginationLabel="MySQL 实例列表分页"
+          pagination={
+            instances.data.data.total === 0 ? undefined : (
+              <>
+                <span>
+                  第 {instances.data.data.page} / {instances.data.data.total_pages}{' '}
+                  页，共 {instances.data.data.total} 个实例
+                </span>
+                <div>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={instances.data.data.page <= 1}
+                    onClick={() =>
+                      updateParameters(
+                        { page: String(instances.data.data.page - 1) },
+                        false,
+                      )
+                    }
+                  >
+                    上一页
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={
+                      instances.data.data.page >= instances.data.data.total_pages
+                    }
+                    onClick={() =>
+                      updateParameters(
+                        { page: String(instances.data.data.page + 1) },
+                        false,
+                      )
+                    }
+                  >
+                    下一页
+                  </button>
+                </div>
+              </>
+            )
+          }
+        >
           <table className="host-table mysql-table mysql-table-compact">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
@@ -618,9 +643,7 @@ export function MySQLPage() {
               ))}
             </thead>
             <tbody>
-              {instances.data !== undefined &&
-                !responseNeedsPageNormalization &&
-                table.getRowModel().rows.map((row) => (
+              {table.getRowModel().rows.map((row) => (
                   <tr key={row.id}>
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id}>
@@ -634,75 +657,8 @@ export function MySQLPage() {
                 ))}
             </tbody>
           </table>
-        </div>
-
-        {instances.data === undefined && instances.isPending ? (
-          <div className="host-list-loading" role="status">
-            正在加载 MySQL 实例列表…
-          </div>
-        ) : instances.data === undefined ? (
-          <ErrorPanel
-            title="无法加载 MySQL 实例列表"
-            message={apiError?.message ?? '服务暂时无法处理请求'}
-            retryable={apiError?.retryable ?? false}
-            retryLabel="重试 MySQL 实例列表"
-            onRetry={() => void instances.refetch()}
-          />
-        ) : responseNeedsPageNormalization ? (
-          <div className="host-list-loading" role="status">
-            正在调整 MySQL 实例列表页码…
-          </div>
-        ) : instances.data.data.total === 0 ? (
-          <div className="host-empty">没有符合条件的 MySQL 实例</div>
-        ) : (
-          <div className="host-pagination" aria-label="MySQL 实例列表分页">
-            {instances.data.data.total_pages === 0 ? (
-              <span>共 0 个实例</span>
-            ) : (
-              <span>
-                第 {instances.data.data.page} /{' '}
-                {instances.data.data.total_pages} 页，共{' '}
-                {instances.data.data.total} 个实例
-              </span>
-            )}
-            <div>
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={
-                  instances.data.data.total_pages === 0 ||
-                  instances.data.data.page <= 1
-                }
-                onClick={() =>
-                  updateParameters(
-                    { page: String(instances.data.data.page - 1) },
-                    false,
-                  )
-                }
-              >
-                上一页
-              </button>
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={
-                  instances.data.data.total_pages === 0 ||
-                  instances.data.data.page >=
-                    instances.data.data.total_pages
-                }
-                onClick={() =>
-                  updateParameters(
-                    { page: String(instances.data.data.page + 1) },
-                    false,
-                  )
-                }
-              >
-                下一页
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+        </ListTablePanel>
+      )}
     </section>
   )
 }

@@ -184,7 +184,7 @@ beforeEach(() => {
   });
 });
 
-it("严格渲染 Redis 十一列及拆分后的指标语义", async () => {
+it("严格渲染 Redis 十三列及拆分后的指标语义", async () => {
   renderPage();
   expect(
     await screen.findByRole("heading", { name: "Redis 实例" }),
@@ -193,15 +193,17 @@ it("严格渲染 Redis 十一列及拆分后的指标语义", async () => {
   expect(
     screen
       .getAllByRole("columnheader")
-      .map((value) => value.textContent?.replace(/[⇅↑↓]/g, "").trim()),
+      .map((value) => value.textContent),
   ).toEqual([
     "实例地址",
     "角色",
     "内存上限",
     "内存使用率",
     "连接",
-    "QPS/命中率",
-    "key总数",
+    "阻塞连接",
+    "QPS",
+    "命中率",
+    "key 总数",
     "复制链路",
     "延迟",
     "运行时间",
@@ -213,31 +215,67 @@ it("严格渲染 Redis 十一列及拆分后的指标语义", async () => {
   const disconnectedSlave = within(rows[2]).getAllByRole("cell");
   const unknown = within(rows[3]).getAllByRole("cell");
 
-  expect(master).toHaveLength(11);
+  expect(master).toHaveLength(13);
   expect(master[2]).toHaveTextContent("2 GiB");
   expect(master[3]).toHaveTextContent("50.0%");
-  expect(master[7]).toHaveTextContent("—");
-  expect(master[8]).toHaveTextContent("2s");
-  expect(master[9]).toHaveTextContent("1天 1小时");
+  expect(master[4]).toHaveTextContent("12/100");
+  expect(master[4]).not.toHaveTextContent("阻塞");
+  expect(master[5]).toHaveTextContent("1");
+  expect(master[6]).toHaveTextContent("25.5");
+  expect(master[7]).toHaveTextContent("75.0%");
+  expect(master[9]).toHaveTextContent("—");
+  expect(master[10]).toHaveTextContent("2s");
+  expect(master[11]).toHaveTextContent("1天 1小时");
 
   expect(healthySlave[2]).toHaveTextContent("未设置上限");
   expect(healthySlave[3]).toHaveTextContent("暂无数据");
-  expect(healthySlave[7]).toHaveTextContent("正常");
-  expect(healthySlave[8]).toHaveTextContent("—");
-  expect(healthySlave[9]).toHaveTextContent("暂无数据");
+  expect(healthySlave[9]).toHaveTextContent("正常");
+  expect(healthySlave[10]).toHaveTextContent("—");
+  expect(healthySlave[11]).toHaveTextContent("暂无数据");
 
   expect(disconnectedSlave[2]).toHaveTextContent("暂无数据");
-  expect(disconnectedSlave[7]).toHaveTextContent("断开");
-  expect(disconnectedSlave[8]).toHaveTextContent("7s");
-  expect(disconnectedSlave[9]).toHaveTextContent("1小时");
-  expect(unknown[7]).toHaveTextContent("未知");
-  expect(unknown[9]).toHaveTextContent("0小时");
+  expect(disconnectedSlave[9]).toHaveTextContent("断开");
+  expect(disconnectedSlave[10]).toHaveTextContent("7s");
+  expect(disconnectedSlave[11]).toHaveTextContent("1小时");
+  expect(unknown[9]).toHaveTextContent("未知");
+  expect(unknown[11]).toHaveTextContent("0小时");
   expect(
     screen.queryByRole("columnheader", { name: /过期|淘汰/ }),
   ).not.toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: /切换|故障转移|重启|删除|执行命令/ }),
   ).not.toBeInTheDocument();
+});
+
+it("所有 Redis 表头排序按钮写入展示键且不渲染箭头", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByText("192.0.2.40:6379");
+
+  const expectations = [
+    ["实例地址", "instance"],
+    ["角色", "role"],
+    ["内存上限", "memory_limit"],
+    ["内存使用率", "memory"],
+    ["连接", "connections"],
+    ["阻塞连接", "blocked_connections"],
+    ["QPS", "qps"],
+    ["命中率", "hit_rate"],
+    ["key 总数", "keys"],
+    ["复制链路", "replication_link"],
+    ["延迟", "replication_lag"],
+    ["运行时间", "uptime"],
+    ["状态", "status"],
+  ] as const;
+
+  for (const [label, sort] of expectations) {
+    const button = screen.getByRole("button", { name: `${label}排序` });
+    expect(button).not.toHaveTextContent(/[⇅↑↓]/);
+    await user.click(button);
+    await waitFor(() =>
+      expect(window.location.search).toContain(`sort=${sort}`),
+    );
+  }
 });
 
 it("复用现有列表控制栏并展示最新数据时间", async () => {

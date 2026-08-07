@@ -30,11 +30,15 @@ import { StaleBanner } from "../../components/StaleBanner";
 const pageSizes = [20, 50, 100] as const;
 const sortFields = [
   "instance",
+  "role",
+  "memory_limit",
   "memory",
   "connections",
+  "blocked_connections",
   "qps",
+  "hit_rate",
   "keys",
-  "evicted",
+  "replication_link",
   "replication_lag",
   "uptime",
   "status",
@@ -100,14 +104,10 @@ function uptime(seconds: number | null) {
 }
 
 function connections(instance: RedisInstance) {
-  if (instance.connected_clients === null) return "暂无数据";
-  const base =
-    instance.max_clients === null
-      ? decimal(instance.connected_clients, 0)
-      : `${decimal(instance.connected_clients, 0)}/${decimal(instance.max_clients, 0)}`;
-  return instance.blocked_clients === null
-    ? base
-    : `${base} · 阻塞 ${decimal(instance.blocked_clients, 0)}`;
+  if (instance.connected_clients === null && instance.max_clients === null) {
+    return "暂无数据";
+  }
+  return `${decimal(instance.connected_clients, 0)}/${decimal(instance.max_clients, 0)}`;
 }
 
 function memoryLimit(value: number | null) {
@@ -288,9 +288,6 @@ export function RedisPage() {
         }}
       >
         {label}
-        <span aria-hidden="true">
-          {sort === field ? (order === "asc" ? "↑" : "↓") : "⇅"}
-        </span>
       </button>
     );
   }
@@ -305,12 +302,12 @@ export function RedisPage() {
     },
     {
       id: "role",
-      header: "角色",
+      header: () => sortButton("role", "角色"),
       cell: ({ row }) => roleText[row.original.role],
     },
     {
       id: "memory-limit",
-      header: "内存上限",
+      header: () => sortButton("memory_limit", "内存上限"),
       cell: ({ row }) => memoryLimit(row.original.max_memory_bytes),
     },
     {
@@ -324,23 +321,31 @@ export function RedisPage() {
       cell: ({ row }) => connections(row.original),
     },
     {
+      id: "blocked-connections",
+      header: () => sortButton("blocked_connections", "阻塞连接"),
+      cell: ({ row }) => decimal(row.original.blocked_clients, 0),
+    },
+    {
       id: "qps",
-      header: () => sortButton("qps", "QPS/命中率"),
+      header: () => sortButton("qps", "QPS"),
+      cell: ({ row }) => decimal(row.original.qps),
+    },
+    {
+      id: "hit-rate",
+      header: () => sortButton("hit_rate", "命中率"),
       cell: ({ row }) =>
-        `${decimal(row.original.qps)} / ${
-          row.original.hit_rate === null
-            ? "暂无数据"
-            : percentage(row.original.hit_rate * 100)
-        }`,
+        row.original.hit_rate === null
+          ? "暂无数据"
+          : percentage(row.original.hit_rate * 100),
     },
     {
       id: "keys",
-      header: () => sortButton("keys", "key总数"),
+      header: () => sortButton("keys", "key 总数"),
       cell: ({ row }) => decimal(row.original.keys, 0),
     },
     {
       id: "replication-link",
-      header: "复制链路",
+      header: () => sortButton("replication_link", "复制链路"),
       cell: ({ row }) => replicationLink(row.original),
     },
     {
