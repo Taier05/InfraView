@@ -9,6 +9,10 @@ import type {
   ElasticsearchLevelCounts,
   ElasticsearchOverviewData,
   ElasticsearchOverviewResponse,
+  JavaAlertCount,
+  JavaLevelCounts,
+  JavaOverviewData,
+  JavaOverviewResponse,
   MetricLevel,
   MySQLOverviewData,
   MySQLOverviewResponse,
@@ -193,6 +197,82 @@ async function requestRabbitMQOverview(signal: AbortSignal) {
   return response
 }
 
+function isJavaLevelCounts(value: unknown): value is JavaLevelCounts {
+  if (!isStrictRecord(value)) return false
+  const { total, normal, warning, critical, unknown } = value
+  return (
+    isNaturalCount(total) &&
+    isNaturalCount(normal) &&
+    isNaturalCount(warning) &&
+    isNaturalCount(critical) &&
+    isNaturalCount(unknown) &&
+    total === normal + warning + critical + unknown
+  )
+}
+
+function isJavaAlertCount(value: unknown): value is JavaAlertCount {
+  return (
+    isStrictRecord(value) &&
+    isNaturalCount(value.warning) &&
+    isNaturalCount(value.critical) &&
+    isNaturalCount(value.unknown)
+  )
+}
+
+function javaOverviewLevel(data: JavaOverviewData): MetricLevel {
+  if (data.services.critical > 0) return 'critical'
+  if (data.services.warning > 0) return 'warning'
+  if (data.services.unknown > 0) return 'unknown'
+  return 'normal'
+}
+
+function isJavaOverviewResponse(value: unknown): value is JavaOverviewResponse {
+  if (
+    !isStrictRecord(value) ||
+    !isStrictRecord(value.data) ||
+    !isStrictRecord(value.meta)
+  ) {
+    return false
+  }
+  const { data, meta } = value
+  if (
+    !isMetricLevel(data.status) ||
+    !isJavaLevelCounts(data.services) ||
+    !isStrictRecord(data.alerts) ||
+    !isJavaAlertCount(data.alerts.health) ||
+    !isJavaAlertCount(data.alerts.port) ||
+    !isJavaAlertCount(data.alerts.process) ||
+    !isJavaAlertCount(data.alerts.collection) ||
+    typeof meta.request_id !== 'string' ||
+    typeof meta.stale !== 'boolean' ||
+    (meta.collected_at !== undefined && typeof meta.collected_at !== 'string')
+  ) {
+    return false
+  }
+
+  const javaData = data as unknown as JavaOverviewData
+  const alertCountFits = (alerts: JavaAlertCount) =>
+    alerts.warning + alerts.critical + alerts.unknown <= javaData.services.total
+
+  return (
+    javaData.status === javaOverviewLevel(javaData) &&
+    alertCountFits(data.alerts.health) &&
+    alertCountFits(data.alerts.port) &&
+    alertCountFits(data.alerts.process) &&
+    alertCountFits(data.alerts.collection)
+  )
+}
+
+async function requestJavaOverview(signal: AbortSignal) {
+  const response = await apiRequest<unknown>('/api/v1/java/overview', {
+    signal,
+  })
+  if (!isJavaOverviewResponse(response)) {
+    throw new APIError(200, 'invalid_response', '服务器响应格式无效', '', false)
+  }
+  return response
+}
+
 function isDiskOverviewResponse(
   value: unknown,
 ): value is DiskOverviewResponse {
@@ -370,12 +450,14 @@ type ModuleLabel =
   | 'Redis'
   | 'Elasticsearch'
   | 'RabbitMQ'
+  | 'Java 服务'
 
 function moduleName(label: ModuleLabel) {
   if (label === 'MySQL') return 'MySQL 板块'
   if (label === 'Redis') return 'Redis 板块'
   if (label === 'Elasticsearch') return 'Elasticsearch 板块'
   if (label === 'RabbitMQ') return 'RabbitMQ 板块'
+  if (label === 'Java 服务') return 'Java 服务板块'
   if (label === '主机硬盘') return '主机硬盘板块'
   return 'Linux 主机板块'
 }
@@ -421,7 +503,9 @@ function ModuleError({
                   ? '无法加载 Redis 板块'
                   : label === 'Elasticsearch'
                     ? '无法加载 Elasticsearch 板块'
-                    : '无法加载 RabbitMQ 板块'}
+                    : label === 'RabbitMQ'
+                      ? '无法加载 RabbitMQ 板块'
+                      : '无法加载 Java 服务板块'}
         </strong>
         <p>{apiError?.message ?? '服务暂时无法处理请求'}</p>
       </div>
@@ -480,6 +564,8 @@ function ModuleStaleBanner({
           ? 'Elasticsearch 数据已过期'
           : label === 'RabbitMQ'
             ? 'RabbitMQ 数据已过期'
+            : label === 'Java 服务'
+              ? 'Java 服务数据已过期'
             : label === '主机硬盘'
               ? '主机硬盘数据已过期'
               : 'Linux 主机数据已过期'
@@ -1012,6 +1098,93 @@ function RabbitMQStatusCard({ data }: { data: RabbitMQOverviewData }) {
   )
 }
 
+function JavaStatusCard({ data }: { data: JavaOverviewData }) {
+  if (data.services.total === 0) {
+    return (
+      <ModuleStatusCardShell
+        to="/java"
+        ariaLabel="查看 Java 服务板块"
+        category="应用板块"
+        title="Java 服务"
+        level="empty"
+        levelLabel="暂无服务"
+        actionLabel="查看 Java 服务"
+        className="java-overview-card"
+        emptyState={{
+          title: '暂无 Java 服务',
+          description: '尚无可展示的 Java 服务健康数据',
+        }}
+      />
+    )
+  }
+
+  const level = javaOverviewLevel(data)
+  const levelLabel =
+    level === 'critical'
+      ? '存在严重异常'
+      : level === 'warning'
+        ? '存在警告'
+        : level === 'unknown'
+          ? '存在未知'
+          : '全部正常'
+  const affectedServices =
+    data.services.warning + data.services.critical + data.services.unknown
+  const warningOrUnknown = data.services.warning + data.services.unknown
+  const warningOrUnknownLevel: MetricLevel =
+    data.services.warning > 0
+      ? 'warning'
+      : data.services.unknown > 0
+        ? 'unknown'
+        : 'normal'
+
+  return (
+    <ModuleStatusCardShell
+      to="/java"
+      ariaLabel="查看 Java 服务板块"
+      category="应用板块"
+      title="Java 服务"
+      level={level}
+      levelLabel={levelLabel}
+      actionLabel="查看 Java 服务"
+      className="java-overview-card"
+    >
+      <div className="module-alert-summary">
+        <div className="module-alert-total">
+          <span>异常服务</span>
+          <strong>
+            {affectedServices}
+            <small> / {data.services.total}</small>
+          </strong>
+        </div>
+        <div className="module-alert-levels">
+          <StatusBadge
+            level={data.services.critical > 0 ? 'critical' : 'normal'}
+            label={
+              data.services.critical > 0
+                ? `严重 ${data.services.critical}`
+                : '无严重'
+            }
+          />
+          <StatusBadge
+            level={warningOrUnknownLevel}
+            label={
+              warningOrUnknown > 0
+                ? `警告/未知 ${warningOrUnknown}`
+                : '无警告/未知'
+            }
+          />
+        </div>
+      </div>
+      <div className="module-metric-alert-grid">
+        <MetricAlert label="健康检查" alerts={data.alerts.health} />
+        <MetricAlert label="端口状态" alerts={data.alerts.port} />
+        <MetricAlert label="进程状态" alerts={data.alerts.process} />
+        <MetricAlert label="采集状态" alerts={data.alerts.collection} />
+      </div>
+    </ModuleStatusCardShell>
+  )
+}
+
 function DiskStatusCard({ data }: { data: DiskOverviewData }) {
   if (data.total === 0) {
     return (
@@ -1161,13 +1334,20 @@ export function OverviewPage() {
     refetchInterval: refreshIntervalMs,
     refetchIntervalInBackground: false,
   })
+  const javaOverview = useQuery({
+    queryKey: ['java-overview'],
+    queryFn: ({ signal }) => requestJavaOverview(signal),
+    refetchInterval: refreshIntervalMs,
+    refetchIntervalInBackground: false,
+  })
   const allDataUpdatedAt =
     hostOverview.data !== undefined &&
     diskOverview.data !== undefined &&
     mysqlOverview.data !== undefined &&
     redisOverview.data !== undefined &&
     elasticsearchOverview.data !== undefined &&
-    rabbitMQOverview.data !== undefined
+    rabbitMQOverview.data !== undefined &&
+    javaOverview.data !== undefined
       ? Math.min(
           hostOverview.dataUpdatedAt,
           diskOverview.dataUpdatedAt,
@@ -1175,6 +1355,7 @@ export function OverviewPage() {
           redisOverview.dataUpdatedAt,
           elasticsearchOverview.dataUpdatedAt,
           rabbitMQOverview.dataUpdatedAt,
+          javaOverview.dataUpdatedAt,
         )
       : 0
 
@@ -1197,7 +1378,8 @@ export function OverviewPage() {
               mysqlOverview.isFetching ||
               redisOverview.isFetching ||
               elasticsearchOverview.isFetching ||
-              rabbitMQOverview.isFetching
+              rabbitMQOverview.isFetching ||
+              javaOverview.isFetching
             }
             dataUpdatedAt={allDataUpdatedAt}
             onRefresh={() => {
@@ -1208,6 +1390,7 @@ export function OverviewPage() {
                 redisOverview.refetch(),
                 elasticsearchOverview.refetch(),
                 rabbitMQOverview.refetch(),
+                javaOverview.refetch(),
               ])
             }}
             refreshIntervalSeconds={refreshIntervalMs / 1_000}
@@ -1257,6 +1440,13 @@ export function OverviewPage() {
             collectedAt={rabbitMQOverview.data.meta.collected_at}
           />
         )}
+      {javaOverview.data?.meta.stale === true &&
+        javaOverview.data.meta.collected_at !== undefined && (
+          <ModuleStaleBanner
+            label="Java 服务"
+            collectedAt={javaOverview.data.meta.collected_at}
+          />
+        )}
       {hostOverview.data !== undefined && hostOverview.isError && (
         <ModuleRefreshError
           label="Linux 主机"
@@ -1298,6 +1488,13 @@ export function OverviewPage() {
           label="RabbitMQ"
           error={rabbitMQOverview.error}
           onRetry={() => void rabbitMQOverview.refetch()}
+        />
+      )}
+      {javaOverview.data !== undefined && javaOverview.isError && (
+        <ModuleRefreshError
+          label="Java 服务"
+          error={javaOverview.error}
+          onRetry={() => void javaOverview.refetch()}
         />
       )}
 
@@ -1388,6 +1585,20 @@ export function OverviewPage() {
           )
         ) : (
           <RabbitMQStatusCard data={rabbitMQOverview.data.data} />
+        )}
+
+        {javaOverview.data === undefined ? (
+          javaOverview.isPending ? (
+            <ModuleLoading label="Java 服务" />
+          ) : (
+            <ModuleError
+              label="Java 服务"
+              error={javaOverview.error}
+              onRetry={() => void javaOverview.refetch()}
+            />
+          )
+        ) : (
+          <JavaStatusCard data={javaOverview.data.data} />
         )}
       </div>
     </section>

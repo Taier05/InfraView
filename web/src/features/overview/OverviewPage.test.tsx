@@ -13,6 +13,8 @@ import {
 import {
   diskOverviewFixture,
   elasticsearchOverviewFixture,
+  javaOverviewEmptyFixture,
+  javaOverviewFixture,
   mysqlOverviewFixture,
   overviewFixture,
   rabbitMQOverviewFixture,
@@ -85,12 +87,14 @@ function mockOverviewRequests({
   redis = redisOverviewFixture(),
   elasticsearch = elasticsearchOverviewFixture(),
   rabbitmq = rabbitMQOverviewFixture(),
+  java = javaOverviewFixture(),
   hostError,
   diskError,
   mysqlError,
   redisError,
   elasticsearchError,
   rabbitmqError,
+  javaError,
 }: {
   host?: OverviewFixture
   disk?: DiskOverviewFixture
@@ -98,12 +102,14 @@ function mockOverviewRequests({
   redis?: RedisOverviewFixture
   elasticsearch?: unknown
   rabbitmq?: unknown
+  java?: unknown
   hostError?: ErrorFixture
   diskError?: ErrorFixture
   mysqlError?: ErrorFixture
   redisError?: ErrorFixture
   elasticsearchError?: ErrorFixture
   rabbitmqError?: ErrorFixture
+  javaError?: ErrorFixture
 } = {}) {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
@@ -139,6 +145,11 @@ function mockOverviewRequests({
           rabbitmqError ?? rabbitmq,
           rabbitmqError === undefined ? 200 : 503,
         ),
+      )
+    }
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(
+        jsonResponse(javaError ?? java, javaError === undefined ? 200 : 503),
       )
     }
     return Promise.resolve(
@@ -181,7 +192,7 @@ it('共享总览样式为 unknown 卡片、等级和指标使用中性灰蓝色'
   ).toContain('color: #a7b0b6')
 })
 
-it('总览按顺序展示六张模块卡并保留四列桌面网格', async () => {
+it('总览按顺序展示七张模块卡并保留四列桌面网格', async () => {
   renderOverview()
 
   const hostCard = await screen.findByRole('link', {
@@ -200,6 +211,7 @@ it('总览按顺序展示六张模块卡并保留四列桌面网格', async () =
   const rabbitMQCard = screen.getByRole('link', {
     name: '查看 RabbitMQ 板块',
   })
+  const javaCard = screen.getByRole('link', { name: '查看 Java 服务板块' })
   const moduleGrid = screen.getByRole('group', { name: '基础设施模块' })
   expect(moduleGrid).toHaveClass(
     'overview-status-grid',
@@ -220,7 +232,7 @@ it('总览按顺序展示六张模块卡并保留四列桌面网格', async () =
     expect(within(redisCard).getByText(label)).toBeVisible()
   }
   const moduleCards = within(moduleGrid).getAllByRole('link')
-  expect(moduleCards).toHaveLength(6)
+  expect(moduleCards).toHaveLength(7)
   expect(moduleCards).toEqual([
     hostCard,
     diskCard,
@@ -228,6 +240,7 @@ it('总览按顺序展示六张模块卡并保留四列桌面网格', async () =
     redisCard,
     elasticsearchCard,
     rabbitMQCard,
+    javaCard,
   ])
   expect(getComputedStyle(moduleGrid).gridTemplateColumns).toBe(
     'repeat(4, minmax(0, 1fr))',
@@ -641,6 +654,9 @@ it.each(invalidRabbitMQOverviewCases)(
 it('其他模块已加载时独立显示 RabbitMQ 加载状态', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/rabbitmq/overview') {
       return new Promise<Response>(() => undefined)
     }
@@ -673,6 +689,9 @@ it('RabbitMQ 首次失败不阻塞旧模块且重试只刷新独立查询', asyn
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
     pathCounts.set(path, (pathCounts.get(path) ?? 0) + 1)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/rabbitmq/overview') {
       return Promise.resolve(
         pathCounts.get(path) === 1
@@ -750,6 +769,193 @@ it('RabbitMQ 过期数据保持可见并显示精确采集时间', async () => {
     'dateTime',
     '2026-08-04T07:30:00.000Z',
   )
+})
+
+it('总览第七张卡展示 Java 服务异常摘要和四个固定摘要', async () => {
+  renderOverview()
+
+  const card = await screen.findByRole('link', { name: '查看 Java 服务板块' })
+  const moduleGrid = screen.getByRole('group', { name: '基础设施模块' })
+  expect(within(moduleGrid).getAllByRole('link')).toHaveLength(7)
+  expect(card).toHaveAttribute('href', '/java')
+  expect(card).toHaveClass('module-status-card', 'java-overview-card')
+  expect(card).toHaveAttribute('data-level', 'critical')
+  expect(within(card).getByText('Java 服务')).toBeVisible()
+  const summary = within(card)
+    .getByText('异常服务')
+    .closest('.module-alert-summary')
+  expect(summary).not.toBeNull()
+  expect(within(summary as HTMLElement).getByText('3')).toBeVisible()
+  expect(within(summary as HTMLElement).getByText('/ 4')).toBeVisible()
+  expect(within(summary as HTMLElement).getByText('严重 1')).toBeVisible()
+  expect(within(summary as HTMLElement).getByText('警告/未知 2')).toBeVisible()
+  for (const label of ['健康检查', '端口状态', '进程状态', '采集状态']) {
+    expect(within(card).getByText(label)).toBeVisible()
+  }
+})
+
+it('Java 服务全正常时四个摘要框显示无异常', async () => {
+  mockOverviewRequests({
+    java: javaOverviewFixture({
+      data: {
+        status: 'normal',
+        services: { total: 2, normal: 2, warning: 0, critical: 0, unknown: 0 },
+        alerts: {
+          health: { warning: 0, critical: 0, unknown: 0 },
+          port: { warning: 0, critical: 0, unknown: 0 },
+          process: { warning: 0, critical: 0, unknown: 0 },
+          collection: { warning: 0, critical: 0, unknown: 0 },
+        },
+      },
+    }),
+  })
+  renderOverview()
+
+  const card = await screen.findByRole('link', { name: '查看 Java 服务板块' })
+  expect(card).toHaveAttribute('data-level', 'normal')
+  expect(within(card).getAllByText('无异常')).toHaveLength(4)
+})
+
+it('Java 服务为空时显示中性空状态', async () => {
+  mockOverviewRequests({ java: javaOverviewEmptyFixture() })
+  renderOverview()
+
+  const emptyCard = await screen.findByRole('link', {
+    name: '查看 Java 服务板块',
+  })
+  expect(emptyCard).toHaveAttribute('data-level', 'empty')
+  expect(within(emptyCard).getByText('暂无 Java 服务')).toBeVisible()
+})
+
+it('其他模块已加载时独立显示 Java 服务加载状态', async () => {
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return new Promise<Response>(() => undefined)
+    }
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
+    if (path === '/api/v1/rabbitmq/overview') {
+      return Promise.resolve(jsonResponse(rabbitMQOverviewFixture()))
+    }
+    if (path === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(jsonResponse(diskOverviewFixture()))
+    }
+    if (path === '/api/v1/redis/overview') {
+      return Promise.resolve(jsonResponse(redisOverviewFixture()))
+    }
+    return Promise.resolve(jsonResponse(overviewFixture()))
+  })
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Linux 主机板块' }),
+  ).toBeVisible()
+  expect(
+    screen.getByRole('status', { name: 'Java 服务板块加载中' }),
+  ).toBeVisible()
+})
+
+it('Java 服务首次 503 不阻塞旧模块且重试只刷新独立查询', async () => {
+  const pathCounts = new Map<string, number>()
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const path = requestedPath(input)
+    pathCounts.set(path, (pathCounts.get(path) ?? 0) + 1)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(
+        pathCounts.get(path) === 1
+          ? jsonResponse(
+              {
+                code: 'java_unavailable',
+                message: 'Java 数据源暂时不可用',
+                request_id: 'req-fixture-java-overview-error',
+                retryable: true,
+              },
+              503,
+            )
+          : jsonResponse(javaOverviewFixture()),
+      )
+    }
+    if (path === '/api/v1/elasticsearch/overview') {
+      return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
+    }
+    if (path === '/api/v1/rabbitmq/overview') {
+      return Promise.resolve(jsonResponse(rabbitMQOverviewFixture()))
+    }
+    if (path === '/api/v1/mysql/overview') {
+      return Promise.resolve(jsonResponse(mysqlOverviewFixture()))
+    }
+    if (path === '/api/v1/disks/overview') {
+      return Promise.resolve(jsonResponse(diskOverviewFixture()))
+    }
+    if (path === '/api/v1/redis/overview') {
+      return Promise.resolve(jsonResponse(redisOverviewFixture()))
+    }
+    return Promise.resolve(jsonResponse(overviewFixture()))
+  })
+  const user = userEvent.setup()
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 RabbitMQ 板块' }),
+  ).toBeVisible()
+  const error = screen.getByRole('alert', { name: 'Java 服务板块加载失败' })
+  expect(error).toHaveTextContent('Java 数据源暂时不可用')
+  await user.click(within(error).getByRole('button', { name: '重试' }))
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Java 服务板块' }),
+  ).toBeVisible()
+  expect(pathCounts.get('/api/v1/java/overview')).toBe(2)
+  for (const path of [
+    '/api/v1/overview',
+    '/api/v1/disks/overview',
+    '/api/v1/mysql/overview',
+    '/api/v1/redis/overview',
+    '/api/v1/elasticsearch/overview',
+    '/api/v1/rabbitmq/overview',
+  ]) {
+    expect(pathCounts.get(path)).toBe(1)
+  }
+})
+
+it('Java 服务过期数据保持可见并显示精确采集时间', async () => {
+  mockOverviewRequests({
+    java: javaOverviewFixture({
+      meta: { stale: true, collected_at: '2026-08-04T07:30:00.000Z' },
+    }),
+  })
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Java 服务板块' }),
+  ).toBeVisible()
+  const banner = screen.getByRole('alert', { name: 'Java 服务数据已过期' })
+  expect(within(banner).getByRole('time')).toHaveAttribute(
+    'dateTime',
+    '2026-08-04T07:30:00.000Z',
+  )
+})
+
+it('Java 服务状态与服务计数不一致时独立报错且不影响已有六卡', async () => {
+  mockOverviewRequests({
+    java: javaOverviewFixture({ data: { status: 'normal' } }),
+  })
+  renderOverview()
+
+  expect(
+    await screen.findByRole('link', { name: '查看 Linux 主机板块' }),
+  ).toBeVisible()
+  expect(
+    screen.getByRole('alert', { name: 'Java 服务板块加载失败' }),
+  ).toHaveTextContent('服务器响应格式无效')
+  expect(
+    screen.queryByRole('link', { name: '查看 Java 服务板块' }),
+  ).not.toBeInTheDocument()
 })
 
 it('Elasticsearch 集群和节点都为空时显示中性空状态', async () => {
@@ -951,6 +1157,9 @@ it('Elasticsearch 使用集群与节点中最坏级别而不直接信任 status'
 it('其他模块已加载时独立显示 Elasticsearch 加载状态', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/elasticsearch/overview') {
       return new Promise<Response>(() => undefined)
     }
@@ -979,6 +1188,9 @@ it('Elasticsearch 首次请求失败不阻塞其他模块且可独立重试', as
   let attempts = 0
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/elasticsearch/overview') {
       attempts += 1
       return Promise.resolve(
@@ -1051,6 +1263,9 @@ it('Elasticsearch 后台刷新失败时保留旧卡并显示独立重试状态',
   let attempts = 0
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/elasticsearch/overview') {
       attempts += 1
       return Promise.resolve(
@@ -1297,6 +1512,9 @@ it('硬盘 unknown 直接使用后端 warning_devices 归入警告风险', async
 it('Linux 和 MySQL 已加载时独立显示硬盘加载状态', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/elasticsearch/overview') {
       return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
     }
@@ -1323,6 +1541,9 @@ it('硬盘首次请求失败不阻塞 Linux 和 MySQL 且可独立重试', async
   let diskAttempts = 0
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/elasticsearch/overview') {
       return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
     }
@@ -1367,6 +1588,9 @@ it('硬盘首次请求失败不阻塞 Linux 和 MySQL 且可独立重试', async
 it('硬盘成功响应结构无效时独立报错而不使总览崩溃', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/elasticsearch/overview') {
       return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
     }
@@ -1495,6 +1719,9 @@ it('硬盘刷新失败时保留旧卡并显示独立重试状态', async () => {
   let diskAttempts = 0
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/elasticsearch/overview') {
       return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
     }
@@ -1688,6 +1915,9 @@ it('MySQL 无实例时显示空状态而不是异常', async () => {
 it('Linux 已加载时独立显示 MySQL 加载状态', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/elasticsearch/overview') {
       return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
     }
@@ -1733,6 +1963,9 @@ it('MySQL 刷新失败时保留旧卡并显示独立重试状态', async () => {
   let mysqlAttempts = 0
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/elasticsearch/overview') {
       return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
     }
@@ -1801,6 +2034,9 @@ it('使用固定查询范围且不显示总览时间范围控件', async () => {
   const requestedRanges: string[] = []
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/elasticsearch/overview') {
       return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
     }
@@ -1829,16 +2065,16 @@ it('使用固定查询范围且不显示总览时间范围控件', async () => {
   expect(screen.queryByRole('button', { name: '7天' })).not.toBeInTheDocument()
 })
 
-it('手动刷新会同时重新请求六个总览模块', async () => {
+it('手动刷新会同时重新请求七个总览模块', async () => {
   const user = userEvent.setup()
   renderOverview()
 
   await screen.findByRole('link', { name: '查看 Linux 主机板块' })
   await screen.findByRole('link', { name: '查看主机硬盘板块' })
-  expect(globalThis.fetch).toHaveBeenCalledTimes(6)
+  expect(globalThis.fetch).toHaveBeenCalledTimes(7)
   await user.click(screen.getByRole('button', { name: '刷新' }))
 
-  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(12))
+  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(14))
   const calls = vi.mocked(globalThis.fetch).mock.calls
   expect(calls.map(([input]) => requestedPath(input))).toEqual(
     expect.arrayContaining([
@@ -1848,6 +2084,7 @@ it('手动刷新会同时重新请求六个总览模块', async () => {
       '/api/v1/redis/overview',
       '/api/v1/elasticsearch/overview',
       '/api/v1/rabbitmq/overview',
+      '/api/v1/java/overview',
     ]),
   )
   const hostCalls = calls.filter(
@@ -1863,6 +2100,9 @@ it('每 15 秒刷新且前一请求未完成时不发起重叠请求', async () 
   let resolveRefresh!: (response: Response) => void
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/elasticsearch/overview') {
       return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
     }
@@ -1931,6 +2171,9 @@ it('可重试错误显示中文信息并可重试成功', async () => {
   let attempts = 0
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
+    if (path === '/api/v1/java/overview') {
+      return Promise.resolve(jsonResponse(javaOverviewFixture()))
+    }
     if (path === '/api/v1/elasticsearch/overview') {
       return Promise.resolve(jsonResponse(elasticsearchOverviewFixture()))
     }
