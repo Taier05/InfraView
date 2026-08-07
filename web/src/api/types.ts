@@ -398,6 +398,72 @@ export interface RabbitMQNodePageData {
 export type RabbitMQOverviewResponse = ApiResponse<RabbitMQOverviewData>
 export type RabbitMQNodePageResponse = ApiResponse<RabbitMQNodePageData>
 
+export type JavaStatusSource =
+  | 'health'
+  | 'port'
+  | 'process'
+  | 'consistency'
+  | 'collection'
+  | 'normal'
+  | 'unknown'
+
+export interface JavaService {
+  id: string
+  name: string
+  business: string
+  address: string
+  health_up: boolean | null
+  health_latency_ms: number | null
+  port_up: boolean | null
+  process_up: boolean | null
+  process_count: number | null
+  port_consistent: boolean | null
+  cpu_usage_percent: number | null
+  memory_bytes: number | null
+  memory_usage_percent: number | null
+  uptime_seconds: number | null
+  status: MetricLevel
+  status_source: JavaStatusSource
+  collection_level: MetricLevel
+}
+
+export interface JavaLevelCounts {
+  total: number
+  normal: number
+  warning: number
+  critical: number
+  unknown: number
+}
+
+export interface JavaAlertCount {
+  warning: number
+  critical: number
+  unknown: number
+}
+
+export interface JavaOverviewData {
+  status: MetricLevel
+  services: JavaLevelCounts
+  alerts: {
+    health: JavaAlertCount
+    port: JavaAlertCount
+    process: JavaAlertCount
+    collection: JavaAlertCount
+  }
+}
+
+export interface JavaServicePageData {
+  services: JavaService[]
+  available_names: string[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export type JavaOverviewResponse = ApiResponse<JavaOverviewData>
+export type JavaServicePageResponse = ApiResponse<JavaServicePageData>
+
 export type DiskSMARTHealth = 'healthy' | 'failed' | 'unknown'
 
 export type DiskStatusSource =

@@ -1,6 +1,8 @@
 import { HttpResponse, http } from 'msw'
 
 import type {
+  JavaOverviewResponse,
+  JavaServicePageResponse,
   RabbitMQNodePageResponse,
   RabbitMQNodeStatusSource,
   RabbitMQOverviewResponse,
@@ -17,6 +19,8 @@ export const ELASTICSEARCH_OVERVIEW_PATH =
 export const ELASTICSEARCH_NODES_PATH = '*/api/v1/elasticsearch/nodes'
 export const RABBITMQ_OVERVIEW_PATH = '*/api/v1/rabbitmq/overview'
 export const RABBITMQ_NODES_PATH = '*/api/v1/rabbitmq/nodes'
+export const JAVA_OVERVIEW_PATH = '*/api/v1/java/overview'
+export const JAVA_SERVICES_PATH = '*/api/v1/java/services'
 export const DISK_OVERVIEW_PATH = '*/api/v1/disks/overview'
 export const DISK_DEVICES_PATH = '*/api/v1/disks/devices'
 
@@ -1099,6 +1103,194 @@ export function rabbitMQNodePageMalformedFixture(): unknown {
   }
 }
 
+export type JavaOverviewFixture = JavaOverviewResponse
+export type JavaServicePageFixture = JavaServicePageResponse
+
+export function javaOverviewFixture(
+  overrides: {
+    data?: Partial<JavaOverviewFixture['data']>
+    meta?: Partial<JavaOverviewFixture['meta']>
+  } = {},
+): JavaOverviewFixture {
+  return {
+    data: {
+      status: 'critical',
+      services: { total: 4, normal: 1, warning: 1, critical: 1, unknown: 1 },
+      alerts: {
+        health: { warning: 0, critical: 1, unknown: 1 },
+        port: { warning: 0, critical: 1, unknown: 1 },
+        process: { warning: 0, critical: 1, unknown: 1 },
+        collection: { warning: 1, critical: 0, unknown: 1 },
+      },
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-fixture-java-overview-001',
+      stale: false,
+      collected_at: '2026-08-05T08:00:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
+export function javaServicePageFixture(
+  overrides: {
+    data?: Partial<JavaServicePageFixture['data']>
+    meta?: Partial<JavaServicePageFixture['meta']>
+  } = {},
+): JavaServicePageFixture {
+  return {
+    data: {
+      services: [
+        {
+          id: 'java-fixture-service-001',
+          name: 'fixture-service-a',
+          business: 'fixture-business-a',
+          address: 'fixture-address-a',
+          health_up: true,
+          health_latency_ms: 12.5,
+          port_up: true,
+          process_up: true,
+          process_count: 1,
+          port_consistent: true,
+          cpu_usage_percent: 22.5,
+          memory_bytes: 512 * 1024 ** 2,
+          memory_usage_percent: 36,
+          uptime_seconds: 86_400,
+          status: 'normal',
+          status_source: 'normal',
+          collection_level: 'normal',
+        },
+        {
+          id: 'java-fixture-service-002',
+          name: 'fixture-service-b',
+          business: 'fixture-business-b',
+          address: 'fixture-address-b',
+          health_up: true,
+          health_latency_ms: 24,
+          port_up: true,
+          process_up: true,
+          process_count: 2,
+          port_consistent: true,
+          cpu_usage_percent: 48,
+          memory_bytes: 1024 * 1024 ** 2,
+          memory_usage_percent: 52.5,
+          uptime_seconds: 172_800,
+          status: 'warning',
+          status_source: 'collection',
+          collection_level: 'warning',
+        },
+        {
+          id: 'java-fixture-service-003',
+          name: 'fixture-service-c',
+          business: 'fixture-business-c',
+          address: 'fixture-address-c',
+          health_up: false,
+          health_latency_ms: 0,
+          port_up: false,
+          process_up: false,
+          process_count: 0,
+          port_consistent: false,
+          cpu_usage_percent: 91,
+          memory_bytes: 2 * 1024 ** 3,
+          memory_usage_percent: 94,
+          uptime_seconds: 259_200,
+          status: 'critical',
+          status_source: 'health',
+          collection_level: 'normal',
+        },
+        {
+          id: 'java-fixture-service-004',
+          name: 'fixture-service-d',
+          business: 'fixture-business-d',
+          address: 'fixture-address-d',
+          health_up: null,
+          health_latency_ms: null,
+          port_up: null,
+          process_up: null,
+          process_count: null,
+          port_consistent: null,
+          cpu_usage_percent: null,
+          memory_bytes: null,
+          memory_usage_percent: null,
+          uptime_seconds: null,
+          status: 'unknown',
+          status_source: 'unknown',
+          collection_level: 'unknown',
+        },
+      ],
+      available_names: [
+        'fixture-service-a',
+        'fixture-service-b',
+        'fixture-service-c',
+        'fixture-service-d',
+      ],
+      total: 4,
+      page: 1,
+      page_size: 20,
+      total_pages: 1,
+      ...overrides.data,
+    },
+    meta: {
+      request_id: 'req-fixture-java-services-001',
+      stale: false,
+      collected_at: '2026-08-05T08:00:00.000Z',
+      ...overrides.meta,
+    },
+  }
+}
+
+export function javaOverviewEmptyFixture(): JavaOverviewFixture {
+  return javaOverviewFixture({
+    data: {
+      status: 'normal',
+      services: { total: 0, normal: 0, warning: 0, critical: 0, unknown: 0 },
+      alerts: {
+        health: { warning: 0, critical: 0, unknown: 0 },
+        port: { warning: 0, critical: 0, unknown: 0 },
+        process: { warning: 0, critical: 0, unknown: 0 },
+        collection: { warning: 0, critical: 0, unknown: 0 },
+      },
+    },
+  })
+}
+
+export function javaServicePageEmptyFixture(): JavaServicePageFixture {
+  return javaServicePageFixture({
+    data: {
+      services: [],
+      available_names: [],
+      total: 0,
+      page: 1,
+      page_size: 20,
+      total_pages: 0,
+    },
+  })
+}
+
+export function javaErrorFixture(): ErrorFixture {
+  return {
+    code: 'java_unavailable',
+    message: '数据源暂时不可用，请稍后重试',
+    request_id: 'req-fixture-java-error-001',
+    retryable: true,
+  }
+}
+
+export function javaOverviewMalformedFixture(): unknown {
+  return {
+    ...javaOverviewFixture(),
+    data: { status: 'invalid' },
+  }
+}
+
+export function javaServicePageMalformedFixture(): unknown {
+  return {
+    ...javaServicePageFixture(),
+    data: { services: [{ id: 42 }] },
+  }
+}
+
 export function redisInstancePageFixture(
   overrides: {
     data?: Partial<RedisInstancePageFixture['data']>
@@ -1410,6 +1602,13 @@ export const rabbitMQHandlers = [
   ),
   http.get(RABBITMQ_NODES_PATH, () =>
     HttpResponse.json(rabbitMQNodePageFixture()),
+  ),
+]
+
+export const javaHandlers = [
+  http.get(JAVA_OVERVIEW_PATH, () => HttpResponse.json(javaOverviewFixture())),
+  http.get(JAVA_SERVICES_PATH, () =>
+    HttpResponse.json(javaServicePageFixture()),
   ),
 ]
 
