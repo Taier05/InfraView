@@ -253,7 +253,7 @@ it('以中文标签展示业务端但保留业务代码作为筛选值', async (
   responseBody = javaServicePageFixture({
     data: {
       available_names: [
-        'tikbee', 'rider', 'mch', 'saas', 'mch_saas', 'future_business',
+        'tikbee', 'rider', 'mch', 'saas', 'mch_saas', 'future_business', 'constructor',
       ],
     },
   })
@@ -266,6 +266,7 @@ it('以中文标签展示业务端但保留业务代码作为筛选值', async (
     ['用户端', 'tikbee'], ['骑手端', 'rider'], ['商家端', 'mch'],
     ['管理后台端', 'saas'], ['商家 PC 端', 'mch_saas'],
     ['future_business', 'future_business'],
+    ['constructor', 'constructor'],
   ]
   for (const [label, value] of expectedOptions) {
     expect(within(select).getByRole('option', { name: label })).toHaveValue(value)
@@ -274,51 +275,40 @@ it('以中文标签展示业务端但保留业务代码作为筛选值', async (
   await user.selectOptions(select, 'rider')
   await waitFor(() => expect(new URLSearchParams(window.location.search).get('name')).toBe('rider'))
   await waitFor(() => expect(requests.at(-1)?.searchParams.get('name')).toBe('rider'))
+
+  await user.selectOptions(select, 'constructor')
+  await waitFor(() => expect(new URLSearchParams(window.location.search).get('name')).toBe('constructor'))
+  await waitFor(() => expect(requests.at(-1)?.searchParams.get('name')).toBe('constructor'))
 })
 
 it('以带等级的徽标展示健康端口和进程的可空二值状态', async () => {
   const base = cloneFixture().data.services[0]
   responseBody = javaServicePageFixture({
     data: {
-      services: [
-        { ...base, id: 'normal' },
-        {
-          ...base,
-          id: 'critical',
-          health_up: false,
-          port_up: false,
-          process_up: false,
-          status: 'critical',
-          status_source: 'health',
-        },
-        {
-          ...base,
-          id: 'unknown',
-          health_up: null,
-          port_up: null,
-          process_up: null,
-          status: 'unknown',
-          status_source: 'unknown',
-          collection_level: 'unknown',
-        },
-      ],
-      total: 3,
+      services: [{
+        ...base,
+        id: 'mixed-binary-status',
+        health_up: true,
+        port_up: false,
+        process_up: null,
+        status: 'critical',
+        status_source: 'port',
+      }],
+      total: 1,
       total_pages: 1,
     },
   })
   renderPage()
 
-  const rows = (await screen.findAllByRole('row')).slice(1)
-  for (const [row, label, level] of [
-    [rows[0], '正常', 'normal'],
-    [rows[1], '异常', 'critical'],
-    [rows[2], '暂无数据', 'unknown'],
+  const cells = within((await screen.findAllByRole('row'))[1]).getAllByRole('cell')
+  for (const [index, label, level] of [
+    [2, '正常', 'normal'],
+    [4, '异常', 'critical'],
+    [5, '暂无数据', 'unknown'],
   ] as const) {
-    for (const index of [2, 4, 5]) {
-      const badge = within(row).getAllByRole('cell')[index].querySelector('.status-badge')
-      expect(badge).toHaveTextContent(label)
-      expect(badge).toHaveAttribute('data-level', level)
-    }
+    const badge = cells[index].querySelector('.status-badge')
+    expect(badge).toHaveTextContent(label)
+    expect(badge).toHaveAttribute('data-level', level)
   }
 })
 

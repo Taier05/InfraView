@@ -66,13 +66,13 @@ const sourceText: Record<string, string> = {
   collection: '采集状态',
 }
 
-const businessLabels: Readonly<Record<string, string>> = {
-  tikbee: '用户端',
-  rider: '骑手端',
-  mch: '商家端',
-  saas: '管理后台端',
-  mch_saas: '商家 PC 端',
-}
+const businessLabels = new Map<string, string>([
+  ['tikbee', '用户端'],
+  ['rider', '骑手端'],
+  ['mch', '商家端'],
+  ['saas', '管理后台端'],
+  ['mch_saas', '商家 PC 端'],
+])
 
 const numberFormatter = new Intl.NumberFormat('zh-CN', {
   maximumFractionDigits: 2,
@@ -252,7 +252,7 @@ function binary(value: boolean | null) {
 }
 
 function javaBusinessLabel(code: string) {
-  return businessLabels[code] ?? code
+  return businessLabels.get(code) ?? code
 }
 
 function BinaryStatus({ value }: { value: boolean | null }) {
