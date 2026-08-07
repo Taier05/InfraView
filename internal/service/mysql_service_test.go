@@ -603,6 +603,88 @@ func TestMySQLInstancesSupportsAllMetricSortFields(t *testing.T) {
 	}
 }
 
+func TestMySQLInstancesAcceptsAllListSortFields(t *testing.T) {
+	sorts := []string{
+		"instance", "version", "role", "connections", "threads_running",
+		"qps", "tps", "slow_queries", "buffer_pool_size",
+		"buffer_pool_usage", "replication_state", "replication_lag",
+		"uptime", "status",
+	}
+	for _, field := range sorts {
+		t.Run(field, func(t *testing.T) {
+			_, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{
+				Sort: field, Order: "asc", Page: 1, PageSize: 20,
+			})
+			if err != nil {
+				t.Fatalf("sort %q error = %v", field, err)
+			}
+		})
+	}
+}
+
+func TestMySQLInstancesSortsSplitMetricColumnsAndKeepsMissingLast(t *testing.T) {
+	snapshot := sortableMySQLMetricSnapshot()
+	wants := map[string]struct {
+		asc  []string
+		desc []string
+	}{
+		"tps":               {asc: []string{"id-30", "id-10", "id-20", "id-40"}, desc: []string{"id-10", "id-20", "id-30", "id-40"}},
+		"buffer_pool_size":  {asc: []string{"id-30", "id-10", "id-20", "id-40"}, desc: []string{"id-10", "id-20", "id-30", "id-40"}},
+		"buffer_pool_usage": {asc: []string{"id-30", "id-10", "id-20", "id-40"}, desc: []string{"id-10", "id-20", "id-30", "id-40"}},
+		"buffer_pool":       {asc: []string{"id-30", "id-10", "id-20", "id-40"}, desc: []string{"id-10", "id-20", "id-30", "id-40"}},
+	}
+	for field, want := range wants {
+		t.Run(field, func(t *testing.T) {
+			for _, order := range []string{"asc", "desc"} {
+				page, _, err := newMySQLServiceWithSnapshot(snapshot).Instances(context.Background(), MySQLQuery{
+					Sort: field, Order: order, Page: 1, PageSize: 20,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantIDs := want.asc
+				if order == "desc" {
+					wantIDs = want.desc
+				}
+				assertMySQLInstanceIDs(t, page.Instances, wantIDs)
+			}
+		})
+	}
+}
+
+func TestMySQLSortInstancesUsesDisplayOrderForSplitTextColumns(t *testing.T) {
+	items := []MySQLInstanceSummary{
+		{ID: "id-20", Version: "8.0.10", Role: mysql.RoleWritable, Replication: MySQLReplicationSummary{State: ReplicationNormal, Level: LevelNormal}, Status: LevelCritical},
+		{ID: "id-10", Version: "8.0.2", Role: mysql.RoleWritable, Replication: MySQLReplicationSummary{State: ReplicationNotConfigured, Level: LevelNormal}, Status: LevelWarning},
+		{ID: "id-05", Version: "8.0.2", Role: mysql.RoleReadOnly, Replication: MySQLReplicationSummary{State: ReplicationNormal, Level: LevelNormal}, Status: LevelNormal},
+		{ID: "id-40", Version: " ", Role: mysql.RoleUnknown, Replication: MySQLReplicationSummary{State: ReplicationThreadsStopped, Level: LevelCritical}, Status: LevelUnknown},
+		{ID: "id-50", Version: "", Role: mysql.RoleUnknown, Replication: MySQLReplicationSummary{State: ReplicationUnknown, Level: LevelUnknown}, Status: LevelUnknown},
+	}
+	tests := []struct {
+		field string
+		asc   []string
+		desc  []string
+	}{
+		{field: "version", asc: []string{"id-05", "id-10", "id-20", "id-40", "id-50"}, desc: []string{"id-20", "id-05", "id-10", "id-40", "id-50"}},
+		{field: "role", asc: []string{"id-10", "id-20", "id-05", "id-40", "id-50"}, desc: []string{"id-40", "id-50", "id-05", "id-10", "id-20"}},
+		{field: "replication_state", asc: []string{"id-05", "id-20", "id-10", "id-40", "id-50"}, desc: []string{"id-50", "id-40", "id-10", "id-05", "id-20"}},
+		{field: "status", asc: []string{"id-05", "id-10", "id-20", "id-40", "id-50"}, desc: []string{"id-40", "id-50", "id-20", "id-10", "id-05"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.field, func(t *testing.T) {
+			for _, order := range []string{"asc", "desc"} {
+				got := append([]MySQLInstanceSummary(nil), items...)
+				sortMySQLInstances(got, tt.field, order)
+				want := tt.asc
+				if order == "desc" {
+					want = tt.desc
+				}
+				assertMySQLInstanceIDs(t, got, want)
+			}
+		})
+	}
+}
+
 func TestMySQLInstancesSortsInstanceAndStatusWithStableIDTies(t *testing.T) {
 	for _, field := range []string{"instance", "status"} {
 		for _, order := range []string{"asc", "desc"} {
@@ -767,6 +849,36 @@ func fixtureMySQLSnapshot() mysql.Snapshot {
 		Role:         mysql.RoleWritable,
 	}
 	return mysql.Snapshot{Instances: []mysql.Instance{first, second, third}}
+}
+
+func sortableMySQLMetricSnapshot() mysql.Snapshot {
+	valueOne := float64(1)
+	valueTwo := float64(2)
+	first := mysql.Instance{ID: "id-20", Availability: mysql.AvailabilityUp, Role: mysql.RoleWritable, TPS: &valueTwo, BufferPoolSizeBytes: &valueTwo, BufferPoolUsagePercent: &valueTwo}
+	second := first
+	second.ID = "id-10"
+	third := first
+	third.ID = "id-30"
+	third.TPS = &valueOne
+	third.BufferPoolSizeBytes = &valueOne
+	third.BufferPoolUsagePercent = &valueOne
+	fourth := first
+	fourth.ID = "id-40"
+	fourth.TPS = nil
+	fourth.BufferPoolSizeBytes = nil
+	fourth.BufferPoolUsagePercent = nil
+	return mysql.Snapshot{Instances: []mysql.Instance{first, second, third, fourth}}
+}
+
+func assertMySQLInstanceIDs(t *testing.T, items []MySQLInstanceSummary, want []string) {
+	t.Helper()
+	got := make([]string, len(items))
+	for i, item := range items {
+		got[i] = item.ID
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("IDs = %#v, want %#v", got, want)
+	}
 }
 
 func pagedMySQLFixtureSnapshot() mysql.Snapshot {

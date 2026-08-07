@@ -238,7 +238,7 @@ func normalizeMySQLQuery(query MySQLQuery) (MySQLQuery, error) {
 		query.Sort = "instance"
 	}
 	switch query.Sort {
-	case "instance", "connections", "threads_running", "qps", "slow_queries", "buffer_pool", "replication_lag", "uptime", "status":
+	case "instance", "version", "role", "connections", "threads_running", "qps", "tps", "slow_queries", "buffer_pool_size", "buffer_pool", "buffer_pool_usage", "replication_state", "replication_lag", "uptime", "status":
 	default:
 		return MySQLQuery{}, fmt.Errorf("%w: unsupported sort %q", ErrInvalidQuery, query.Sort)
 	}
@@ -257,6 +257,13 @@ func sortMySQLInstances(items []MySQLInstanceSummary, field, order string) {
 		rightValue, rightAvailable, _ := mysqlMetricSortValue(items[j], field)
 		if metricSort && leftAvailable != rightAvailable {
 			return leftAvailable
+		}
+		if field == "version" {
+			leftAvailable := strings.TrimSpace(items[i].Version) != ""
+			rightAvailable := strings.TrimSpace(items[j].Version) != ""
+			if leftAvailable != rightAvailable {
+				return leftAvailable
+			}
 		}
 		comparison := 0
 		if metricSort && leftAvailable {
@@ -282,9 +289,13 @@ func mysqlMetricSortValue(item MySQLInstanceSummary, field string) (float64, boo
 		return metricSortValue(item.ThreadsRunning)
 	case "qps":
 		return metricSortValue(item.QPS)
+	case "tps":
+		return metricSortValue(item.TPS)
 	case "slow_queries":
 		return metricSortValue(item.SlowQueriesPerSecond)
-	case "buffer_pool":
+	case "buffer_pool_size":
+		return metricSortValue(item.BufferPoolSizeBytes)
+	case "buffer_pool", "buffer_pool_usage":
 		return metricSortValue(item.BufferPoolUsagePercent)
 	case "replication_lag":
 		return metricSortValue(item.Replication.LagSeconds)
@@ -299,10 +310,43 @@ func compareMySQLInstances(left, right MySQLInstanceSummary, field string) int {
 	switch field {
 	case "instance":
 		return compareAddresses(left.Address, right.Address)
+	case "version":
+		return compareNatural(strings.TrimSpace(left.Version), strings.TrimSpace(right.Version))
+	case "role":
+		return mysqlRoleSortRank(left.Role) - mysqlRoleSortRank(right.Role)
+	case "replication_state":
+		if comparison := listLevelSortRank(left.Replication.Level) - listLevelSortRank(right.Replication.Level); comparison != 0 {
+			return comparison
+		}
+		return mysqlReplicationStateSortRank(left.Replication.State) - mysqlReplicationStateSortRank(right.Replication.State)
 	case "status":
-		return strings.Compare(string(left.Status), string(right.Status))
+		return listLevelSortRank(left.Status) - listLevelSortRank(right.Status)
 	default:
 		return 0
+	}
+}
+
+func mysqlRoleSortRank(role mysql.Role) int {
+	switch role {
+	case mysql.RoleWritable:
+		return 0
+	case mysql.RoleReadOnly:
+		return 1
+	default:
+		return 2
+	}
+}
+
+func mysqlReplicationStateSortRank(state MySQLReplicationState) int {
+	switch state {
+	case ReplicationNormal:
+		return 0
+	case ReplicationNotConfigured:
+		return 1
+	case ReplicationThreadsStopped:
+		return 2
+	default:
+		return 3
 	}
 }
 

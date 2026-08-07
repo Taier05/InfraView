@@ -251,6 +251,24 @@ func TestMySQLInstancesEncodeNonFiniteDerivedConnectionUsageAsNull(t *testing.T)
 	}
 }
 
+func TestMySQLInstancesAcceptsAllListSortFields(t *testing.T) {
+	handler, sessionCookie := newMySQLAPITestHandler(t, fixtureMySQLSnapshot())
+	sorts := []string{
+		"instance", "version", "role", "connections", "threads_running",
+		"qps", "tps", "slow_queries", "buffer_pool_size",
+		"buffer_pool_usage", "replication_state", "replication_lag",
+		"uptime", "status",
+	}
+	for _, field := range sorts {
+		t.Run(field, func(t *testing.T) {
+			response := request(t, handler, http.MethodGet, "/api/v1/mysql/instances?sort="+field+"&order=asc&page=1&page_size=20", "", sessionCookie)
+			if response.Code != http.StatusOK {
+				t.Fatalf("sort=%s status = %d", field, response.Code)
+			}
+		})
+	}
+}
+
 func TestMySQLInstancesAcceptsLabelAndReturnsAvailableLabelsForEmptyResult(t *testing.T) {
 	snapshot := fixtureMySQLSnapshot()
 	duplicate := snapshot.Instances[0]
