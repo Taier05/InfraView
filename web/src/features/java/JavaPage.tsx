@@ -9,7 +9,12 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { APIError, apiRequest } from '../../api/client'
-import type { JavaService, JavaServicePageResponse, MetricLevel } from '../../api/types'
+import type {
+  JavaService,
+  JavaServicePageResponse,
+  JavaStatusSource,
+  MetricLevel,
+} from '../../api/types'
 import { useRefreshIntervalMs } from '../../app/runtime'
 import { ErrorPanel } from '../../components/ErrorPanel'
 import {
@@ -30,6 +35,15 @@ const sortFields = [
   'uptime', 'status',
 ] as const
 const metricLevels = ['normal', 'warning', 'critical', 'unknown'] as const
+const javaStatusSources = [
+  'health',
+  'port',
+  'process',
+  'consistency',
+  'collection',
+  'normal',
+  'unknown',
+] as const
 
 type PageSize = (typeof pageSizes)[number]
 type JavaSort = (typeof sortFields)[number]
@@ -74,6 +88,75 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
 
+function levelRank(value: MetricLevel) {
+  switch (value) {
+    case 'critical':
+      return 3
+    case 'warning':
+      return 2
+    case 'unknown':
+      return 1
+    default:
+      return 0
+  }
+}
+
+function sourceRank(value: JavaStatusSource) {
+  switch (value) {
+    case 'unknown':
+      return 6
+    case 'health':
+      return 5
+    case 'port':
+      return 4
+    case 'process':
+      return 3
+    case 'consistency':
+      return 2
+    case 'collection':
+      return 1
+    default:
+      return 0
+  }
+}
+
+function binaryAssessment(
+  value: boolean | null,
+  source: JavaStatusSource,
+) {
+  if (value === null) return { level: 'unknown' as const, source: 'unknown' as const }
+  if (!value) return { level: 'critical' as const, source }
+  return { level: 'normal' as const, source: 'normal' as const }
+}
+
+function hasValidJavaStatusCombination(service: JavaService) {
+  let assessment: { level: MetricLevel; source: JavaStatusSource } = {
+    level: 'normal',
+    source: 'normal',
+  }
+  const candidates = [
+    binaryAssessment(service.health_up, 'health'),
+    binaryAssessment(service.port_up, 'port'),
+    binaryAssessment(service.process_up, 'process'),
+    binaryAssessment(service.port_consistent, 'consistency'),
+    { level: service.collection_level, source: 'collection' as const },
+  ]
+  for (const candidate of candidates) {
+    if (candidate.level === 'normal') continue
+    if (
+      levelRank(candidate.level) > levelRank(assessment.level) ||
+      (levelRank(candidate.level) === levelRank(assessment.level) &&
+        sourceRank(candidate.source) > sourceRank(assessment.source))
+    ) {
+      assessment = candidate
+    }
+  }
+  return (
+    service.status === assessment.level &&
+    service.status_source === assessment.source
+  )
+}
+
 function isJavaService(value: unknown): value is JavaService {
   if (!isRecord(value)) return false
   return (
@@ -92,8 +175,9 @@ function isJavaService(value: unknown): value is JavaService {
     isNonNegativeFiniteNumberOrNull(value.memory_usage_percent) &&
     isNonNegativeIntegerOrNull(value.uptime_seconds) &&
     isOneOf(value.status, metricLevels) &&
-    typeof value.status_source === 'string' && value.status_source.trim() !== '' &&
-    isOneOf(value.collection_level, metricLevels)
+    isOneOf(value.status_source, javaStatusSources) &&
+    isOneOf(value.collection_level, metricLevels) &&
+    hasValidJavaStatusCombination(value as unknown as JavaService)
   )
 }
 
@@ -199,7 +283,7 @@ function TitledValue({ value, className }: { value: string; className?: string }
 export function JavaPage() {
   const refreshIntervalMs = useRefreshIntervalMs()
   const [searchParams, setSearchParams] = useSearchParams()
-  const querySearch = searchParams.get('search') ?? ''
+  const querySearch = (searchParams.get('search') ?? '').trim()
   const name = (searchParams.get('name') ?? '').trim()
   const status = statusFilter(searchParams.get('status'))
   const sort = sortField(searchParams.get('sort'))
@@ -226,8 +310,9 @@ export function JavaPage() {
     if (searchText === querySearch) return
     const timeout = window.setTimeout(() => {
       const next = new URLSearchParams(searchParams)
-      if (searchText === '') next.delete('search')
-      else next.set('search', searchText)
+      const normalizedSearch = searchText.trim()
+      if (normalizedSearch === '') next.delete('search')
+      else next.set('search', normalizedSearch)
       next.set('page', '1')
       setSearchParams(next)
     }, 300)

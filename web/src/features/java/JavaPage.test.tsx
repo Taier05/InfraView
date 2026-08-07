@@ -126,17 +126,16 @@ it('身份字段单行省略并通过原生 title 保留完整值', async () => 
   }
 })
 
-it('映射五种已知状态来源、保留未知来源并格式化空值', async () => {
+it('映射五种已知状态来源并格式化空值', async () => {
   const base = cloneFixture().data.services[0]
   responseBody = javaServicePageFixture({
     data: {
       services: [
-        { ...base, id: 'health', status_source: 'health' },
-        { ...base, id: 'port', status_source: 'port' },
-        { ...base, id: 'process', status_source: 'process' },
-        { ...base, id: 'consistency', status_source: 'consistency' },
-        { ...base, id: 'collection', status_source: 'collection' },
-        { ...base, id: 'future', status_source: 'future_source' as never },
+        { ...base, id: 'health', health_up: false, status: 'critical', status_source: 'health' },
+        { ...base, id: 'port', port_up: false, status: 'critical', status_source: 'port' },
+        { ...base, id: 'process', process_up: false, status: 'critical', status_source: 'process' },
+        { ...base, id: 'consistency', port_consistent: false, status: 'critical', status_source: 'consistency' },
+        { ...base, id: 'collection', status: 'warning', status_source: 'collection', collection_level: 'warning' },
         {
           ...base,
           id: 'empty',
@@ -150,19 +149,22 @@ it('映射五种已知状态来源、保留未知来源并格式化空值', asyn
           memory_bytes: null,
           memory_usage_percent: null,
           uptime_seconds: null,
+          status: 'unknown',
+          status_source: 'unknown',
+          collection_level: 'unknown',
         },
       ],
-      total: 7,
+      total: 6,
       total_pages: 1,
     },
   })
   renderPage()
 
   const rows = (await screen.findAllByRole('row')).slice(1)
-  expect(rows.slice(0, 6).map((row) => within(row).getAllByRole('cell')[12].textContent)).toEqual([
-    '健康检查', '端口状态', '进程状态', '端口进程一致性', '采集状态', 'future_source',
+  expect(rows.slice(0, 5).map((row) => within(row).getAllByRole('cell')[12].textContent)).toEqual([
+    '健康检查', '端口状态', '进程状态', '端口进程一致性', '采集状态',
   ])
-  const values = within(rows[6]).getAllByRole('cell').map((cell) => cell.textContent)
+  const values = within(rows[5]).getAllByRole('cell').map((cell) => cell.textContent)
   expect(values.slice(2, 12)).toEqual(Array.from({ length: 10 }, () => '暂无数据'))
 })
 
@@ -239,6 +241,24 @@ it('搜索精确等待 300ms 后写入 URL 并重置页码', async () => {
   expect(new URLSearchParams(window.location.search).get('page')).toBe('1')
 })
 
+it('空白搜索在 URL 和 300ms 输入后都删除且不透传给后端', async () => {
+  respondWithRequestedPage()
+  renderPage('/java?search=%20&page=3')
+  await screen.findByText('fixture-business-a')
+  await waitFor(() => {
+    expect(new URLSearchParams(window.location.search).has('search')).toBe(false)
+    expect(requests.at(-1)?.searchParams.has('search')).toBe(false)
+  })
+
+  vi.useFakeTimers()
+  fireEvent.change(screen.getByRole('searchbox', { name: '搜索业务端、服务名称或地址' }), {
+    target: { value: '   ' },
+  })
+  act(() => vi.advanceTimersByTime(300))
+  expect(new URLSearchParams(window.location.search).has('search')).toBe(false)
+  expect(new URLSearchParams(window.location.search).get('page')).toBe('1')
+})
+
 it('筛选页数和全部十三个排序键都重置页码', async () => {
   respondWithRequestedPage()
   const user = userEvent.setup()
@@ -312,6 +332,17 @@ describe('严格响应校验', () => {
     ['负数指标', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], process_count: -1 }] } })],
     ['分页缺失', (fixture) => { const { total_pages: _omitted, ...data } = fixture.data; return { ...fixture, data } }],
     ['页内服务超出页大小', (fixture) => ({ ...fixture, data: { ...fixture.data, services: Array.from({ length: 21 }, (_, index) => ({ ...fixture.data.services[0], id: `java-${index}` })), total: 21, page_size: 20, total_pages: 2 } })],
+    ['未知状态来源', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], status_source: 'future_source' }] } })],
+    ['critical 搭配 normal 来源', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], status: 'critical', status_source: 'normal' }] } })],
+    ['normal 搭配 health 来源', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], status_source: 'health' }] } })],
+    ['normal 搭配 critical 采集等级', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], collection_level: 'critical' }] } })],
+    ['port 来源遗漏对应失败信号', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], status: 'critical', status_source: 'port' }] } })],
+    ['port 来源被更高优先级 health 失败遮蔽', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], health_up: false, port_up: false, status: 'critical', status_source: 'port' }] } })],
+    ['collection 来源被同级 health 失败遮蔽', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], health_up: false, status: 'critical', status_source: 'collection', collection_level: 'critical' }] } })],
+    ['normal 来源未保持所有信号正常', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[0], process_up: null }] } })],
+    ['unknown 来源没有缺失信号', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[3], health_up: true, port_up: true, process_up: true, port_consistent: true }] } })],
+    ['unknown 来源含失败信号', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[3], health_up: false }] } })],
+    ['unknown 来源采集等级高于 unknown', (fixture) => ({ ...fixture, data: { ...fixture.data, services: [{ ...fixture.data.services[3], collection_level: 'warning' }] } })],
   ]
 
   it.each(malformedResponses)('%s', async (_name, mutate) => {
