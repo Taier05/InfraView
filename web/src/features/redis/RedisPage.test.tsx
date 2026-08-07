@@ -292,16 +292,26 @@ it("严格渲染 Redis 十三列及拆分后的指标语义", async () => {
 
 it.each(redisSortFields)("从 fresh page 3 排序 Redis %s 时首击升序、再击降序，并发送精确参数", async (label, sort) => {
   const user = userEvent.setup();
+  const initialSort = sort === "status" ? "instance" : "status";
   mockPaginatedRedisRequests();
   renderPage(
-    "/redis?role=slave&status=warning&sort=instance&order=desc&page=3&page_size=20",
+    `/redis?role=slave&status=warning&sort=${initialSort}&order=desc&page=3&page_size=20`,
   );
   await screen.findByText("192.0.2.40:6379");
 
-  const button = screen.getByRole("button", { name: `${label}排序` });
+  const button = screen.getByRole("button", {
+    name: `${label}排序，当前未排序`,
+  });
+  expect(button).toHaveAttribute("data-active", "false");
+  expect(button).toHaveAttribute("title", `${label}排序，当前未排序`);
   expect(button).not.toHaveTextContent(/[⇅↑↓]/);
   await user.click(button);
   await waitFor(() => {
+    const ascending = screen.getByRole("button", {
+      name: `${label}排序，当前升序`,
+    });
+    expect(ascending).toHaveAttribute("data-active", "true");
+    expect(ascending).toHaveAttribute("title", `${label}排序，当前升序`);
     const parameters = new URLSearchParams(window.location.search);
     expect(parameters.get("sort")).toBe(sort);
     expect(parameters.get("order")).toBe("asc");
@@ -316,8 +326,15 @@ it.each(redisSortFields)("从 fresh page 3 排序 Redis %s 时首击升序、再
     });
   });
 
-  await user.click(screen.getByRole("button", { name: `${label}排序` }));
+  await user.click(
+    screen.getByRole("button", { name: `${label}排序，当前升序` }),
+  );
   await waitFor(() => {
+    const descending = screen.getByRole("button", {
+      name: `${label}排序，当前降序`,
+    });
+    expect(descending).toHaveAttribute("data-active", "true");
+    expect(descending).toHaveAttribute("title", `${label}排序，当前降序`);
     const parameters = new URLSearchParams(window.location.search);
     expect(parameters.get("sort")).toBe(sort);
     expect(parameters.get("order")).toBe("desc");

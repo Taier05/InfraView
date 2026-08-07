@@ -493,8 +493,11 @@ func redisRoleSortRank(role redis.Role) int {
 }
 
 func redisReplicationLinkSortValue(item RedisInstanceSummary) (float64, bool, bool) {
-	if item.Role != redis.RoleSlave || item.Replication.MasterLinkUp == nil {
+	if item.Role != redis.RoleSlave {
 		return 0, false, true
+	}
+	if item.Replication.MasterLinkUp == nil {
+		return 2, true, true
 	}
 	if *item.Replication.MasterLinkUp {
 		return 0, true, true

@@ -538,6 +538,52 @@ func TestHostsSortsMissingNameAndIPLastInBothDirectionsWithStableID(t *testing.T
 	}
 }
 
+func TestHostsSortsNameAndIPNaturallyIgnoringCaseAndWhitespace(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	provider.hosts = []datasource.Host{
+		{ID: "id-node-10", Name: "node10", IP: "192.0.2.10", Status: datasource.StatusOnline},
+		{ID: "id-node-2b", Name: " NODE2 ", IP: " 192.0.2.2 ", Status: datasource.StatusOnline},
+		{ID: "id-missing-z", Name: " \t", IP: "\t", Status: datasource.StatusOnline},
+		{ID: "id-node-2a", Name: "node2", IP: "192.0.2.2", Status: datasource.StatusOnline},
+		{ID: "id-missing-a", Name: "", IP: "", Status: datasource.StatusOnline},
+	}
+	provider.metrics = map[string]datasource.CurrentMetrics{
+		"id-node-10":   {Timestamp: clock.Now()},
+		"id-node-2a":   {Timestamp: clock.Now()},
+		"id-node-2b":   {Timestamp: clock.Now()},
+		"id-missing-a": {Timestamp: clock.Now()},
+		"id-missing-z": {Timestamp: clock.Now()},
+	}
+	svc := newService(provider, clock)
+
+	for _, field := range []string{"name", "ip"} {
+		t.Run(field, func(t *testing.T) {
+			for _, test := range []struct {
+				order string
+				want  []string
+			}{
+				{order: "asc", want: []string{"id-node-2a", "id-node-2b", "id-node-10", "id-missing-a", "id-missing-z"}},
+				{order: "desc", want: []string{"id-node-10", "id-node-2a", "id-node-2b", "id-missing-a", "id-missing-z"}},
+			} {
+				page, _, err := svc.Hosts(context.Background(), service.HostQuery{
+					Sort: field, Order: test.order, Page: 1, PageSize: 20,
+				})
+				if err != nil {
+					t.Fatalf("Hosts() error = %v", err)
+				}
+				got := make([]string, len(page.Hosts))
+				for index, host := range page.Hosts {
+					got[index] = host.ID
+				}
+				if !reflect.DeepEqual(got, test.want) {
+					t.Fatalf("%s/%s IDs = %v, want %v", field, test.order, got, test.want)
+				}
+			}
+		})
+	}
+}
+
 func TestHostsSortsStatusByDisplayedCollectionLevelThenStableID(t *testing.T) {
 	clock := newServiceClock()
 	provider := fixtureProvider(clock.Now())

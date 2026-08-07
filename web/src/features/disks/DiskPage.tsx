@@ -314,13 +314,14 @@ export function DiskPage() {
   function sortButton(field: DiskSort, label: string) {
     const current =
       sort === field ? (order === 'asc' ? '升序' : '降序') : '未排序'
+    const description = `${label}排序，当前${current}`
     return (
       <button
         className="host-sort-button"
         type="button"
         data-active={sort === field}
-        aria-label={`${label}排序，当前${current}`}
-        title={`点击按${label}排序`}
+        aria-label={description}
+        title={description}
         onClick={() => changeSort(field)}
       >
         {label}

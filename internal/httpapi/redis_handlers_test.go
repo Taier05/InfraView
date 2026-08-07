@@ -84,6 +84,15 @@ func TestRedisInstancesAPIAcceptsVisibleSortColumns(t *testing.T) {
 	}
 }
 
+func TestRedisInstancesAPIAcceptsEvictedCompatibilitySortForAuthenticatedGET(t *testing.T) {
+	handler, cookie := newRedisAPIHandler(t)
+	response := request(t, handler, http.MethodGet,
+		"/api/v1/redis/instances?sort=evicted&order=asc&page=1&page_size=20", "", cookie)
+	if response.Code != http.StatusOK {
+		t.Fatalf("authenticated evicted sort status = %d body = %s", response.Code, response.Body.String())
+	}
+}
+
 func TestRedisAPIsRejectInvalidQueriesAndWriteMethods(t *testing.T) {
 	handler, cookie := newRedisAPIHandler(t)
 	for _, path := range []string{

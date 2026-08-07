@@ -151,7 +151,7 @@ func sortHosts(hosts []HostSummary, field, order string) {
 					return leftAvailable
 				}
 				if textSort && leftAvailable {
-					comparison = strings.Compare(leftText, rightText)
+					comparison = compareNatural(leftText, rightText)
 				} else if !textSort {
 					comparison = compareHosts(hosts[i], hosts[j], field)
 				}
@@ -170,7 +170,7 @@ func sortHosts(hosts []HostSummary, field, order string) {
 func hostTextSortValue(host HostSummary, field string) (string, bool, bool) {
 	switch field {
 	case "name":
-		value := strings.ToLower(strings.TrimSpace(host.Name))
+		value := strings.TrimSpace(host.Name)
 		return value, value != "", true
 	case "ip":
 		value := strings.TrimSpace(host.IP)

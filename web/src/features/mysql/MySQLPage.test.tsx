@@ -184,15 +184,25 @@ it('renders the fourteen independent MySQL metric columns', async () => {
 
 it.each(mysqlSortFields)('sorts MySQL %s from a fresh later page with exact URL and request parameters', async (label, sort) => {
   const user = userEvent.setup()
+  const initialSort = sort === 'status' ? 'instance' : 'status'
   renderMySQLPage(
-    '/mysql?label=tier-fixture&status=warning&role=read_only&sort=instance&order=desc&page=3&page_size=20',
+    `/mysql?label=tier-fixture&status=warning&role=read_only&sort=${initialSort}&order=desc&page=3&page_size=20`,
   )
   await screen.findByText('192.0.2.101:3306')
 
-  const button = screen.getByRole('button', { name: `${label}排序` })
+  const button = screen.getByRole('button', {
+    name: `${label}排序，当前未排序`,
+  })
+  expect(button).toHaveAttribute('data-active', 'false')
+  expect(button).toHaveAttribute('title', `${label}排序，当前未排序`)
   expect(button).not.toHaveTextContent(/[⇅↑↓]/)
   await user.click(button)
   await waitFor(() => {
+    const ascending = screen.getByRole('button', {
+      name: `${label}排序，当前升序`,
+    })
+    expect(ascending).toHaveAttribute('data-active', 'true')
+    expect(ascending).toHaveAttribute('title', `${label}排序，当前升序`)
     const parameters = new URLSearchParams(window.location.search)
     expect(parameters.get('sort')).toBe(sort)
     expect(parameters.get('order')).toBe('asc')
@@ -208,8 +218,15 @@ it.each(mysqlSortFields)('sorts MySQL %s from a fresh later page with exact URL 
     })
   })
 
-  await user.click(screen.getByRole('button', { name: `${label}排序` }))
+  await user.click(
+    screen.getByRole('button', { name: `${label}排序，当前升序` }),
+  )
   await waitFor(() => {
+    const descending = screen.getByRole('button', {
+      name: `${label}排序，当前降序`,
+    })
+    expect(descending).toHaveAttribute('data-active', 'true')
+    expect(descending).toHaveAttribute('title', `${label}排序，当前降序`)
     const parameters = new URLSearchParams(window.location.search)
     expect(parameters.get('sort')).toBe(sort)
     expect(parameters.get('order')).toBe('desc')
@@ -304,7 +321,7 @@ it('writes filters sort and pagination to the URL', async () => {
   )
   await user.click(
     screen.getByRole('button', {
-      name: 'QPS排序',
+      name: 'QPS排序，当前未排序',
     }),
   )
   expect(window.location.search).toContain('status=warning')

@@ -274,11 +274,16 @@ export function RedisPage() {
   }
 
   function sortButton(field: RedisSort, label: string) {
+    const current =
+      sort === field ? (order === "asc" ? "升序" : "降序") : "未排序";
+    const description = `${label}排序，当前${current}`;
     return (
       <button
         className="host-sort-button"
         type="button"
-        aria-label={`${label}排序`}
+        data-active={sort === field}
+        aria-label={description}
+        title={description}
         onClick={() => {
           const next = new URLSearchParams(searchParams);
           next.set("sort", field);

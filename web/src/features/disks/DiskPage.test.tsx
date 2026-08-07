@@ -420,33 +420,58 @@ it('搜索、状态和每页数量变化写入 URL 并回到第一页', async ()
   expect(window.location.search).toContain('search=atlas')
 })
 
-it('所有硬盘表头排序均支持升序和降序并在变化时回到第一页', async () => {
+it.each(expectedDiskSorts)(
+  '从 fresh page 3 排序硬盘 %s 时首击升序、再击降序，并发送精确参数',
+  async (label, field) => {
   const user = userEvent.setup()
-  renderDiskPage('/disks?sort=status&order=asc&page=4')
+  const initialSort = field === 'status' ? 'host' : 'status'
+  renderDiskPage(
+    `/disks?status=warning&sort=${initialSort}&order=desc&page=3&page_size=20`,
+  )
   await screen.findByText('node-alpha')
 
-  for (const [label, field] of expectedDiskSorts) {
-    await user.click(
-      screen.getByRole('button', {
-        name: new RegExp(`^${label}排序，当前`),
-      }),
-    )
-    await waitFor(() => expect(lastRequest().searchParams.get('sort')).toBe(field))
-    expect(lastRequest().searchParams.get('order')).toBe('asc')
-    expect(lastRequest().searchParams.get('page')).toBe('1')
-    expect(window.location.search).toContain(`sort=${field}`)
-    expect(window.location.search).toContain('page=1')
+  const button = screen.getByRole('button', {
+    name: `${label}排序，当前未排序`,
+  })
+  expect(button).toHaveAttribute('data-active', 'false')
+  expect(button).toHaveAttribute('title', `${label}排序，当前未排序`)
+  expect(button).not.toHaveTextContent(/[⇅↑↓]/)
 
-    await user.click(
-      screen.getByRole('button', {
-        name: new RegExp(`^${label}排序，当前升序$`),
-      }),
-    )
-    await waitFor(() =>
-      expect(lastRequest().searchParams.get('order')).toBe('desc'),
-    )
-  }
-})
+  await user.click(button)
+  await waitFor(() => {
+    const ascending = screen.getByRole('button', {
+      name: `${label}排序，当前升序`,
+    })
+    expect(ascending).toHaveAttribute('data-active', 'true')
+    expect(ascending).toHaveAttribute('title', `${label}排序，当前升序`)
+    expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+      sort: field,
+      order: 'asc',
+      page: '1',
+      page_size: '20',
+      status: 'warning',
+    })
+  })
+
+  await user.click(
+    screen.getByRole('button', { name: `${label}排序，当前升序` }),
+  )
+  await waitFor(() => {
+    const descending = screen.getByRole('button', {
+      name: `${label}排序，当前降序`,
+    })
+    expect(descending).toHaveAttribute('data-active', 'true')
+    expect(descending).toHaveAttribute('title', `${label}排序，当前降序`)
+    expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+      sort: field,
+      order: 'desc',
+      page: '1',
+      page_size: '20',
+      status: 'warning',
+    })
+  })
+  },
+)
 
 it('使用 URL 分页并在后端总页数缩小时替换为末页重新请求', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {

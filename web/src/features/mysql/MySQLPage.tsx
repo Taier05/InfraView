@@ -331,6 +331,9 @@ export function MySQLPage() {
     label: string,
     className?: string,
   ) {
+    const current =
+      sort === field ? (order === 'asc' ? '升序' : '降序') : '未排序'
+    const description = `${label}排序，当前${current}`
     return (
       <button
         className={
@@ -340,8 +343,8 @@ export function MySQLPage() {
         }
         type="button"
         data-active={sort === field}
-        aria-label={`${label}排序`}
-        title={label}
+        aria-label={description}
+        title={description}
         onClick={() => changeSort(field)}
       >
         {label}

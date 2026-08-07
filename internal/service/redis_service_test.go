@@ -210,6 +210,17 @@ func TestRedisInstancesAcceptsVisibleSortColumns(t *testing.T) {
 	}
 }
 
+func TestRedisInstancesAcceptsEvictedCompatibilitySort(t *testing.T) {
+	service := newRedisServiceWithSnapshot(redis.Snapshot{Instances: []redis.Instance{
+		healthyRedisMaster("fixture-a", "192.0.2.10:6379"),
+	}})
+	if _, _, err := service.Instances(context.Background(), RedisQuery{
+		Sort: "evicted", Order: "asc", Page: 1, PageSize: 20,
+	}); err != nil {
+		t.Fatalf("evicted compatibility sort error = %v", err)
+	}
+}
+
 func TestRedisInstancesSortsIntegerColumnsExactly(t *testing.T) {
 	const maximum = int64(9223372036854775807)
 	for _, sortField := range []string{"memory_limit", "blocked_connections", "keys", "uptime"} {
@@ -254,16 +265,16 @@ func TestRedisInstancesSortsHitRate(t *testing.T) {
 }
 
 func TestRedisInstancesSortsReplicationLink(t *testing.T) {
-	normal := healthyRedisSlave("slave-normal", "192.0.2.10:6379")
-	disconnected := healthyRedisSlave("slave-disconnected", "192.0.2.11:6379")
-	unknown := healthyRedisSlave("slave-unknown", "192.0.2.12:6379")
-	master := healthyRedisMaster("master-not-applicable", "192.0.2.13:6379")
+	normal := healthyRedisSlave("z-slave-normal", "192.0.2.10:6379")
+	disconnected := healthyRedisSlave("m-slave-disconnected", "192.0.2.11:6379")
+	unknown := healthyRedisSlave("a-slave-unknown", "192.0.2.12:6379")
+	master := healthyRedisMaster("0-master-not-applicable", "192.0.2.13:6379")
 	disconnected.Replication.MasterLinkUp = boolPointer(false)
 	unknown.Replication.MasterLinkUp = nil
 	service := newRedisServiceWithSnapshot(redis.Snapshot{Instances: []redis.Instance{unknown, master, disconnected, normal}})
 
-	assertRedisSortIDs(t, service, "replication_link", "asc", []string{"slave-normal", "slave-disconnected", "master-not-applicable", "slave-unknown"})
-	assertRedisSortIDs(t, service, "replication_link", "desc", []string{"slave-disconnected", "slave-normal", "master-not-applicable", "slave-unknown"})
+	assertRedisSortIDs(t, service, "replication_link", "asc", []string{"z-slave-normal", "m-slave-disconnected", "a-slave-unknown", "0-master-not-applicable"})
+	assertRedisSortIDs(t, service, "replication_link", "desc", []string{"a-slave-unknown", "m-slave-disconnected", "z-slave-normal", "0-master-not-applicable"})
 }
 
 func TestRedisInstancesSortsStatusByListOrder(t *testing.T) {

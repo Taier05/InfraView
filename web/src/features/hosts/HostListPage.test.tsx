@@ -319,34 +319,60 @@ it('搜索等待 300ms 后请求并把页码重置为 1', async () => {
   expect(window.location.search).toContain('page=1')
 })
 
-it('所有主机表头排序写入精确 URL 键、重置页码并可切换降序', async () => {
+it.each(expectedHostSorts)(
+  '从 fresh page 3 排序主机 %s 时首击升序、再击降序，并发送精确参数',
+  async (label, field) => {
   const user = userEvent.setup()
-  renderHostList('/hosts?sort=status&order=asc&page=3')
+  const initialSort = field === 'status' ? 'name' : 'status'
+  renderHostList(
+    `/hosts?status=offline&sort=${initialSort}&order=desc&page=3&page_size=20`,
+  )
   await screen.findByText('linux-app-01')
 
-  for (const [label, field] of expectedHostSorts) {
-    const button = screen.getByRole('button', {
-      name: new RegExp(`^${label}排序，当前`),
-    })
-    await user.click(button)
-    await waitFor(() =>
-      expect(lastRequest().searchParams.get('sort')).toBe(field),
-    )
-    expect(lastRequest().searchParams.get('order')).toBe('asc')
-    expect(lastRequest().searchParams.get('page')).toBe('1')
-    expect(window.location.search).toContain(`sort=${field}`)
-    expect(window.location.search).toContain('page=1')
+  const button = screen.getByRole('button', {
+    name: `${label}排序，当前未排序`,
+  })
+  expect(button).toHaveAttribute('data-active', 'false')
+  expect(button).toHaveAttribute('title', `${label}排序，当前未排序`)
+  expect(button).not.toHaveTextContent(/[⇅↑↓]/)
 
-    await user.click(
-      screen.getByRole('button', {
-        name: new RegExp(`^${label}排序，当前升序$`),
-      }),
-    )
-    await waitFor(() =>
-      expect(lastRequest().searchParams.get('order')).toBe('desc'),
-    )
-  }
-})
+  await user.click(button)
+  await waitFor(() => {
+    const ascending = screen.getByRole('button', {
+      name: `${label}排序，当前升序`,
+    })
+    expect(ascending).toHaveAttribute('data-active', 'true')
+    expect(ascending).toHaveAttribute('title', `${label}排序，当前升序`)
+    expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+      q: '',
+      status: 'offline',
+      sort: field,
+      order: 'asc',
+      page: '1',
+      page_size: '20',
+    })
+  })
+
+  await user.click(
+    screen.getByRole('button', { name: `${label}排序，当前升序` }),
+  )
+  await waitFor(() => {
+    const descending = screen.getByRole('button', {
+      name: `${label}排序，当前降序`,
+    })
+    expect(descending).toHaveAttribute('data-active', 'true')
+    expect(descending).toHaveAttribute('title', `${label}排序，当前降序`)
+    expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+      q: '',
+      status: 'offline',
+      sort: field,
+      order: 'desc',
+      page: '1',
+      page_size: '20',
+    })
+  })
+  },
+)
 
 it('使用服务端分页并保持当前每页数量', async () => {
   const user = userEvent.setup()
