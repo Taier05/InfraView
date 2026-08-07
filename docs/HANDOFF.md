@@ -2,9 +2,9 @@
 
 最后更新：2026-08-07
 
-## 当前数据时间与 Elasticsearch 容错恢复入口（未提交、已部署至现有 8080）
+## 当前数据时间与 Elasticsearch 容错恢复入口（已合并、已推送、已部署）
 
-当前改动位于隔离工作树 `/root/github/InfraView/.worktrees/refresh-data-time-es-stale`、分支 `feature/refresh-data-time-es-stale`，基线为 `main` 的 `b619ac9`。用户已授权实现和原位部署，但尚未授权提交或推送；主工作区不应被本分支改动污染。恢复时先读本节、对应 design/plan、`docs/PROJECT_STATUS.md`、`docs/TODO.md` 和 `docs/datasources/NIGHTINGALE.md`，再以 Git 只读检查为准。
+功能提交 `ad6f01b fix: show sample times and tolerate sparse Elasticsearch data` 已从隔离分支快进合并到 `main` 并推送至 `origin/main`。恢复时使用主工作区 `/root/github/InfraView`，先读本节、对应 design/plan、`docs/PROJECT_STATUS.md`、`docs/TODO.md` 和 `docs/datasources/NIGHTINGALE.md`，再以 Git 只读检查为准。
 
 本轮把 API 既有字段 `meta.collected_at` 的语义统一为“本次响应内最新有效上游样本时间”：Service 从 Nightingale 样本 `Timestamp`/`ReportedAt`/`CheckedAt` 取最大非零值并转 UTC；缓存 stale 只改变 `meta.stale`，不能把缓存时间、API 响应时间或浏览器刷新时间写入 `collected_at`；空快照省略该字段。前端保留 15 秒自动轮询和错误态“重试”，删除正常态刷新按钮及“上次刷新/每 N 秒自动刷新”，列表展示 `最新数据时间：YYYY/MM/DD HH:mm:ss`，总览七张卡分别展示各自模块时间，不能合成全局时间。
 
