@@ -657,6 +657,8 @@ func TestMySQLSortInstancesUsesDisplayOrderForSplitTextColumns(t *testing.T) {
 		{ID: "id-20", Version: "8.0.10", Role: mysql.RoleWritable, Replication: MySQLReplicationSummary{State: ReplicationNormal, Level: LevelNormal}, Status: LevelCritical},
 		{ID: "id-10", Version: "8.0.2", Role: mysql.RoleWritable, Replication: MySQLReplicationSummary{State: ReplicationNotConfigured, Level: LevelNormal}, Status: LevelWarning},
 		{ID: "id-05", Version: "8.0.2", Role: mysql.RoleReadOnly, Replication: MySQLReplicationSummary{State: ReplicationNormal, Level: LevelNormal}, Status: LevelNormal},
+		{ID: "id-15", Version: "8.0.3", Role: mysql.RoleReadOnly, Replication: MySQLReplicationSummary{State: ReplicationNormal, Level: LevelWarning}, Status: LevelWarning},
+		{ID: "id-25", Version: "8.0.11", Role: mysql.RoleWritable, Replication: MySQLReplicationSummary{State: ReplicationNotConfigured, Level: LevelNormal}, Status: LevelNormal},
 		{ID: "id-40", Version: " ", Role: mysql.RoleUnknown, Replication: MySQLReplicationSummary{State: ReplicationThreadsStopped, Level: LevelCritical}, Status: LevelUnknown},
 		{ID: "id-50", Version: "", Role: mysql.RoleUnknown, Replication: MySQLReplicationSummary{State: ReplicationUnknown, Level: LevelUnknown}, Status: LevelUnknown},
 	}
@@ -665,10 +667,10 @@ func TestMySQLSortInstancesUsesDisplayOrderForSplitTextColumns(t *testing.T) {
 		asc   []string
 		desc  []string
 	}{
-		{field: "version", asc: []string{"id-05", "id-10", "id-20", "id-40", "id-50"}, desc: []string{"id-20", "id-05", "id-10", "id-40", "id-50"}},
-		{field: "role", asc: []string{"id-10", "id-20", "id-05", "id-40", "id-50"}, desc: []string{"id-40", "id-50", "id-05", "id-10", "id-20"}},
-		{field: "replication_state", asc: []string{"id-05", "id-20", "id-10", "id-40", "id-50"}, desc: []string{"id-50", "id-40", "id-10", "id-05", "id-20"}},
-		{field: "status", asc: []string{"id-05", "id-10", "id-20", "id-40", "id-50"}, desc: []string{"id-40", "id-50", "id-20", "id-10", "id-05"}},
+		{field: "version", asc: []string{"id-05", "id-10", "id-15", "id-20", "id-25", "id-40", "id-50"}, desc: []string{"id-25", "id-20", "id-15", "id-05", "id-10", "id-40", "id-50"}},
+		{field: "role", asc: []string{"id-10", "id-20", "id-25", "id-05", "id-15", "id-40", "id-50"}, desc: []string{"id-40", "id-50", "id-05", "id-15", "id-10", "id-20", "id-25"}},
+		{field: "replication_state", asc: []string{"id-05", "id-20", "id-10", "id-25", "id-15", "id-40", "id-50"}, desc: []string{"id-50", "id-40", "id-15", "id-10", "id-25", "id-05", "id-20"}},
+		{field: "status", asc: []string{"id-05", "id-25", "id-10", "id-15", "id-20", "id-40", "id-50"}, desc: []string{"id-40", "id-50", "id-20", "id-10", "id-15", "id-05", "id-25"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.field, func(t *testing.T) {
