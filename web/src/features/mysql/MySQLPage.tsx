@@ -28,7 +28,7 @@ import {
 } from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
 
-const pageSizes = [20, 50, 100] as const
+const pageSizes = [20, 50, 100, 500] as const
 type PageSize = (typeof pageSizes)[number]
 const sortFields = [
   'instance',

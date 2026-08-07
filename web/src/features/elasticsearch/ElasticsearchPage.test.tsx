@@ -98,12 +98,15 @@ function respondWithRequestedPage() {
     http.get(ELASTICSEARCH_NODES_PATH, ({ request }) => {
       const url = new URL(request.url)
       requests.push(url)
+      const pageSize = Number(url.searchParams.get('page_size'))
+      const total = pageSize === 500 ? 501 : 60
       return HttpResponse.json(
         elasticsearchNodePageFixture({
           data: {
             page: Number(url.searchParams.get('page')),
-            total: 60,
-            total_pages: 3,
+            page_size: pageSize,
+            total,
+            total_pages: Math.ceil(total / pageSize),
           },
         }),
       )
@@ -232,7 +235,7 @@ it('把四种筛选、分页大小与固定白名单写入 URL 和请求', async
   )
   await user.selectOptions(
     screen.getByRole('combobox', { name: '每页数量' }),
-    '50',
+    '500',
   )
 
   await waitFor(() => {
@@ -241,10 +244,11 @@ it('把四种筛选、分页大小与固定白名单写入 URL 和请求', async
     expect(parameters.get('role')).toBe('data_hot')
     expect(parameters.get('cluster_health')).toBe('yellow')
     expect(parameters.get('status')).toBe('warning')
-    expect(parameters.get('page_size')).toBe('50')
+    expect(parameters.get('page_size')).toBe('500')
     expect(parameters.get('page')).toBe('1')
   })
-  await waitFor(() => expect(requests.at(-1)?.searchParams.get('page_size')).toBe('50'))
+  await waitFor(() => expect(requests.at(-1)?.searchParams.get('page_size')).toBe('500'))
+  expect(await screen.findByText('第 1 / 2 页，共 501 个节点')).toBeVisible()
   expect([...requests.at(-1)!.searchParams.keys()].sort()).toEqual(
     [
       'cluster',
@@ -316,6 +320,16 @@ it('规范非法 URL 参数并按服务端结果修正越界页码', async () =>
     expect(parameters.has('role')).toBe(false)
     expect(parameters.has('cluster_health')).toBe(false)
     expect(parameters.has('status')).toBe(false)
+  })
+})
+
+it.each([499, 501])('将非法 page_size=%i 规范为 20 且回到第一页', async (pageSize) => {
+  renderPage(`/elasticsearch?page=1&page_size=${pageSize}`)
+
+  await screen.findByText('fixture-es-node-a')
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=20')
+    expect(requests.at(-1)?.searchParams.get('page_size')).toBe('20')
   })
 })
 

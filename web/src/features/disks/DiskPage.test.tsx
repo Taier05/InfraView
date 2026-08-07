@@ -413,12 +413,22 @@ it('搜索、状态和每页数量变化写入 URL 并回到第一页', async ()
   expect(lastRequest().searchParams.get('page')).toBe('1')
 
   fireEvent.change(screen.getByRole('combobox', { name: '每页数量' }), {
-    target: { value: '100' },
+    target: { value: '500' },
   })
   await act(async () => vi.advanceTimersByTimeAsync(0))
-  expect(lastRequest().searchParams.get('page_size')).toBe('100')
+  expect(lastRequest().searchParams.get('page_size')).toBe('500')
   expect(lastRequest().searchParams.get('page')).toBe('1')
   expect(window.location.search).toContain('search=atlas')
+})
+
+it.each([499, 501])('将非法 page_size=%i 规范为 20 且回到第一页', async (pageSize) => {
+  renderDiskPage(`/disks?page=1&page_size=${pageSize}`)
+
+  await screen.findByText('node-alpha')
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=20')
+    expect(lastRequest().searchParams.get('page_size')).toBe('20')
+  })
 })
 
 it.each(expectedDiskSorts)(

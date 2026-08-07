@@ -46,7 +46,7 @@ function ControlsFixture() {
         <ListPageSizeField
           value={pageSize}
           onChange={(event) => setPageSize(event.target.value)}
-          pageSizes={[20, 50, 100]}
+          pageSizes={[20, 50, 100, 500]}
         />
       </ListPageControls>
     </>
@@ -76,7 +76,7 @@ describe("ListPage shared template", () => {
     expect(within(controls).queryByRole("button", { name: /刷新/ })).not.toBeInTheDocument();
     expect(within(controls).queryByText(/上次刷新|自动刷新/)).not.toBeInTheDocument();
     expect(within(controls).getByText("2026/08/06 13:50:52")).toBeVisible();
-    for (const label of ["20 条", "50 条", "100 条"]) {
+    for (const label of ["20 条", "50 条", "100 条", "全部（最多500条）"]) {
       expect(within(controls).getByRole("option", { name: label })).toBeVisible();
     }
   });

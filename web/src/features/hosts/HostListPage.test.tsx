@@ -139,7 +139,7 @@ it('按固定顺序渲染十二个单值单行列，并使用共享列表壳', a
     within(screen.getByRole('combobox', { name: '每页数量' }))
       .getAllByRole('option')
       .map((option) => option.textContent),
-  ).toEqual(['20 条', '50 条', '100 条'])
+  ).toEqual(['20 条', '50 条', '100 条', '全部（最多500条）'])
 
   const appName = await screen.findByText('linux-app-01')
 
@@ -399,16 +399,16 @@ it('切换每页数量会回到第一页并写入 URL', async () => {
   expect(await screen.findByText('第 2 / 3 页，共 41 台')).toBeInTheDocument()
   await user.selectOptions(
     screen.getByRole('combobox', { name: '每页数量' }),
-    '50',
+    '500',
   )
 
   await waitFor(() => {
     expect(lastRequest().searchParams.get('page')).toBe('1')
-    expect(lastRequest().searchParams.get('page_size')).toBe('50')
+    expect(lastRequest().searchParams.get('page_size')).toBe('500')
   })
   expect(window.location.search).toContain('page=1')
-  expect(window.location.search).toContain('page_size=50')
-  expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('50')
+  expect(window.location.search).toContain('page_size=500')
+  expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('500')
   expect(await screen.findByText('第 1 / 1 页，共 41 台')).toBeInTheDocument()
 })
 
@@ -474,7 +474,7 @@ it('零结果时规范为第一页并显示空状态而不是 1/0 页', async ()
 it('用 replace 规范非法 URL 参数并保留搜索词', async () => {
   const historyLength = window.history.length
   renderHostList(
-    '/hosts?q=keep&status=broken&sort=password&order=sideways&page=nope&page_size=999',
+    '/hosts?q=keep&status=broken&sort=password&order=sideways&page=nope&page_size=499',
   )
 
   await screen.findByText('linux-app-01')
@@ -492,6 +492,16 @@ it('用 replace 规范非法 URL 参数并保留搜索词', async () => {
     page: '1',
     page_size: '20',
   })
+})
+
+it('用 replace 把 501 页数规范为 20 且页码为 1', async () => {
+  renderHostList('/hosts?page=1&page_size=501')
+
+  await screen.findByText('linux-app-01')
+  await waitFor(() =>
+    expect(window.location.search).toContain('page=1&page_size=20'),
+  )
+  expect(lastRequest().searchParams.get('page_size')).toBe('20')
 })
 
 it('连续快速输入只在最后一次变更 300ms 后请求最终搜索词', async () => {

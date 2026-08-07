@@ -318,7 +318,7 @@ it('writes filters sort and pagination to the URL', async () => {
   )
   await user.selectOptions(
     screen.getByRole('combobox', { name: '每页数量' }),
-    '50',
+    '500',
   )
   await user.click(
     screen.getByRole('button', {
@@ -328,7 +328,7 @@ it('writes filters sort and pagination to the URL', async () => {
   expect(window.location.search).toContain('status=warning')
   expect(window.location.search).toContain('role=read_only')
   expect(window.location.search).toContain('label=tier-fixture')
-  expect(window.location.search).toContain('page_size=50')
+  expect(window.location.search).toContain('page_size=500')
   expect(new URLSearchParams(window.location.search).get('sort')).toBe('qps')
   expect(window.location.search).toContain('page=1')
 
@@ -341,7 +341,7 @@ it('writes filters sort and pagination to the URL', async () => {
       sort: 'qps',
       order: 'asc',
       page: '1',
-      page_size: '50',
+      page_size: '500',
     })
   })
 })
@@ -672,6 +672,16 @@ it('normalizes invalid URL state and out-of-range response pages', async () => {
   )
   expect(window.history.length).toBe(historyLength)
   expect(requestedURLs.every((url) => url.searchParams.has('label'))).toBe(false)
+})
+
+it.each([499, 501])('normalizes page_size=%i to 20 on the first page', async (pageSize) => {
+  renderMySQLPage(`/mysql?page=1&page_size=${pageSize}`)
+
+  await screen.findByText('192.0.2.101:3306')
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=20')
+    expect(lastRequest().searchParams.get('page_size')).toBe('20')
+  })
 })
 
 it('keeps stale data visible and reports background errors', async () => {

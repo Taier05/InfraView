@@ -189,6 +189,7 @@ function mockPaginatedRedisRequests() {
           : input.url;
     const url = new URL(raw, "http://localhost");
     requests.push(url);
+    const pageSize = Number(url.searchParams.get("page_size"));
     return Promise.resolve(
       new Response(
         JSON.stringify({
@@ -196,9 +197,9 @@ function mockPaginatedRedisRequests() {
           data: {
             ...fixture.data,
             page: Number(url.searchParams.get("page")),
-            page_size: Number(url.searchParams.get("page_size")),
+            page_size: pageSize,
             total: 64,
-            total_pages: 4,
+            total_pages: Math.ceil(64 / pageSize),
           },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
@@ -391,6 +392,7 @@ it("复用现有列表控制栏并展示最新数据时间", async () => {
 });
 
 it("把角色状态排序和分页写入 URL 与固定 GET 参数", async () => {
+  mockPaginatedRedisRequests();
   const user = userEvent.setup();
   renderPage("/redis?page=3");
   await screen.findByText("192.0.2.40:6379");
@@ -404,6 +406,10 @@ it("把角色状态排序和分页写入 URL 与固定 GET 参数", async () => 
     "warning",
   );
   await user.click(screen.getByRole("button", { name: /内存使用率排序/ }));
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "每页数量" }),
+    "500",
+  );
   await waitFor(() =>
     expect(requests.at(-1)?.pathname).toBe("/api/v1/redis/instances"),
   );
@@ -413,7 +419,7 @@ it("把角色状态排序和分页写入 URL 与固定 GET 参数", async () => 
     sort: "memory",
     order: "asc",
     page: "1",
-    page_size: "20",
+    page_size: "500",
   });
 });
 
@@ -473,6 +479,16 @@ it("展示分页并按服务端响应归一化越界页码", async () => {
   expect(await screen.findByRole("button", { name: "下一页" })).toBeDisabled();
   await user.click(await screen.findByRole("button", { name: "上一页" }));
   await waitFor(() => expect(window.location.search).toContain("page=2"));
+});
+
+it.each([499, 501])("将非法 page_size=%i 规范为 20 且回到第一页", async (pageSize) => {
+  renderPage(`/redis?page=1&page_size=${pageSize}`);
+
+  await screen.findByText("192.0.2.40:6379");
+  await waitFor(() => {
+    expect(window.location.search).toContain("page=1&page_size=20");
+    expect(requests.at(-1)?.searchParams.get("page_size")).toBe("20");
+  });
 });
 
 it("展示初始加载和空列表状态", async () => {

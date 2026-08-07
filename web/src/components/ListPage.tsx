@@ -127,7 +127,7 @@ export function ListPageSizeField({
       <select value={value} onChange={onChange}>
         {pageSizes.map((size) => (
           <option key={size} value={size}>
-            {size} 条
+            {size === 500 ? '全部（最多500条）' : `${size} 条`}
           </option>
         ))}
       </select>

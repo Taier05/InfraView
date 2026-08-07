@@ -28,7 +28,7 @@ import {
 import { StaleBanner } from '../../components/StaleBanner'
 import { StatusBadge } from '../../components/StatusBadge'
 
-const pageSizes = [20, 50, 100] as const
+const pageSizes = [20, 50, 100, 500] as const
 const sortFields = [
   'business', 'address', 'health', 'health_latency', 'port', 'process',
   'process_count', 'consistency', 'cpu', 'memory', 'memory_percent',

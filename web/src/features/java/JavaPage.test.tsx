@@ -64,12 +64,14 @@ function respondWithRequestedPage() {
     http.get(JAVA_SERVICES_PATH, ({ request }) => {
       const url = new URL(request.url)
       requests.push(url)
+      const pageSize = Number(url.searchParams.get('page_size'))
       return HttpResponse.json(
         javaServicePageFixture({
           data: {
             page: Number(url.searchParams.get('page')),
+            page_size: pageSize,
             total: 60,
-            total_pages: 3,
+            total_pages: Math.ceil(60 / pageSize),
           },
         }),
       )
@@ -242,6 +244,16 @@ it('从白名单 URL 恢复筛选排序分页并规范非法参数', async () =>
   })
 })
 
+it.each([499, 501])('将非法 page_size=%i 规范为 20 且回到第一页', async (pageSize) => {
+  renderPage(`/java?page=1&page_size=${pageSize}`)
+
+  await screen.findByText('fixture-business-a')
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=20')
+    expect(requests.at(-1)?.searchParams.get('page_size')).toBe('20')
+  })
+})
+
 it('服务端暂缺当前业务端时仍保留筛选选项', async () => {
   responseBody = javaServicePageFixture({
     data: { available_names: ['fixture-service-a'] },
@@ -360,13 +372,13 @@ it('筛选页数和全部十三个排序键都重置页码', async () => {
 
   await user.selectOptions(screen.getByRole('combobox', { name: '业务端' }), 'fixture-service-a')
   await user.selectOptions(screen.getByRole('combobox', { name: '服务状态' }), 'critical')
-  await user.selectOptions(screen.getByRole('combobox', { name: '每页数量' }), '100')
+  await user.selectOptions(screen.getByRole('combobox', { name: '每页数量' }), '500')
   for (const [index, header] of exactHeaders.entries()) {
     await user.click(screen.getByRole('button', { name: new RegExp(`^${header}排序`) }))
     await waitFor(() => expect(requests.at(-1)?.searchParams.get('sort')).toBe(sortFields[index]))
   }
   expect(new URLSearchParams(window.location.search).get('page')).toBe('1')
-  expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('100')
+  expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('500')
 })
 
 it('展示初始加载、空、过期和后台刷新错误状态', async () => {

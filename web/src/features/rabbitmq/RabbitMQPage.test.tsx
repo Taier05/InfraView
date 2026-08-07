@@ -96,12 +96,14 @@ function respondWithRequestedPage() {
     http.get(RABBITMQ_NODES_PATH, ({ request }) => {
       const url = new URL(request.url)
       requests.push(url)
+      const pageSize = Number(url.searchParams.get('page_size'))
       return HttpResponse.json(
         rabbitMQNodePageFixture({
           data: {
             page: Number(url.searchParams.get('page')),
+            page_size: pageSize,
             total: 60,
-            total_pages: 3,
+            total_pages: Math.ceil(60 / pageSize),
           },
         }),
       )
@@ -311,14 +313,14 @@ it('筛选与每页数量都重置页码且请求只含白名单参数', async (
   )
   await user.selectOptions(
     screen.getByRole('combobox', { name: '每页数量' }),
-    '100',
+    '500',
   )
 
   await waitFor(() => {
     const parameters = new URLSearchParams(window.location.search)
     expect(parameters.get('cluster')).toBe('fixture-rabbit-cluster-a')
     expect(parameters.get('status')).toBe('critical')
-    expect(parameters.get('page_size')).toBe('100')
+    expect(parameters.get('page_size')).toBe('500')
     expect(parameters.get('page')).toBe('1')
   })
   expect([...requests.at(-1)!.searchParams.keys()].sort()).toEqual(
@@ -364,6 +366,16 @@ it('规范非法 URL 参数并按服务端结果修正越界页码', async () =>
     expect(parameters.get('page_size')).toBe('20')
     expect(parameters.has('status')).toBe(false)
     expect(parameters.has('unknown')).toBe(false)
+  })
+})
+
+it.each([499, 501])('将非法 page_size=%i 规范为 20 且回到第一页', async (pageSize) => {
+  renderPage(`/rabbitmq?page=1&page_size=${pageSize}`)
+
+  await screen.findByText('fixture-rabbit-node-normal')
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=20')
+    expect(requests.at(-1)?.searchParams.get('page_size')).toBe('20')
   })
 })
 
