@@ -2,7 +2,7 @@
 
 最后更新：2026-08-08
 
-## 当前状态（唯一权威）
+## 当前 feature 分支状态
 
 ### 2026-08-08 列表单页最多 500 条（隔离 feature 分支本地交付，未合并/未推送/未部署）
 
@@ -12,9 +12,9 @@ Task 4 已完成一次性容器 Node 22 全量测试、typecheck、production bu
 
 本节对应的文档提交仅保留在该 feature 分支本地，提交信息为 `docs: record 500-row list delivery`；未合并到 `main`、未推送、未部署或重启。编辑前的只读 Git 核对显示本地 `main` 为 `7ff1cea`、`origin/main` 为 `4b9f9f7`，二者均不包含本 feature 分支基线；实际 main/远端状态必须在继续前重新核对。
 
-### 2026-08-07 旧模块列表统一、七页共享排版与 Elasticsearch inventory 稳定性（已合并、推送并部署）
+### 2026-08-07 当前 main 已部署基线（本 feature 分支的历史记录）
 
-当前恢复工作树为 `/root/github/InfraView`，分支为 `main`。产品功能提交 `05656d5 feat: unify observability tables and stabilize Elasticsearch inventory` 已从 `feature/list-table-consistency` 快进合并并推送到 `origin/main`；本节是本文件唯一权威的当前状态，以下章节均为历史记录，不能覆盖本节。
+当前恢复工作树为 `/root/github/InfraView`，分支为 `main`。产品功能提交 `05656d5 feat: unify observability tables and stabilize Elasticsearch inventory` 已从 `feature/list-table-consistency` 快进合并并推送到 `origin/main`；本节记录该 main 已部署基线，不能覆盖本文件顶端的 feature 分支当前状态。
 
 主机、硬盘、MySQL、Redis 已统一为紧凑单行列表：固定列数依次为 12、10、14、13；主机的网络发送/接收拆列，MySQL 的版本、角色、QPS、TPS、Buffer Pool 容量/使用率、复制状态/延迟拆列，Redis 的阻塞连接、QPS、命中率与复制链路拆列。经确认保留的例外只有硬盘“错误摘要”单列，以及 MySQL/Redis 的“当前连接/最大连接”单元格。
 
