@@ -485,6 +485,59 @@ func TestHostsSortsHardwareAndNetworkColumnsWithMissingValuesLastInBothDirection
 	}
 }
 
+func TestHostsSortsMissingNameAndIPLastInBothDirectionsWithStableID(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	provider.hosts = []datasource.Host{
+		{ID: "id-empty-z", Name: "  ", IP: "\t", Status: datasource.StatusOnline},
+		{ID: "id-high", Name: "beta", IP: "192.0.2.20", Status: datasource.StatusOnline},
+		{ID: "id-empty-a", Name: "", IP: "", Status: datasource.StatusOnline},
+		{ID: "id-low", Name: "alpha", IP: "192.0.2.10", Status: datasource.StatusOnline},
+	}
+	provider.metrics = map[string]datasource.CurrentMetrics{
+		"id-low":     {Timestamp: clock.Now()},
+		"id-high":    {Timestamp: clock.Now()},
+		"id-empty-a": {Timestamp: clock.Now()},
+		"id-empty-z": {Timestamp: clock.Now()},
+	}
+	svc := newService(provider, clock)
+
+	for _, test := range []struct {
+		field             string
+		wantAsc, wantDesc []string
+	}{
+		{field: "name", wantAsc: []string{"id-low", "id-high", "id-empty-a", "id-empty-z"}, wantDesc: []string{"id-high", "id-low", "id-empty-a", "id-empty-z"}},
+		{field: "ip", wantAsc: []string{"id-low", "id-high", "id-empty-a", "id-empty-z"}, wantDesc: []string{"id-high", "id-low", "id-empty-a", "id-empty-z"}},
+	} {
+		t.Run(test.field, func(t *testing.T) {
+			for _, order := range []struct {
+				name  string
+				order string
+				want  []string
+			}{
+				{name: "ascending", order: "asc", want: test.wantAsc},
+				{name: "descending", order: "desc", want: test.wantDesc},
+			} {
+				t.Run(order.name, func(t *testing.T) {
+					page, _, err := svc.Hosts(context.Background(), service.HostQuery{
+						Sort: test.field, Order: order.order, Page: 1, PageSize: 20,
+					})
+					if err != nil {
+						t.Fatalf("Hosts() error = %v", err)
+					}
+					got := make([]string, len(page.Hosts))
+					for index, host := range page.Hosts {
+						got[index] = host.ID
+					}
+					if !reflect.DeepEqual(got, order.want) {
+						t.Fatalf("host IDs = %v, want %v", got, order.want)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestHostsSortsStatusByDisplayedCollectionLevelThenStableID(t *testing.T) {
 	clock := newServiceClock()
 	provider := fixtureProvider(clock.Now())

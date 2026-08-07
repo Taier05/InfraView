@@ -145,7 +145,16 @@ func sortHosts(hosts []HostSummary, field, order string) {
 			if metricSort && leftAvailable {
 				comparison = compareFloat64(leftMetric, rightMetric)
 			} else {
-				comparison = compareHosts(hosts[i], hosts[j], field)
+				leftText, leftAvailable, textSort := hostTextSortValue(hosts[i], field)
+				rightText, rightAvailable, _ := hostTextSortValue(hosts[j], field)
+				if textSort && leftAvailable != rightAvailable {
+					return leftAvailable
+				}
+				if textSort && leftAvailable {
+					comparison = strings.Compare(leftText, rightText)
+				} else if !textSort {
+					comparison = compareHosts(hosts[i], hosts[j], field)
+				}
 			}
 		}
 		if comparison == 0 {
@@ -156,6 +165,19 @@ func sortHosts(hosts []HostSummary, field, order string) {
 		}
 		return comparison < 0
 	})
+}
+
+func hostTextSortValue(host HostSummary, field string) (string, bool, bool) {
+	switch field {
+	case "name":
+		value := strings.ToLower(strings.TrimSpace(host.Name))
+		return value, value != "", true
+	case "ip":
+		value := strings.TrimSpace(host.IP)
+		return value, value != "", true
+	default:
+		return "", false, false
+	}
 }
 
 func hostIntegerSortValue(host HostSummary, field string) (int64, bool, bool) {
