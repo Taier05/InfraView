@@ -1086,17 +1086,30 @@ h1 {
   line-height: normal;
 }
 
-.host-table th:nth-child(1) { width: 10%; }
-.host-table th:nth-child(2) { width: 9%; }
-.host-table th:nth-child(3) { width: 6%; }
-.host-table th:nth-child(4) { width: 7%; }
-.host-table th:nth-child(5),
-.host-table th:nth-child(6) { width: 8%; }
-.host-table th:nth-child(7) { width: 6%; }
-.host-table th:nth-child(8) { width: 9%; }
-.host-table th:nth-child(9) { width: 20%; }
-.host-table th:nth-child(10) { width: 10%; }
-.host-table th:nth-child(11) { width: 7%; }
+.host-table.host-list-table {
+  min-width: 78rem;
+  table-layout: fixed;
+}
+
+.host-table.host-list-table th,
+.host-table.host-list-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.host-table.host-list-table th:nth-child(1) { width: 12%; }
+.host-table.host-list-table th:nth-child(2) { width: 10%; }
+.host-table.host-list-table th:nth-child(3) { width: 7%; }
+.host-table.host-list-table th:nth-child(4) { width: 8%; }
+.host-table.host-list-table th:nth-child(5) { width: 7%; }
+.host-table.host-list-table th:nth-child(6) { width: 8%; }
+.host-table.host-list-table th:nth-child(7) { width: 6%; }
+.host-table.host-list-table th:nth-child(8) { width: 7%; }
+.host-table.host-list-table th:nth-child(9) { width: 8%; }
+.host-table.host-list-table th:nth-child(10) { width: 8%; }
+.host-table.host-list-table th:nth-child(11) { width: 8%; }
+.host-table.host-list-table th:nth-child(12) { width: 11%; }
 
 .elasticsearch-list-controls {
   grid-template-columns:
@@ -1354,12 +1367,12 @@ h1 {
 
 .disk-table-scroll {
   max-width: 100%;
-  overflow-x: hidden;
 }
 
 .host-table.disk-table {
   width: 100%;
   min-width: 0;
+  table-layout: fixed;
 }
 
 .host-table.disk-table th,

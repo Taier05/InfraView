@@ -16,6 +16,36 @@ import { HostListPage } from './HostListPage'
 
 const requestedURLs: URL[] = []
 
+const expectedHostHeaders = [
+  '主机名',
+  'IP 地址',
+  'CPU 核数',
+  '内存容量',
+  'CPU 使用率',
+  '内存使用率',
+  '负载',
+  'IO 忙碌度',
+  '网络发送',
+  '网络接收',
+  '运行时间',
+  '状态',
+] as const
+
+const expectedHostSorts = [
+  ['主机名', 'name'],
+  ['IP 地址', 'ip'],
+  ['CPU 核数', 'cpu_cores'],
+  ['内存容量', 'memory_total'],
+  ['CPU 使用率', 'cpu'],
+  ['内存使用率', 'memory'],
+  ['负载', 'load'],
+  ['IO 忙碌度', 'io'],
+  ['网络发送', 'network_transmit'],
+  ['网络接收', 'network_receive'],
+  ['运行时间', 'uptime'],
+  ['状态', 'status'],
+] as const
+
 function requestURL(input: RequestInfo | URL) {
   const rawURL =
     typeof input === 'string'
@@ -94,7 +124,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标', async () => {
+it('按固定顺序渲染十二个单值单行列，并使用共享列表壳', async () => {
   renderHostList()
 
   expect(
@@ -120,29 +150,20 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
   expect(screen.queryByRole('button', { name: /刷新/ })).not.toBeInTheDocument()
   expect(screen.queryByText(/上次刷新|自动刷新/)).not.toBeInTheDocument()
 
-  for (const label of [
-    '主机名',
-    'CPU 使用率',
-    '内存使用率',
-    '负载',
-    'IO 忙碌度',
-    '网络 出/入',
-    '运行时间',
-  ]) {
-    const sortButton = screen.getByRole('button', {
-      name: new RegExp(`^${label}`),
-    })
-    expect(sortButton).toBeInTheDocument()
-    expect(sortButton).toHaveClass('host-sort-button')
+  const headers = screen.getAllByRole('columnheader')
+  expect(headers.map((header) => header.textContent)).toEqual(
+    expectedHostHeaders,
+  )
+  for (const header of headers) {
+    expect(within(header).getByRole('button')).toHaveClass('host-sort-button')
+    expect(header.textContent).not.toMatch(/[⇅↑↓]/)
   }
-  for (const label of ['IP 地址', 'CPU 核数', '内存容量', '状态']) {
-    expect(
-      screen.getByRole('columnheader', { name: label }),
-    ).toBeInTheDocument()
-  }
-  expect(
-    within(screen.getByRole('columnheader', { name: '状态' })).getByText('状态'),
-  ).toHaveClass('status-align-header', 'host-status-align-header')
+
+  const table = screen.getByRole('table')
+  const scrollOwner = table.closest('.host-table-scroll')
+  expect(scrollOwner).not.toBeNull()
+  expect(scrollOwner?.parentElement).toHaveClass('host-table-panel')
+  expect(scrollOwner?.parentElement?.querySelectorAll('.host-table-scroll')).toHaveLength(1)
 
   expect(
     screen.queryByRole('link', { name: 'linux-app-01' }),
@@ -150,18 +171,22 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
   const appRow = appName.closest('tr')
   expect(appRow).not.toBeNull()
   const appCells = within(appRow!).getAllByRole('cell')
-  expect(appCells).toHaveLength(11)
+  expect(appCells).toHaveLength(12)
   expect(appCells[0]).toHaveTextContent('linux-app-01')
   expect(appCells[1]).toHaveTextContent('192.0.2.11')
   expect(appCells[2]).toHaveTextContent('8 核')
   expect(appCells[3]).toHaveTextContent('32 GiB')
   expect(appCells[7]).toHaveTextContent('91.2%')
-  expect(appCells[8]).toHaveTextContent('8.0KiB/s / 4.0KiB/s')
+  expect(appCells[8]).toHaveTextContent('8.0KiB/s')
+  expect(appCells[9]).toHaveTextContent('4.0KiB/s')
   expect(appCells[4].querySelector('[data-level="normal"]')).not.toBeNull()
   expect(appCells[5].querySelector('[data-level="warning"]')).not.toBeNull()
   expect(appCells[7].querySelector('[data-level="critical"]')).not.toBeNull()
   expect(appCells[8].querySelector('[data-level="warning"]')).not.toBeNull()
-  expect(appCells[8].querySelector('[data-level="critical"]')).not.toBeNull()
+  expect(appCells[9].querySelector('[data-level="critical"]')).not.toBeNull()
+  for (const cell of appCells) {
+    expect(cell.querySelector('br')).toBeNull()
+  }
   expect(within(appRow!).getByText('在线')).toHaveAttribute(
     'data-level',
     'normal',
@@ -294,60 +319,33 @@ it('搜索等待 300ms 后请求并把页码重置为 1', async () => {
   expect(window.location.search).toContain('page=1')
 })
 
-it('筛选和服务端排序变化都重置页码并使用规范 load 字段', async () => {
+it('所有主机表头排序写入精确 URL 键、重置页码并可切换降序', async () => {
   const user = userEvent.setup()
-  renderHostList('/hosts?page=3')
+  renderHostList('/hosts?sort=status&order=asc&page=3')
   await screen.findByText('linux-app-01')
 
-  await user.selectOptions(
-    screen.getByRole('combobox', { name: '主机状态' }),
-    'offline',
-  )
-  await waitFor(() =>
-    expect(lastRequest().searchParams.get('status')).toBe('offline'),
-  )
-  expect(lastRequest().searchParams.get('page')).toBe('1')
+  for (const [label, field] of expectedHostSorts) {
+    const button = screen.getByRole('button', {
+      name: new RegExp(`^${label}排序，当前`),
+    })
+    await user.click(button)
+    await waitFor(() =>
+      expect(lastRequest().searchParams.get('sort')).toBe(field),
+    )
+    expect(lastRequest().searchParams.get('order')).toBe('asc')
+    expect(lastRequest().searchParams.get('page')).toBe('1')
+    expect(window.location.search).toContain(`sort=${field}`)
+    expect(window.location.search).toContain('page=1')
 
-  await user.click(screen.getByRole('button', { name: /^CPU/ }))
-  await waitFor(() =>
-    expect(lastRequest().searchParams.get('sort')).toBe('cpu'),
-  )
-  expect(lastRequest().searchParams.get('order')).toBe('asc')
-  expect(lastRequest().searchParams.get('page')).toBe('1')
-  expect(lastRequest().searchParams.get('status')).toBe('offline')
-  expect(window.location.search).toContain('status=offline')
-
-  await user.click(screen.getByRole('button', { name: /^CPU/ }))
-  await waitFor(() =>
-    expect(lastRequest().searchParams.get('order')).toBe('desc'),
-  )
-
-  await user.click(screen.getByRole('button', { name: /^负载/ }))
-  await waitFor(() =>
-    expect(lastRequest().searchParams.get('sort')).toBe('load'),
-  )
-  expect(lastRequest().searchParams.get('order')).toBe('asc')
-  expect(window.location.search).not.toContain('load_1')
-
-  await user.click(screen.getByRole('button', { name: /^IO 忙碌度/ }))
-  await waitFor(() =>
-    expect(lastRequest().searchParams.get('sort')).toBe('io'),
-  )
-  expect(lastRequest().searchParams.get('order')).toBe('asc')
-  expect(screen.getByRole('button', { name: /^IO 忙碌度/ })).toHaveAttribute(
-    'data-active',
-    'true',
-  )
-
-  await user.click(screen.getByRole('button', { name: /^网络 出\/入/ }))
-  await waitFor(() =>
-    expect(lastRequest().searchParams.get('sort')).toBe('network'),
-  )
-  expect(lastRequest().searchParams.get('order')).toBe('asc')
-  expect(screen.getByRole('button', { name: /^网络 出\/入/ })).toHaveAttribute(
-    'data-active',
-    'true',
-  )
+    await user.click(
+      screen.getByRole('button', {
+        name: new RegExp(`^${label}排序，当前升序$`),
+      }),
+    )
+    await waitFor(() =>
+      expect(lastRequest().searchParams.get('order')).toBe('desc'),
+    )
+  }
 })
 
 it('使用服务端分页并保持当前每页数量', async () => {

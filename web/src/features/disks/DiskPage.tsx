@@ -18,7 +18,14 @@ import type {
 } from '../../api/types'
 import { useRefreshIntervalMs } from '../../app/runtime'
 import { ErrorPanel } from '../../components/ErrorPanel'
-import { DataTime } from '../../components/DataTime'
+import {
+  ListPageControls,
+  ListPageHeader,
+  ListPageSizeField,
+  ListSearchField,
+  ListSelectField,
+  ListTablePanel,
+} from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
 import { StatusBadge } from '../../components/StatusBadge'
 
@@ -27,10 +34,13 @@ type PageSize = (typeof pageSizes)[number]
 const sortFields = [
   'host',
   'device',
+  'model',
   'capacity',
+  'smart',
   'temperature',
   'lifetime',
   'power_on_hours',
+  'errors',
   'status',
 ] as const
 type DiskSort = (typeof sortFields)[number]
@@ -177,19 +187,6 @@ function statusPresentation(device: DiskDevice) {
   return { level: device.status, label: statusLabels[device.status] }
 }
 
-const columnLabels: Record<string, string> = {
-  host: '主机',
-  device: '设备',
-  model: '型号',
-  capacity: '容量',
-  smart: 'SMART 健康',
-  temperature: '温度',
-  lifetime: '寿命',
-  'power-on-hours': '通电时间',
-  errors: '错误摘要',
-  status: '状态',
-}
-
 export function DiskPage() {
   const refreshIntervalMs = useRefreshIntervalMs()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -315,20 +312,18 @@ export function DiskPage() {
   }
 
   function sortButton(field: DiskSort, label: string) {
-    const state = sort === field ? (order === 'asc' ? '升序' : '降序') : '未排序'
+    const current =
+      sort === field ? (order === 'asc' ? '升序' : '降序') : '未排序'
     return (
       <button
         className="host-sort-button"
         type="button"
         data-active={sort === field}
-        aria-label={label}
-        title={`${label}排序，当前${state}`}
+        aria-label={`${label}排序，当前${current}`}
+        title={`点击按${label}排序`}
         onClick={() => changeSort(field)}
       >
-        <span>{label}</span>
-        <span className="host-sort-indicator" aria-hidden="true">
-          {sort === field ? (order === 'asc' ? '↑' : '↓') : '⇅'}
-        </span>
+        {label}
       </button>
     )
   }
@@ -354,7 +349,7 @@ export function DiskPage() {
     },
     {
       id: 'model',
-      header: () => <span title="型号">型号</span>,
+      header: () => sortButton('model', '型号'),
       cell: ({ row }) => {
         const model = row.original.model.trim() || '暂无数据'
         return (
@@ -378,7 +373,7 @@ export function DiskPage() {
     },
     {
       id: 'smart',
-      header: () => <span title="SMART 健康">SMART 健康</span>,
+      header: () => sortButton('smart', 'SMART 健康'),
       cell: ({ row }) => {
         const label = smartLabels[row.original.smart_health]
         return (
@@ -429,7 +424,7 @@ export function DiskPage() {
     },
     {
       id: 'errors',
-      header: () => <span title="错误摘要">错误摘要</span>,
+      header: () => sortButton('errors', '错误摘要'),
       cell: ({ row }) => {
         const summary = errorSummary(row.original.errors)
         return (
@@ -468,54 +463,40 @@ export function DiskPage() {
 
   return (
     <section aria-labelledby="disks-title">
-      <p className="eyebrow">硬盘观测</p>
-      <h1 id="disks-title">硬盘设备</h1>
-      <p className="page-description">查看主机硬盘的只读 SMART 健康与寿命数据。</p>
+      <ListPageHeader
+        eyebrow="硬盘观测"
+        title="硬盘设备"
+        description="查看主机硬盘的只读 SMART 健康与寿命数据。"
+        titleId="disks-title"
+      />
 
-      <div className="host-list-controls disk-list-controls">
-        <label className="host-search">
-          <span>搜索主机、设备或型号</span>
-          <input
-            type="search"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-          />
-        </label>
-        <label className="host-status-filter">
-          <span>设备状态</span>
-          <select
-            value={status}
-            onChange={(event) =>
-              updateParameters({ status: event.target.value })
-            }
-          >
-            <option value="">全部状态</option>
-            <option value="normal">正常</option>
-            <option value="warning">警告</option>
-            <option value="critical">严重</option>
-            <option value="unknown">未知</option>
-          </select>
-        </label>
-        <label className="host-page-size">
-          <span>每页数量</span>
-          <select
-            value={pageSize}
-            onChange={(event) =>
-              updateParameters({ page_size: event.target.value })
-            }
-          >
-            {pageSizes.map((value) => (
-              <option key={value} value={value}>
-                {value} 条
-              </option>
-            ))}
-          </select>
-        </label>
-        <DataTime
-          collectedAt={devices.data?.meta.collected_at}
-          className="data-time"
+      <ListPageControls
+        className="disk-list-controls"
+        collectedAt={devices.data?.meta.collected_at}
+      >
+        <ListSearchField
+          label="搜索主机、设备或型号"
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
         />
-      </div>
+        <ListSelectField
+          label="设备状态"
+          value={status}
+          onChange={(event) => updateParameters({ status: event.target.value })}
+          options={[
+            { value: '', label: '全部状态' },
+            { value: 'normal', label: '正常' },
+            { value: 'warning', label: '警告' },
+            { value: 'critical', label: '严重' },
+            { value: 'unknown', label: '未知' },
+          ]}
+        />
+        <ListPageSizeField
+          value={pageSize}
+          onChange={(event) => updateParameters({ page_size: event.target.value })}
+          pageSizes={pageSizes}
+        />
+      </ListPageControls>
 
       {devices.data?.meta.stale === true &&
         devices.data.meta.collected_at !== undefined && (
@@ -551,22 +532,61 @@ export function DiskPage() {
           正在调整硬盘设备列表页码…
         </div>
       ) : (
-        <div className="host-table-panel">
-          {devices.data.data.total === 0 ? (
-            <div className="host-empty">没有符合条件的硬盘设备</div>
-          ) : (
+        <ListTablePanel
+          scrollClassName="disk-table-scroll"
+          emptyState={
+            devices.data.data.total === 0 ? (
+              <div className="host-empty">没有符合条件的硬盘设备</div>
+            ) : undefined
+          }
+          paginationLabel="硬盘设备列表分页"
+          pagination={
+            devices.data.data.total === 0 ? undefined :
             <>
-              <div className="disk-table-scroll">
-                <table className="host-table disk-table">
+              <span>
+                第 {devices.data.data.page} / {devices.data.data.total_pages}{' '}
+                页，共 {devices.data.data.total} 块
+              </span>
+              <div>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={devices.data.data.page <= 1}
+                  onClick={() =>
+                    updateParameters(
+                      { page: String(devices.data.data.page - 1) },
+                      false,
+                    )
+                  }
+                >
+                  上一页
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={
+                    devices.data.data.page >= devices.data.data.total_pages
+                  }
+                  onClick={() =>
+                    updateParameters(
+                      { page: String(devices.data.data.page + 1) },
+                      false,
+                    )
+                  }
+                >
+                  下一页
+                </button>
+              </div>
+            </>
+          }
+        >
+          {devices.data.data.total > 0 && (
+            <table className="host-table disk-table">
                   <thead>
                     {table.getHeaderGroups().map((headerGroup) => (
                       <tr key={headerGroup.id}>
                         {headerGroup.headers.map((header) => (
-                          <th
-                            key={header.id}
-                            scope="col"
-                            aria-label={columnLabels[header.column.id]}
-                          >
+                          <th key={header.id} scope="col">
                             {header.isPlaceholder
                               ? null
                               : flexRender(
@@ -592,49 +612,9 @@ export function DiskPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
-              <div className="host-pagination" aria-label="硬盘设备列表分页">
-                <span>
-                  第 {devices.data.data.page} /{' '}
-                  {devices.data.data.total_pages} 页，共{' '}
-                  {devices.data.data.total} 块
-                </span>
-                <div>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={devices.data.data.page <= 1}
-                    onClick={() =>
-                      updateParameters(
-                        { page: String(devices.data.data.page - 1) },
-                        false,
-                      )
-                    }
-                  >
-                    上一页
-                  </button>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={
-                      devices.data.data.page >=
-                      devices.data.data.total_pages
-                    }
-                    onClick={() =>
-                      updateParameters(
-                        { page: String(devices.data.data.page + 1) },
-                        false,
-                      )
-                    }
-                  >
-                    下一页
-                  </button>
-                </div>
-              </div>
-            </>
+            </table>
           )}
-        </div>
+        </ListTablePanel>
       )}
     </section>
   )

@@ -16,7 +16,14 @@ import type {
   MetricValue,
 } from '../../api/types'
 import { ErrorPanel } from '../../components/ErrorPanel'
-import { DataTime } from '../../components/DataTime'
+import {
+  ListPageControls,
+  ListPageHeader,
+  ListPageSizeField,
+  ListSearchField,
+  ListSelectField,
+  ListTablePanel,
+} from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
 import { useRefreshIntervalMs } from '../../app/runtime'
 
@@ -24,12 +31,17 @@ const pageSizes = [20, 50, 100] as const
 type PageSize = (typeof pageSizes)[number]
 const sortFields = [
   'name',
+  'ip',
+  'cpu_cores',
+  'memory_total',
   'cpu',
   'memory',
   'load',
   'io',
-  'network',
+  'network_transmit',
+  'network_receive',
   'uptime',
+  'status',
 ] as const
 type HostSort = (typeof sortFields)[number]
 type SortOrder = 'asc' | 'desc'
@@ -253,20 +265,18 @@ export function HostListPage() {
   }
 
   function sortButton(field: HostSort, label: string) {
-    const state = sort === field ? (order === 'asc' ? '升序' : '降序') : '未排序'
+    const current =
+      sort === field ? (order === 'asc' ? '升序' : '降序') : '未排序'
     return (
       <button
         className="host-sort-button"
         type="button"
         data-active={sort === field}
-        aria-label={`${label}排序，当前${state}`}
+        aria-label={`${label}排序，当前${current}`}
         title={`点击按${label}排序`}
         onClick={() => changeSort(field)}
       >
-        <span>{label}</span>
-        <span className="host-sort-indicator" aria-hidden="true">
-          {sort === field ? (order === 'asc' ? '↑' : '↓') : '⇅'}
-        </span>
+        {label}
       </button>
     )
   }
@@ -283,7 +293,7 @@ export function HostListPage() {
     },
     {
       id: 'ip',
-      header: 'IP 地址',
+      header: () => sortButton('ip', 'IP 地址'),
       cell: ({ row }) => (
         <span className="host-cell-text host-ip" title={row.original.ip}>
           {row.original.ip}
@@ -292,7 +302,7 @@ export function HostListPage() {
     },
     {
       id: 'cpu-cores',
-      header: 'CPU 核数',
+      header: () => sortButton('cpu_cores', 'CPU 核数'),
       cell: ({ row }) => (
         <span className="host-config-value">
           {cpuCoreCount(row.original.cpu_cores)}
@@ -301,7 +311,7 @@ export function HostListPage() {
     },
     {
       id: 'memory-total',
-      header: '内存容量',
+      header: () => sortButton('memory_total', '内存容量'),
       cell: ({ row }) => (
         <span className="host-config-value">
           {memoryCapacity(row.original.memory_total_bytes)}
@@ -349,20 +359,22 @@ export function HostListPage() {
       ),
     },
     {
-      id: 'network',
-      header: () => sortButton('network', '网络 出/入'),
+      id: 'network-transmit',
+      header: () => sortButton('network_transmit', '网络发送'),
       cell: ({ row }) => {
         const transmit = row.original.metrics.network_transmit_bytes_per_second
+        return (
+          <MetricText metric={transmit} text={bytesPerSecond(transmit)} />
+        )
+      },
+    },
+    {
+      id: 'network-receive',
+      header: () => sortButton('network_receive', '网络接收'),
+      cell: ({ row }) => {
         const receive = row.original.metrics.network_receive_bytes_per_second
         return (
-          <span
-            className="host-network-rate"
-            title={`发送 ${bytesPerSecond(transmit)} / 接收 ${bytesPerSecond(receive)}`}
-          >
-            <MetricText metric={transmit} text={bytesPerSecond(transmit)} />
-            <span className="host-network-separator"> / </span>
-            <MetricText metric={receive} text={bytesPerSecond(receive)} />
-          </span>
+          <MetricText metric={receive} text={bytesPerSecond(receive)} />
         )
       },
     },
@@ -373,9 +385,7 @@ export function HostListPage() {
     },
     {
       id: 'status',
-      header: () => (
-        <span className="status-align-header host-status-align-header">状态</span>
-      ),
+      header: () => sortButton('status', '状态'),
       cell: ({ row }) => (
         <StatusText
           status={row.original.status}
@@ -397,52 +407,35 @@ export function HostListPage() {
 
   return (
     <section aria-labelledby="hosts-title">
-      <p className="eyebrow">资产清单</p>
-      <h1 id="hosts-title">主机</h1>
-      <p className="page-description">查看纳入观测范围的 Linux 主机。</p>
+      <ListPageHeader
+        eyebrow="资产清单"
+        title="主机"
+        description="查看纳入观测范围的 Linux 主机。"
+        titleId="hosts-title"
+      />
 
-      <div className="host-list-controls">
-        <label className="host-search">
-          <span>搜索主机名或 IP</span>
-          <input
-            type="search"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-          />
-        </label>
-        <label className="host-status-filter">
-          <span>主机状态</span>
-          <select
-            value={status}
-            onChange={(event) =>
-              updateParameters({ status: event.target.value })
-            }
-          >
-            <option value="">全部状态</option>
-            <option value="online">在线</option>
-            <option value="offline">离线</option>
-          </select>
-        </label>
-        <label className="host-page-size">
-          <span>每页数量</span>
-          <select
-            value={pageSize}
-            onChange={(event) =>
-              updateParameters({ page_size: event.target.value })
-            }
-          >
-            {pageSizes.map((value) => (
-              <option key={value} value={value}>
-                {value} 条
-              </option>
-            ))}
-          </select>
-        </label>
-        <DataTime
-          collectedAt={hosts.data?.meta.collected_at}
-          className="data-time"
+      <ListPageControls collectedAt={hosts.data?.meta.collected_at}>
+        <ListSearchField
+          label="搜索主机名或 IP"
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
         />
-      </div>
+        <ListSelectField
+          label="主机状态"
+          value={status}
+          onChange={(event) => updateParameters({ status: event.target.value })}
+          options={[
+            { value: '', label: '全部状态' },
+            { value: 'online', label: '在线' },
+            { value: 'offline', label: '离线' },
+          ]}
+        />
+        <ListPageSizeField
+          value={pageSize}
+          onChange={(event) => updateParameters({ page_size: event.target.value })}
+          pageSizes={pageSizes}
+        />
+      </ListPageControls>
 
       {hosts.data?.meta.stale === true &&
         hosts.data.meta.collected_at !== undefined && (
@@ -478,12 +471,62 @@ export function HostListPage() {
           正在调整主机列表页码…
         </div>
       ) : (
-        <div className="host-table-panel">
-          {hosts.data.data.total === 0 ? (
-            <div className="host-empty">没有符合条件的主机</div>
-          ) : (
-            <div className="host-table-scroll">
-              <table className="host-table">
+        <ListTablePanel
+          emptyState={
+            hosts.data.data.total === 0 ? (
+              <div className="host-empty">没有符合条件的主机</div>
+            ) : undefined
+          }
+          paginationLabel="主机列表分页"
+          pagination={
+            <>
+              {hosts.data.data.total_pages === 0 ? (
+                <span>共 0 台</span>
+              ) : (
+                <span>
+                  第 {hosts.data.data.page} / {hosts.data.data.total_pages}{' '}
+                  页，共 {hosts.data.data.total} 台
+                </span>
+              )}
+              <div>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={
+                    hosts.data.data.total_pages === 0 ||
+                    hosts.data.data.page <= 1
+                  }
+                  onClick={() =>
+                    updateParameters(
+                      { page: String(hosts.data.data.page - 1) },
+                      false,
+                    )
+                  }
+                >
+                  上一页
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={
+                    hosts.data.data.total_pages === 0 ||
+                    hosts.data.data.page >= hosts.data.data.total_pages
+                  }
+                  onClick={() =>
+                    updateParameters(
+                      { page: String(hosts.data.data.page + 1) },
+                      false,
+                    )
+                  }
+                >
+                  下一页
+                </button>
+              </div>
+            </>
+          }
+        >
+          {hosts.data.data.total > 0 && (
+            <table className="host-table host-list-table">
                 <thead>
                   {table.getHeaderGroups().map((headerGroup) => (
                     <tr key={headerGroup.id}>
@@ -514,54 +557,9 @@ export function HostListPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+            </table>
           )}
-          <div className="host-pagination" aria-label="主机列表分页">
-            {hosts.data.data.total_pages === 0 ? (
-              <span>共 0 台</span>
-            ) : (
-              <span>
-                第 {hosts.data.data.page} / {hosts.data.data.total_pages}{' '}
-                页，共 {hosts.data.data.total} 台
-              </span>
-            )}
-            <div>
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={
-                  hosts.data.data.total_pages === 0 ||
-                  hosts.data.data.page <= 1
-                }
-                onClick={() =>
-                  updateParameters(
-                    { page: String(hosts.data.data.page - 1) },
-                    false,
-                  )
-                }
-              >
-                上一页
-              </button>
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={
-                  hosts.data.data.total_pages === 0 ||
-                  hosts.data.data.page >= hosts.data.data.total_pages
-                }
-                onClick={() =>
-                  updateParameters(
-                    { page: String(hosts.data.data.page + 1) },
-                    false,
-                  )
-                }
-              >
-                下一页
-              </button>
-            </div>
-          </div>
-        </div>
+        </ListTablePanel>
       )}
     </section>
   )

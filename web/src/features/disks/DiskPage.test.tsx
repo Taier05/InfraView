@@ -16,6 +16,32 @@ import { DiskPage } from './DiskPage'
 
 const requestedURLs: URL[] = []
 
+const expectedDiskHeaders = [
+  '主机',
+  '设备',
+  '型号',
+  '容量',
+  'SMART 健康',
+  '温度',
+  '寿命',
+  '通电时间',
+  '错误摘要',
+  '状态',
+] as const
+
+const expectedDiskSorts = [
+  ['主机', 'host'],
+  ['设备', 'device'],
+  ['型号', 'model'],
+  ['容量', 'capacity'],
+  ['SMART 健康', 'smart'],
+  ['温度', 'temperature'],
+  ['寿命', 'lifetime'],
+  ['通电时间', 'power_on_hours'],
+  ['错误摘要', 'errors'],
+  ['状态', 'status'],
+] as const
+
 function requestURL(input: RequestInfo | URL) {
   const rawURL =
     typeof input === 'string'
@@ -119,30 +145,33 @@ it('默认请求按主机升序并发送完整分页参数', async () => {
   })
 })
 
-it('严格渲染十列并格式化容量、温度、寿命、通电时间和 SMART 健康', async () => {
+it('严格渲染十个可排序单值单行列，并使用共享列表壳', async () => {
   renderDiskPage()
 
   expect(await screen.findByRole('heading', { name: '硬盘设备' })).toBeVisible()
   await screen.findByText('node-alpha')
-  expect(
-    screen.getAllByRole('columnheader').map((header) => header.ariaLabel),
-  ).toEqual([
-    '主机',
-    '设备',
-    '型号',
-    '容量',
-    'SMART 健康',
-    '温度',
-    '寿命',
-    '通电时间',
-    '错误摘要',
-    '状态',
-  ])
+  const headers = screen.getAllByRole('columnheader')
+  expect(headers.map((header) => header.textContent)).toEqual(
+    expectedDiskHeaders,
+  )
+  for (const header of headers) {
+    expect(within(header).getByRole('button')).toHaveClass('host-sort-button')
+    expect(header.textContent).not.toMatch(/[⇅↑↓]/)
+  }
+  const table = screen.getByRole('table')
+  const scrollOwner = table.closest('.host-table-scroll')
+  expect(scrollOwner).not.toBeNull()
+  expect(scrollOwner?.parentElement).toHaveClass('host-table-panel')
+  expect(scrollOwner?.parentElement?.querySelectorAll('.host-table-scroll')).toHaveLength(1)
 
   const healthyRow = screen.getByText('node-alpha').closest('tr')
   expect(healthyRow).not.toBeNull()
   const healthyCells = within(healthyRow!).getAllByRole('cell')
   expect(healthyCells).toHaveLength(10)
+
+  for (const cell of healthyCells) {
+    expect(cell.querySelector('br')).toBeNull()
+  }
 	  expect(healthyCells[1]).toHaveTextContent('/dev/nvme0n1')
 	  const modelCell = healthyCells[2]
 	  const capacityCell = healthyCells[3]
@@ -345,7 +374,7 @@ it('从 URL 恢复搜索、状态、排序和分页并发送全部规范参数',
     'warning',
   )
   expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('20')
-  expect(screen.getByRole('button', { name: '温度' })).toHaveAttribute(
+  expect(screen.getByRole('button', { name: '温度排序，当前降序' })).toHaveAttribute(
     'data-active',
     'true',
   )
@@ -391,32 +420,30 @@ it('搜索、状态和每页数量变化写入 URL 并回到第一页', async ()
   expect(window.location.search).toContain('search=atlas')
 })
 
-it('七种服务端排序均支持升序和降序并在变化时回到第一页', async () => {
+it('所有硬盘表头排序均支持升序和降序并在变化时回到第一页', async () => {
   const user = userEvent.setup()
-  renderDiskPage('/disks?page=4')
+  renderDiskPage('/disks?sort=status&order=asc&page=4')
   await screen.findByText('node-alpha')
 
-  const expected = [
-	    ['主机', 'host'],
-	    ['设备', 'device'],
-	    ['容量', 'capacity'],
-    ['温度', 'temperature'],
-    ['寿命', 'lifetime'],
-    ['通电时间', 'power_on_hours'],
-    ['状态', 'status'],
-  ] as const
-  for (const [label, field] of expected) {
-    await user.click(screen.getByRole('button', { name: label }))
+  for (const [label, field] of expectedDiskSorts) {
+    await user.click(
+      screen.getByRole('button', {
+        name: new RegExp(`^${label}排序，当前`),
+      }),
+    )
     await waitFor(() => expect(lastRequest().searchParams.get('sort')).toBe(field))
-    const firstOrder = field === 'host' ? 'desc' : 'asc'
-    expect(lastRequest().searchParams.get('order')).toBe(firstOrder)
+    expect(lastRequest().searchParams.get('order')).toBe('asc')
     expect(lastRequest().searchParams.get('page')).toBe('1')
+    expect(window.location.search).toContain(`sort=${field}`)
+    expect(window.location.search).toContain('page=1')
 
-    await user.click(screen.getByRole('button', { name: label }))
+    await user.click(
+      screen.getByRole('button', {
+        name: new RegExp(`^${label}排序，当前升序$`),
+      }),
+    )
     await waitFor(() =>
-      expect(lastRequest().searchParams.get('order')).toBe(
-        firstOrder === 'asc' ? 'desc' : 'asc',
-      ),
+      expect(lastRequest().searchParams.get('order')).toBe('desc'),
     )
   }
 })
