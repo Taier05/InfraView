@@ -1,6 +1,40 @@
 # InfraView 开发交接
 
-最后更新：2026-08-05
+最后更新：2026-08-07
+
+## 当前 Java 服务恢复入口
+
+当前 Java 服务工作目录为 `/root/github/InfraView/.worktrees/java-service-status`，分支为 `feature/java-service-status`。恢复时先读取本文件、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/TESTING.md`、`docs/datasources/NIGHTINGALE.md`、Java 服务设计/计划，再只读执行 `git status --short --branch`、`git log -3 --oneline`、`git diff --check` 与 `git diff --cached --check`；必须以这些实时结果为准，不把下方 RabbitMQ 历史基线误作当前工作树状态。
+
+Java 服务 Task 1–8 已完成实现与本地容器化静态验证：领域、完全脱敏 Mock、Nightingale Provider、Service、两个认证只读 GET API、总览第七卡、侧边栏和共享 `ListPage` 的 13 列 `/java` 页均已交付。Provider 每个共享快照固定一次 11 查询 `query-instant-batch`，业务实例身份仅为 `name + server_ip`，`ident` 仅限 Provider 内部归并且不得进入领域、API 或页面。业务端完整精确映射为 `tikbee`→`用户端`、`rider`→`骑手端`、`mch`→`商家端`、`saas`→`管理后台端`、`mch_saas`→`商家 PC 端`；未知代码原样展示。固定 13 列、空值“暂无数据”、15 秒预期周期的 2/5 freshness、无 N+1、写方法 405 与无破坏性控件均由脱敏测试锁定。
+
+本任务的本地提交已完成；push、合并 `main`、现有 8080 重建/部署和动态 Playwright/浏览器验收均未执行，且每一项都需要新的单独授权。未运行 `scripts/e2e.sh` 或 `make verify`，不创建额外端口；未读取私密环境、未连接任何外部或生产数据源。继续时禁止输出 Token、Cookie、认证头、Base URL、真实身份、地址、数量、容量、指标值或上游正文。
+
+在新账号或新对话中直接粘贴：
+
+```text
+继续开发 InfraView Java 服务状态模块。请始终使用简体中文回复。
+
+工作目录：/root/github/InfraView/.worktrees/java-service-status
+分支：feature/java-service-status
+
+先完整阅读：
+1. docs/HANDOFF.md
+2. docs/PROJECT_STATUS.md
+3. docs/TODO.md
+4. docs/TESTING.md
+5. docs/datasources/NIGHTINGALE.md
+6. docs/superpowers/specs/2026-08-05-java-service-status-module-design.md
+7. docs/superpowers/plans/2026-08-05-java-service-status-module.md
+
+然后只读执行：
+git status --short --branch
+git log -3 --oneline
+git diff --check
+git diff --cached --check
+
+Java 服务已实现并完成本地提交与无端口静态验证：一次固定 11 查询 batch，`name + server_ip` 身份，`ident` 不出 Provider，五项精确业务端映射、13 列列表和 2/5 freshness。不要推送、合并 main、重建/部署 8080 或运行动态浏览器；它们都需新的单独授权。禁止读取或输出私密环境、认证信息、真实身份/地址/数量/容量/指标值或上游正文；产品始终只读。
+```
 
 ## 当前 main 恢复入口
 

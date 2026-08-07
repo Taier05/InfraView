@@ -1,6 +1,18 @@
 # InfraView TODO
 
-最后更新：2026-08-01
+最后更新：2026-08-07
+
+## Java 业务服务模块
+
+- [x] 以 TDD 实现 Java 独立领域、完全脱敏 Mock、稳定不可逆 ID 与 `ident` 对外排除。
+- [x] 实现 Nightingale 一次固定 11 查询即时 batch、`name + server_ip` inventory、严格归并与无 N+1。
+- [x] 实现共享 `JavaService`、15 秒预期周期的 2/5 freshness、状态来源优先、搜索、筛选、13 字段排序和安全分页。
+- [x] 实现两个认证只读 GET API、参数白名单、显式脱敏 View、400/405/503 和 stale 语义。
+- [x] 实现总览第七卡、侧边栏和共享 `ListPage` 的固定 13 列 `/java` 页面；五项业务端精确映射，未知原样展示，空值为“暂无数据”。
+- [x] 新增 6 项合成 Java Playwright 静态契约，覆盖入口、URL、映射、状态、布局、405 和无破坏性控件；未运行动态浏览器。
+- [x] 完成容器化前端 253 项、typecheck/build、Go gofmt/vet/普通/race/编译、E2E 安全脚本、敏感/whitespace 扫描与无缓存镜像构建；镜像未运行。
+- [x] 按明确授权完成本地提交；提交信息为 `docs: record Java service monitoring delivery`。
+- [ ] push、合并 `main`、现有 8080 重建/部署与动态 Playwright/浏览器验收均未执行，分别需要新的明确授权。
 
 ## Mock MVP
 

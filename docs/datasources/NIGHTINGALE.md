@@ -182,6 +182,16 @@ tlast_over_time(elasticsearch_jvm_uptime_seconds[24h])
 
 HTTP 仅暴露受认证的 `GET /api/v1/elasticsearch/overview` 和 `GET /api/v1/elasticsearch/nodes`；前端为总览第五卡和共享模板上的 16 列节点页。首期不直连 Elasticsearch，不做详情、历史、拓扑、任意查询或运维写操作。本轮只使用完全脱敏夹具完成离线验证，未访问真实 Nightingale/Elasticsearch 或现有 8080。
 
+## Java 业务服务只读映射
+
+Java Provider 复用受限 Nightingale Client，每个共享快照恰好一次 `POST /api/n9e/query-instant-batch`，固定 11 组并按以下顺序执行：`service_health_latency_ms`、`service_health_up`、`service_port_up`、`service_process_count`、`service_process_cpu_percent`、`service_process_memory_bytes`、`service_process_memory_percent`、`service_process_port_consistent`、`service_process_start_time_seconds`、`service_process_up`、`tlast_over_time(service_process_up[24h])`。调用方不能传入指标名、PromQL、URL 或任意查询；不按服务、采集机器或指标发起 N+1。
+
+查询 11 建立近期业务实例 inventory 并提供原始样本时间。稳定业务实例身份只使用原始 `name + server_ip`；`ident` 只在 Provider 内部关联、去重与冲突判断，绝不进入领域对外 View、HTTP 响应、页面、fixture 或日志。其他十组只归并到 inventory 中已知实例；最新合法样本优先，同一最新时间冲突保持字段缺失。`service_port_pid` 与 `service_process_pid` 不进入固定查询、领域、API 或页面。
+
+名称映射仅作完整值精确匹配：`tikbee`→`用户端`、`rider`→`骑手端`、`mch`→`商家端`、`saas`→`管理后台端`、`mch_saas`→`商家 PC 端`；未知代码原样展示。健康、端口、进程和端口进程一致性为必需二值字段；缺失或冲突不伪造为零。状态来源为 `health|port|process|consistency|collection|normal|unknown`，等级为 `critical > warning > unknown > normal`。采集 freshness 只按查询 11 原始样本是否推进的本地观察计算：默认 15 秒预期周期，连续 2/5 周期未推进为 warning/critical；首次观察与样本时间回退重新建立基线。CPU、内存、健康延迟、进程数和运行时间仅展示，不设推测阈值。
+
+HTTP 只提供认证的 `GET /api/v1/java/overview` 与 `GET /api/v1/java/services`，后者只接受固定搜索、名称、状态、13 个排序字段、方向和分页参数；其他方法为 405。页面固定 13 列，缺失值显示“暂无数据”。本地验证仅使用脱敏 Go/前端夹具和合成 Playwright route fixture；未读取私密环境、未连接真实或生产 Java 服务/Nightingale、未部署 8080，也未运行动态浏览器。任何 push、`main` 合并、8080 重建/部署和动态验收均须新的单独授权。
+
 ## RabbitMQ 只读映射
 
 RabbitMQ Provider 复用同一个受限 Nightingale Client，恰好发送一次 `POST /api/n9e/query-instant-batch`，固定 22 条查询且顺序不可变：

@@ -1,5 +1,14 @@
 # 测试与验收
 
+## 2026-08-07 Java 业务服务模块本地静态验证
+
+- Playwright 只执行静态发现：`docker run --rm --ipc=host --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/npm-cache -v "$PWD:/work" -v /work/web/node_modules -w /work/web mcr.microsoft.com/playwright:v1.61.1-noble sh -c 'npm ci && npx playwright test --list e2e/java.spec.ts'`。该命令列出 1 个文件/6 项 Java 合成规格，不启动 InfraView、不创建端口，也不执行动态 Chromium。
+- 前端容器验证：`docker run --rm --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/npm-cache -v "$PWD:/src" -w /src/web node:22-alpine sh -c 'npm ci && npm run test:run && npm run typecheck && npm run build'`。Vitest 16 个文件/253 项、typecheck 与 production build 均退出 0。
+- Go 容器验证：`docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm sh -c 'files="$(find cmd internal -type f -name "*.go")"; test -z "$(gofmt -l $files)" && go vet ./... && go test ./... && go test -race ./... && go build -o /tmp/infraview ./cmd/infraview'` 退出 0。
+- 还执行 `./scripts/e2e-safety.test.sh`、`docker build --no-cache --tag infraview:java-verify .`、`git diff --check`、`git diff --cached --check`、Java 范围 whitespace 检查和敏感/只读源码扫描；均不启动项目服务，镜像只构建不运行。
+- 已知非阻断告警：`npm ci` 报告锁文件的 1 个 moderate、2 个 high；前端测试中 Java/RabbitMQ POST 未注册 MSW handler 的预期拒绝日志；Vite 对第三方 `"use client"` 指令的忽略提示。它们均为既有依赖或只读安全契约提示，本轮未改依赖、未执行 `npm audit fix`。
+- 未运行 `make verify`、`scripts/e2e.sh`、Compose、动态 Playwright 或浏览器；未访问现有 8080、未发布端口、未读取私密环境、未连接外部或生产数据源。push、`main` 合并、8080 重建/部署和动态验收需分别重新授权。
+
 ## 标准入口
 
 ```bash

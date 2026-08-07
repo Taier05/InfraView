@@ -4,6 +4,14 @@
 
 ## 当前阶段
 
+### 2026-08-07 Java 业务服务模块（本地交付完成，未部署）
+
+Java 服务 Task 1–8 已在 `feature/java-service-status` 完成：独立 `internal/javaapp` 领域、脱敏 Mock、固定 11 查询 Nightingale Provider、共享 `JavaService`、两个认证只读 GET API、总览第七卡、侧边栏与共享 `ListPage` 的 13 列 `/java` 页面均已交付。Provider 每个共享快照恰好一次 `query-instant-batch`，稳定业务实例只由 `name + server_ip` 建立；`ident` 仅用于 Provider 内部归并，不进入任何领域对外 View、HTTP 响应或页面。`tikbee`、`rider`、`mch`、`saas`、`mch_saas` 分别精确映射为“用户端、骑手端、商家端、管理后台端、商家 PC 端”，未知值保持原值。
+
+状态仍为 `critical > warning > unknown > normal`，采集推进按默认 15 秒预期周期的 2/5 周期升级；资源、进程数、运行时间和健康延迟只展示。服务页固定 13 列、每格单值单行、缺失统一“暂无数据”；合成 Playwright 契约覆盖侧边栏/第七卡入口、精确列/URL、映射、stale/error/empty、原生 `title`、宽窄布局、认证共享 request context 的 POST 405 和无破坏性控件。
+
+本地提交已完成。容器化静态验证包括前端 16 文件/253 项、typecheck、production build、Java Playwright 静态发现 1 文件/6 项、Go gofmt/vet/普通/race/编译、E2E 安全脚本、安全/whitespace 扫描和无缓存生产镜像构建；镜像不运行。npm 的锁文件审计提示和 Vite 第三方 `"use client"` 提示为预存依赖警告，未修改依赖或执行 audit fix。未 push、未合并 `main`、未重建或部署 8080、未运行动态 Playwright/浏览器验收、未读取私密环境，也未连接外部或生产数据源；这些动作均需新的单独授权。
+
 ### 2026-08-05 RabbitMQ Task 11（节点发现与名称真实性收口）
 
 现场反馈确认，部分实例具有连接指标但当前/近期 `rabbitmq_identity_info` 没有覆盖，原 inventory-only 集合会漏节点；连接发现补齐实例后，旧回退又把实例地址错误写入“节点名称”。最终架构改为：当前与近期身份优先建立具名节点，连接指标只补充发现缺失实例；Provider 扫描同一固定批次，只有采集键对应唯一一致的显式 `rabbitmq_node` 才补全名称，缺失或冲突时名称保持空值，页面显示“暂无数据”。实例地址和 `ident` 均不再参与名称猜测。
