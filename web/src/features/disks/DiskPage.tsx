@@ -28,6 +28,7 @@ import {
 } from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
 import { StatusBadge } from '../../components/StatusBadge'
+import { formatDurationSeconds } from '../../formatters/duration'
 
 const pageSizes = [20, 50, 100, 500] as const
 type PageSize = (typeof pageSizes)[number]
@@ -121,13 +122,10 @@ function lifetime(value: number | null) {
 }
 
 function powerOnTime(value: number | null) {
-  if (value === null) return '暂无数据'
-  const wholeHours = Math.max(0, Math.floor(value))
-  const days = Math.floor(wholeHours / 24)
-  const hours = wholeHours % 24
-  if (days > 0 && hours > 0) return `${days}天 ${hours}小时`
-  if (days > 0) return `${days}天`
-  return `${hours}小时`
+  if (value === null || !Number.isFinite(value) || value < 0) {
+    return formatDurationSeconds(null)
+  }
+  return formatDurationSeconds(value * 3_600)
 }
 
 function errorItems(errors: DiskErrorCounters): ErrorItem[] {

@@ -220,6 +220,50 @@ it('严格渲染十个可排序单值单行列，并使用共享列表壳', asyn
   expect(within(unknownRow!).getAllByText('暂无数据').length).toBeGreaterThan(0)
 })
 
+it('以共享时长格式显示通电小时、保留完整 title，并保持原始排序参数', async () => {
+  const fixture = diskPageFixtureForDisplayTests()
+  const powerOnHours = [50, 1.5, 8_766, 0, null] as const
+  fixture.data.devices = fixture.data.devices.slice(0, powerOnHours.length).map(
+    (device, index) => ({
+      ...device,
+      host: `node-duration-${index + 1}`,
+      power_on_hours: powerOnHours[index],
+    }),
+  )
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    requestedURLs.push(requestURL(input))
+    return Promise.resolve(jsonResponse(fixture))
+  })
+
+  const user = userEvent.setup()
+  renderDiskPage('/disks?sort=host&order=asc&page=3&page_size=20')
+
+  const expected = [
+    ['node-duration-1', '2天 2小时'],
+    ['node-duration-2', '1小时 30分钟'],
+    ['node-duration-3', '1年 6小时'],
+    ['node-duration-4', '不足1分钟'],
+    ['node-duration-5', '暂无数据'],
+  ] as const
+  for (const [host, duration] of expected) {
+    const row = (await screen.findByText(host)).closest('tr')
+    expect(row).not.toBeNull()
+    const cell = within(row!).getAllByRole('cell')[7]
+    expect(cell).toHaveTextContent(duration)
+    expect(cell.firstElementChild).toHaveAttribute('title', duration)
+  }
+
+  await user.click(screen.getByRole('button', { name: '通电时间排序，当前未排序' }))
+  await waitFor(() => {
+    expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+      sort: 'power_on_hours',
+      order: 'asc',
+      page: '1',
+      page_size: '20',
+    })
+  })
+})
+
 it('型号缺失时独立显示暂无数据且不影响容量', async () => {
   const fixture = diskPageFixtureForDisplayTests()
   fixture.data.devices = [

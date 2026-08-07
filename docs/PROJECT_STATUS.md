@@ -4,13 +4,13 @@
 
 ## 当前 feature 分支状态
 
-### 2026-08-08 列表单页最多 500 条（隔离 feature 分支本地交付，未合并/未推送/未部署）
+### 2026-08-08 列表单页最多 500 条与共享运行时长（隔离 feature 分支本地交付，未合并/未推送/未部署）
 
 本节仅说明隔离工作树 `/root/github/InfraView/.worktrees/list-duration-disk-errors` 的 `feature/list-duration-disk-errors`。七个只读列表（主机、硬盘、MySQL、Redis、Elasticsearch、RabbitMQ、Java）现共同接受 `20|50|100|500` 的 `page_size`；页面新增“全部（最多500条）”，切换后回到第 1 页并通过 URL 恢复。服务端仍对完整筛选结果排序后分页，超过 500 条仍继续分页，不做客户端拼接、静默截断、额外请求或虚拟滚动；API 响应结构、15 秒刷新和只读边界不变。
 
-Task 4 已完成一次性容器 Node 22 全量测试、typecheck、production build 与 Playwright `--list`，以及 Go 1.24 gofmt 检查、vet、全仓普通/race 测试和 Linux 编译；`git diff --check`、固定查询/只读/敏感静态扫描均通过。未启动服务、端口或浏览器，未访问 Nightingale、任何上游或私密环境。共享运行时长格式化和硬盘错误摘要/命令超时仍未在本分支实施或宣称完成。
+共享运行时长已交付：六个运行时间列和硬盘通电时间均使用共享 formatter，固定按 365 天计算年并只显示非零年、天、小时、分钟。硬盘仅把有限非负 `power_on_hours` 换算为秒，合法小数小时保留真实分钟，缺失或非法值安全显示“暂无数据”；页面正文与原生 `title` 相同，原始服务端排序仍为 `power_on_hours`，点击后仍回到第 1 页。硬盘错误摘要和命令超时仍未在本分支实施或宣称完成。
 
-本节对应的文档提交仅保留在该 feature 分支本地，提交信息为 `docs: record 500-row list delivery`；未合并到 `main`、未推送、未部署或重启。编辑前的只读 Git 核对显示本地 `main` 为 `7ff1cea`、`origin/main` 为 `4b9f9f7`，二者均不包含本 feature 分支基线；实际 main/远端状态必须在继续前重新核对。
+分页与时长交付提交均仅保留在该 feature 分支本地；未合并到 `main`、未推送、未部署或重启。实际 main/远端状态必须在继续前重新核对。
 
 ### 2026-08-07 当前 main 已部署基线（本 feature 分支的历史记录）
 
