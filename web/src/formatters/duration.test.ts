@@ -19,6 +19,7 @@ describe("formatDurationSeconds", () => {
     [31536300, "1年 5分钟"],
     [60.9, "1分钟"],
     [31536000000000000n, "1000000000年"],
+    [9007199254741019n, "285616414年 264天 7小时 36分钟"],
   ] as const)("formats %s seconds as %s", (value, want) => {
     expect(formatDurationSeconds(value)).toBe(want)
   })
