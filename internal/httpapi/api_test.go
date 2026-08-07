@@ -862,6 +862,21 @@ func TestHostListAcceptsLoadSortAliases(t *testing.T) {
 	}
 }
 
+func TestHostListAcceptsEveryDisplayedColumnSort(t *testing.T) {
+	handler := newTestAPI(t, mock.New(3, testNow))
+	cookie := loginCookie(t, handler)
+	for _, sortField := range []string{
+		"name", "ip", "cpu_cores", "memory_total", "cpu", "memory", "load", "io", "network_transmit", "network_receive", "uptime", "status",
+	} {
+		t.Run(sortField, func(t *testing.T) {
+			response := request(t, handler, http.MethodGet, "/api/v1/hosts?sort="+sortField+"&order=asc&page=1&page_size=20", "", cookie)
+			if response.Code != http.StatusOK {
+				t.Fatalf("sort=%s status = %d, body = %s", sortField, response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
 func TestUnavailableSourceReturnsSanitized503WithoutStaleData(t *testing.T) {
 	handler := newTestAPI(t, unavailableProvider{})
 	cookie := loginCookie(t, handler)

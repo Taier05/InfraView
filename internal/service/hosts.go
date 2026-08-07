@@ -113,7 +113,7 @@ func normalizeHostQuery(query HostQuery) (HostQuery, error) {
 		query.Sort = "name"
 	}
 	switch query.Sort {
-	case "id", "name", "ip", "status", "cpu", "cpu_usage", "memory", "memory_usage", "load", "io", "io_busy_percent", "network", "uptime":
+	case "id", "name", "ip", "cpu_cores", "memory_total", "cpu", "cpu_usage", "memory", "memory_usage", "load", "io", "io_busy_percent", "network", "network_transmit", "network_receive", "uptime", "status":
 	default:
 		return HostQuery{}, fmt.Errorf("%w: unsupported sort %q", ErrInvalidQuery, query.Sort)
 	}
@@ -128,16 +128,25 @@ func normalizeHostQuery(query HostQuery) (HostQuery, error) {
 
 func sortHosts(hosts []HostSummary, field, order string) {
 	sort.SliceStable(hosts, func(i, j int) bool {
-		leftValue, leftAvailable, metricSort := hostMetricSortValue(hosts[i], field)
-		rightValue, rightAvailable, _ := hostMetricSortValue(hosts[j], field)
-		if metricSort && leftAvailable != rightAvailable {
+		leftInteger, leftAvailable, integerSort := hostIntegerSortValue(hosts[i], field)
+		rightInteger, rightAvailable, _ := hostIntegerSortValue(hosts[j], field)
+		if integerSort && leftAvailable != rightAvailable {
 			return leftAvailable
 		}
 		comparison := 0
-		if metricSort && leftAvailable {
-			comparison = compareFloat64(leftValue, rightValue)
+		if integerSort && leftAvailable {
+			comparison = compareInt64(leftInteger, rightInteger)
 		} else {
-			comparison = compareHosts(hosts[i], hosts[j], field)
+			leftMetric, leftAvailable, metricSort := hostMetricSortValue(hosts[i], field)
+			rightMetric, rightAvailable, _ := hostMetricSortValue(hosts[j], field)
+			if metricSort && leftAvailable != rightAvailable {
+				return leftAvailable
+			}
+			if metricSort && leftAvailable {
+				comparison = compareFloat64(leftMetric, rightMetric)
+			} else {
+				comparison = compareHosts(hosts[i], hosts[j], field)
+			}
 		}
 		if comparison == 0 {
 			return hosts[i].ID < hosts[j].ID
@@ -147,6 +156,23 @@ func sortHosts(hosts []HostSummary, field, order string) {
 		}
 		return comparison < 0
 	})
+}
+
+func hostIntegerSortValue(host HostSummary, field string) (int64, bool, bool) {
+	switch field {
+	case "cpu_cores":
+		if host.CPUCores == nil {
+			return 0, false, true
+		}
+		return int64(*host.CPUCores), true, true
+	case "memory_total":
+		if host.MemoryTotalBytes == nil {
+			return 0, false, true
+		}
+		return *host.MemoryTotalBytes, true, true
+	default:
+		return 0, false, false
+	}
 }
 
 func hostMetricSortValue(host HostSummary, field string) (float64, bool, bool) {
@@ -171,6 +197,10 @@ func hostMetricSortValue(host HostSummary, field string) (float64, bool, bool) {
 			available = true
 		}
 		return total, available, true
+	case "network_transmit":
+		return metricSortValue(host.Metrics.NetworkTransmitBytesPerSecond.Value)
+	case "network_receive":
+		return metricSortValue(host.Metrics.NetworkReceiveBytesPerSecond.Value)
 	default:
 		return 0, false, false
 	}
@@ -202,7 +232,7 @@ func compareHosts(left, right HostSummary, field string) int {
 	case "ip":
 		return strings.Compare(left.IP, right.IP)
 	case "status":
-		return strings.Compare(string(left.Status), string(right.Status))
+		return compareInt64(int64(hostStatusRank(left)), int64(hostStatusRank(right)))
 	case "cpu", "cpu_usage":
 		return compareMetricValues(left.Metrics.CPUUsage.Value, right.Metrics.CPUUsage.Value)
 	case "memory", "memory_usage":
@@ -220,6 +250,23 @@ func compareHosts(left, right HostSummary, field string) int {
 		}
 	}
 	return 0
+}
+
+func hostStatusRank(host HostSummary) int {
+	if host.CollectionLevel == LevelWarning {
+		return 1
+	}
+	if host.CollectionLevel == LevelCritical {
+		return 2
+	}
+	switch host.Status {
+	case datasource.StatusOnline:
+		return listLevelSortRank(LevelNormal)
+	case datasource.StatusOffline:
+		return listLevelSortRank(LevelCritical)
+	default:
+		return listLevelSortRank(LevelUnknown)
+	}
 }
 
 func compareMetricValues(left, right *float64) int {

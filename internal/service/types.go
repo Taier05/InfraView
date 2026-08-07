@@ -22,6 +22,19 @@ const (
 	LevelUnknown  Level = "unknown"
 )
 
+func listLevelSortRank(level Level) int {
+	switch level {
+	case LevelNormal:
+		return 0
+	case LevelWarning:
+		return 1
+	case LevelCritical:
+		return 2
+	default:
+		return 3
+	}
+}
+
 type Options struct {
 	InventoryTTL       time.Duration
 	CurrentMetricsTTL  time.Duration

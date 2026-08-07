@@ -423,6 +423,112 @@ func TestHostsSortsIOAndCombinedNetworkWithMissingValuesLast(t *testing.T) {
 	}
 }
 
+func TestHostsSortsHardwareAndNetworkColumnsWithMissingValuesLastInBothDirections(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	provider.hosts = []datasource.Host{
+		{ID: "id-missing", Name: "missing", Status: datasource.StatusOnline},
+		{ID: "id-high", Name: "high", CPUCores: intPointer(8), MemoryTotalBytes: int64Pointer(9_007_199_254_740_993), Status: datasource.StatusOnline},
+		{ID: "id-low", Name: "low", CPUCores: intPointer(4), MemoryTotalBytes: int64Pointer(9_007_199_254_740_992), Status: datasource.StatusOnline},
+	}
+	provider.metrics = map[string]datasource.CurrentMetrics{
+		"id-low": {
+			Timestamp:                     clock.Now(),
+			NetworkTransmitBytesPerSecond: float64Pointer(10),
+			NetworkReceiveBytesPerSecond:  float64Pointer(20),
+		},
+		"id-high": {
+			Timestamp:                     clock.Now(),
+			NetworkTransmitBytesPerSecond: float64Pointer(20),
+			NetworkReceiveBytesPerSecond:  float64Pointer(10),
+		},
+		"id-missing": {Timestamp: clock.Now()},
+	}
+	svc := newService(provider, clock)
+
+	tests := []struct {
+		field             string
+		wantAsc, wantDesc []string
+	}{
+		{"cpu_cores", []string{"id-low", "id-high", "id-missing"}, []string{"id-high", "id-low", "id-missing"}},
+		{"memory_total", []string{"id-low", "id-high", "id-missing"}, []string{"id-high", "id-low", "id-missing"}},
+		{"network_transmit", []string{"id-low", "id-high", "id-missing"}, []string{"id-high", "id-low", "id-missing"}},
+		{"network_receive", []string{"id-high", "id-low", "id-missing"}, []string{"id-low", "id-high", "id-missing"}},
+	}
+	for _, test := range tests {
+		t.Run(test.field, func(t *testing.T) {
+			for _, order := range []struct {
+				name  string
+				order string
+				want  []string
+			}{
+				{name: "ascending", order: "asc", want: test.wantAsc},
+				{name: "descending", order: "desc", want: test.wantDesc},
+			} {
+				t.Run(order.name, func(t *testing.T) {
+					page, _, err := svc.Hosts(context.Background(), service.HostQuery{
+						Sort: test.field, Order: order.order, Page: 1, PageSize: 20,
+					})
+					if err != nil {
+						t.Fatalf("Hosts() error = %v", err)
+					}
+					got := make([]string, len(page.Hosts))
+					for index, host := range page.Hosts {
+						got[index] = host.ID
+					}
+					if !reflect.DeepEqual(got, order.want) {
+						t.Fatalf("host IDs = %v, want %v", got, order.want)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestHostsSortsStatusByDisplayedCollectionLevelThenStableID(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	provider.hosts = []datasource.Host{
+		{ID: "id-unknown", Name: "unknown", Status: datasource.StatusUnknown},
+		{ID: "id-offline", Name: "offline", Status: datasource.StatusOffline},
+		{ID: "id-warning", Name: "warning", Status: datasource.StatusOnline},
+		{ID: "id-normal-z", Name: "normal-z", Status: datasource.StatusOnline},
+		{ID: "id-normal-a", Name: "normal-a", Status: datasource.StatusOnline},
+	}
+	provider.metrics = map[string]datasource.CurrentMetrics{
+		"id-normal-a": {Timestamp: clock.Now()},
+		"id-normal-z": {Timestamp: clock.Now()},
+		"id-warning":  {Timestamp: clock.Now()},
+		"id-offline":  {Timestamp: clock.Now()},
+		"id-unknown":  {Timestamp: clock.Now()},
+	}
+	svc := service.New(provider, cache.New(clock.Now), service.Options{
+		InventoryTTL: time.Minute, CurrentMetricsTTL: time.Nanosecond, CollectionInterval: 15 * time.Second,
+		RangeTTL: time.Minute, HealthTTL: 15 * time.Second, MaxStale: 5 * time.Minute, Clock: clock.Now,
+	})
+	if _, _, err := svc.Hosts(context.Background(), service.HostQuery{Page: 1, PageSize: 20}); err != nil {
+		t.Fatalf("initial Hosts() error = %v", err)
+	}
+	clock.Advance(30 * time.Second)
+	provider.metrics["id-normal-a"] = datasource.CurrentMetrics{Timestamp: clock.Now()}
+	provider.metrics["id-normal-z"] = datasource.CurrentMetrics{Timestamp: clock.Now()}
+	provider.metrics["id-offline"] = datasource.CurrentMetrics{Timestamp: clock.Now()}
+	provider.metrics["id-unknown"] = datasource.CurrentMetrics{Timestamp: clock.Now()}
+
+	page, _, err := svc.Hosts(context.Background(), service.HostQuery{Sort: "status", Order: "asc", Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatalf("Hosts() error = %v", err)
+	}
+	got := make([]string, len(page.Hosts))
+	for index, host := range page.Hosts {
+		got[index] = host.ID
+	}
+	want := []string{"id-normal-a", "id-normal-z", "id-warning", "id-offline", "id-unknown"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("host IDs = %v, want %v", got, want)
+	}
+}
+
 func TestHostsRejectsPageSizesOutsideOneToOneHundred(t *testing.T) {
 	clock := newServiceClock()
 	for _, pageSize := range []int{0, 101} {
