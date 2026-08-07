@@ -35,6 +35,28 @@ func TestMySQLSummaryAggregatesReplicationChannelsAndBoundaries(t *testing.T) {
 	}
 }
 
+func TestMySQLServiceMetaUsesLatestSampleTime(t *testing.T) {
+	now := time.Date(2026, time.August, 7, 8, 0, 0, 0, time.UTC)
+	older := instanceWithChannels()
+	older.ID = "fixture-mysql-older"
+	older.CollectionTracked = true
+	older.ReportedAt = now.Add(-2 * time.Minute)
+	latest := instanceWithChannels()
+	latest.ID = "fixture-mysql-latest"
+	latest.CollectionTracked = false
+	latest.ReportedAt = now.Add(-time.Minute)
+	provider := &recordingMySQLProvider{snapshot: mysql.Snapshot{Instances: []mysql.Instance{older, latest}}}
+	service := NewMySQL(provider, cache.New(func() time.Time { return now }), MySQLOptions{Clock: func() time.Time { return now }})
+
+	_, meta, err := service.Overview(context.Background())
+	if err != nil {
+		t.Fatalf("Overview() error = %v", err)
+	}
+	if !meta.CollectedAt.Equal(latest.ReportedAt) {
+		t.Fatalf("CollectedAt = %s, want latest sample %s", meta.CollectedAt, latest.ReportedAt)
+	}
+}
+
 func TestMySQLSummaryMakesStoppedThreadCritical(t *testing.T) {
 	instance := instanceWithChannels(
 		mysql.ReplicationChannel{IORunning: boolPointer(true), SQLRunning: boolPointer(true), LagSeconds: floatPointer(1)},

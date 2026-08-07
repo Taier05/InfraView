@@ -1,5 +1,14 @@
 # 测试与验收
 
+## 2026-08-07 数据时间与 Elasticsearch 瞬时空组修复
+
+- Elasticsearch Provider 定向测试锁定固定 26 组、仅第 25/26 组 inventory 为硬依赖，第 1–24 组逐组 `null` 均能安全构建快照；批次数和 inventory 失败契约保持不变。
+- Service/HTTP 测试覆盖 Linux 当前/历史/健康、硬盘、MySQL、Redis、Elasticsearch、RabbitMQ、Java 的最新有效样本时间，空快照省略时间，stale 合并仍取有效样本最大值，不使用 Service Clock。
+- 前端最终全量为 16 文件/273 项；typecheck 与 production build 退出 0。正常态没有刷新按钮或浏览器刷新时间，七个列表页与总览每卡展示自己的格式化最新数据时间；错误态重试、15 秒非重叠自动轮询和 401 清缓存仍有覆盖。
+- Go `gofmt`、`go vet ./...`、全仓普通测试、`go test -race ./...` 与 `go build ./cmd/infraview` 均退出 0。Playwright 只执行 `--list`，静态发现 5 文件/27 项；未运行动态浏览器或启动端口。
+- 无缓存生产镜像 `infraview:refresh-data-time-es-stale-verify` 构建退出 0，镜像内再次通过前端 16 文件/273 项、typecheck 和完整构建；镜像未运行。既有 npm 1 moderate/2 high、MSW 预期拒绝日志和 Vite 第三方 `"use client"` 告警未变，本轮未修改依赖或执行 audit fix。
+- 经用户授权，现有测试 8080 已用当前隔离工作树原位重建；健康、唯一服务/8080、非 root、只读根文件系统、cap drop `ALL`、禁止提权、健康接口和未认证 API 拒绝均通过。未创建额外端口，未读取私密环境内容，未连接生产上游；未提交或推送，会创建 18080 的动态 E2E 未执行。
+
 ## 2026-08-07 Java 业务服务模块本地静态验证
 
 - Playwright 只执行静态发现：`docker run --rm --ipc=host --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/npm-cache -v "$PWD:/work" -v /work/web/node_modules -w /work/web mcr.microsoft.com/playwright:v1.61.1-noble sh -c 'npm ci && npx playwright test --list e2e/java.spec.ts'`。该命令列出 1 个文件/6 项 Java 合成规格，不启动 InfraView、不创建端口，也不执行动态 Chromium。
@@ -47,7 +56,7 @@ make verify
 `web/e2e/infraview.spec.ts` 覆盖：
 
 - 未登录重定向、固定账号登录、退出和退出后重定向。
-- 总览板块状态卡和手动刷新。
+- 总览板块状态卡和各模块最新数据时间；正常态不提供手动刷新控件。
 - 主机搜索、离线筛选和主机名不可点击。
 - 主机清单 9 个单行列、IO 忙碌度、网络出入速率及指标等级着色。
 - MySQL 总览导航、实例清单 10 列、复制/实例状态和紧凑布局。

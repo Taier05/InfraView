@@ -70,13 +70,10 @@ func (provider *Provider) ElasticsearchSnapshot(ctx context.Context) (elasticsea
 }
 
 func buildElasticsearchSnapshot(results [][]instantSeries) (elasticsearch.Snapshot, error) {
-	if len(results) != elasticsearchQueryCount {
+	if len(results) != elasticsearchQueryCount ||
+		results[elasticsearchClusterInventoryQuery] == nil ||
+		results[elasticsearchNodeInventoryQuery] == nil {
 		return elasticsearch.Snapshot{}, elasticsearchUnavailableError()
-	}
-	for _, group := range results {
-		if group == nil {
-			return elasticsearch.Snapshot{}, elasticsearchUnavailableError()
-		}
 	}
 	clusters, err := buildElasticsearchClusterInventory(results[elasticsearchClusterInventoryQuery])
 	if err != nil {

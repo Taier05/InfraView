@@ -824,7 +824,7 @@ func TestOverviewReturnsStaleAggregateTrendsWithCollectionTime(t *testing.T) {
 		Meta ResponseMeta `json:"meta"`
 	}
 	decodeJSON(t, stale, &staleBody)
-	if !staleBody.Meta.Stale || !staleBody.Meta.CollectedAt.Equal(firstBody.Meta.CollectedAt) || len(staleBody.Data.Trends) != 2 {
+	if !staleBody.Meta.Stale || !staleBody.Meta.CollectedAt.Equal(now) || len(staleBody.Data.Trends) != 2 {
 		t.Fatalf("stale body = %#v, first meta = %#v", staleBody, firstBody.Meta)
 	}
 }
@@ -978,13 +978,15 @@ func newMySQLAPIProviderTestHandler(t *testing.T, provider mysql.Provider) (http
 
 func fixtureMySQLSnapshot() mysql.Snapshot {
 	return mysql.Snapshot{Instances: []mysql.Instance{{
-		ID:           mysql.StableInstanceID("fixture-host-a", "fixture-mysql-a", "192.0.2.10:3306"),
-		Name:         "fixture-mysql-a",
-		Address:      "192.0.2.10:3306",
-		Host:         "fixture-host-a",
-		Version:      "8.4.0",
-		Availability: mysql.AvailabilityUp,
-		Role:         mysql.RoleWritable,
+		ID:                mysql.StableInstanceID("fixture-host-a", "fixture-mysql-a", "192.0.2.10:3306"),
+		Name:              "fixture-mysql-a",
+		Address:           "192.0.2.10:3306",
+		Host:              "fixture-host-a",
+		Version:           "8.4.0",
+		Availability:      mysql.AvailabilityUp,
+		Role:              mysql.RoleWritable,
+		CollectionTracked: true,
+		ReportedAt:        testNow(),
 	}}}
 }
 

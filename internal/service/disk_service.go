@@ -75,7 +75,11 @@ func (s *DiskService) snapshot(ctx context.Context) (disk.Snapshot, Meta, error)
 	if !ok {
 		return disk.Snapshot{}, Meta{}, fmt.Errorf("service: disk cache contained %T", result.Value)
 	}
-	return cloneDiskSnapshot(snapshot), resultMeta(result), nil
+	var collectedAt time.Time
+	for _, device := range snapshot.Devices {
+		collectedAt = latestTime(collectedAt, device.ReportedAt)
+	}
+	return cloneDiskSnapshot(snapshot), resultMetaAt(result, collectedAt), nil
 }
 
 func (s *DiskService) Overview(ctx context.Context) (DiskOverview, Meta, error) {

@@ -518,12 +518,6 @@ h1 {
   gap: 0.5rem;
 }
 
-.overview-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
 .stale-banner,
 .error-panel {
   display: flex;
@@ -554,6 +548,24 @@ h1 {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
+.data-time {
+  display: flex;
+  align-self: end;
+  align-items: center;
+  min-height: 2rem;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stale-banner .data-time {
+  display: inline;
+  min-height: 0;
+}
+
 .error-panel {
   min-height: 6rem;
   border: 1px solid #684645;
@@ -567,25 +579,6 @@ h1 {
 
 .host-refresh-error .error-panel {
   min-height: 0;
-}
-
-.refresh-button {
-  flex: 0 0 auto;
-}
-
-.refresh-control {
-  display: flex;
-  align-self: end;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 2rem;
-}
-
-.refresh-time {
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .overview-loading {
@@ -895,6 +888,13 @@ h1 {
   justify-content: space-between;
   gap: 0.45rem;
   margin-top: 0.42rem;
+}
+
+.module-status-footer .data-time {
+  align-self: auto;
+  min-width: 0;
+  min-height: 0;
+  font-size: 0.62rem;
 }
 
 .module-status-breakdown {
@@ -1635,7 +1635,7 @@ h1 {
     min-width: 0;
   }
 
-  .host-list-controls .refresh-time {
+  .host-list-controls .data-time {
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -1648,13 +1648,8 @@ h1 {
     min-width: 0;
   }
 
-  .mysql-list-controls .refresh-control {
+  .mysql-list-controls .data-time {
     grid-column: auto;
-  }
-
-  .mysql-list-controls .refresh-time {
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 }
 
@@ -1705,12 +1700,8 @@ h1 {
   }
 
   .mysql-list-controls .host-search,
-  .mysql-list-controls .refresh-control {
+  .mysql-list-controls .data-time {
     grid-column: 1 / -1;
-  }
-
-  .refresh-control {
-    justify-content: flex-start;
   }
 
   .host-pagination {
@@ -1738,16 +1729,6 @@ h1 {
 
   .overview-heading {
     align-items: stretch;
-    flex-direction: column;
-  }
-
-  .overview-controls {
-    align-items: stretch;
-    flex-wrap: wrap;
-  }
-
-  .overview-controls .refresh-control {
-    align-items: flex-start;
     flex-direction: column;
   }
 

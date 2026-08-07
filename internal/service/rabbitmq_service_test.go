@@ -33,6 +33,25 @@ func TestRabbitMQClusterConnectivityDoesNotContaminateNodes(t *testing.T) {
 	}
 }
 
+func TestRabbitMQServiceMetaUsesLatestSampleTime(t *testing.T) {
+	now := time.Date(2026, time.August, 7, 8, 0, 0, 0, time.UTC)
+	older := rabbitMQHealthyNode("id-older", "node-older", "cluster-a", "fixture-address-older")
+	older.ReportedAt = now.Add(-2 * time.Minute)
+	latest := rabbitMQHealthyNode("id-latest", "node-latest", "cluster-a", "fixture-address-latest")
+	latest.ReportedAt = now.Add(-time.Minute)
+	snapshot := rabbitmq.Snapshot{Clusters: []rabbitmq.Cluster{{ID: "cluster-a", Name: "cluster-a"}}, Nodes: []rabbitmq.Node{older, latest}}
+	provider := &recordingRabbitMQProvider{snapshot: snapshot}
+	service := NewRabbitMQ(provider, cache.New(func() time.Time { return now }), RabbitMQOptions{Clock: func() time.Time { return now }})
+
+	_, meta, err := service.Overview(context.Background())
+	if err != nil {
+		t.Fatalf("Overview() error = %v", err)
+	}
+	if !meta.CollectedAt.Equal(latest.ReportedAt) {
+		t.Fatalf("CollectedAt = %s, want latest sample %s", meta.CollectedAt, latest.ReportedAt)
+	}
+}
+
 func TestRabbitMQMessagesNeverAffectStatus(t *testing.T) {
 	snapshot := rabbitMQHealthySnapshot()
 	snapshot.Nodes[0].Messages = rabbitMQInt64(math.MaxInt64)

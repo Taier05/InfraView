@@ -587,15 +587,7 @@ export function RabbitMQPage() {
         titleId="rabbitmq-title"
       />
 
-      <ListPageControls
-        refresh={{
-          isFetching: nodes.isFetching,
-          dataUpdatedAt: nodes.dataUpdatedAt,
-          onRefresh: () => void nodes.refetch(),
-          refreshIntervalSeconds: refreshIntervalMs / 1_000,
-          ariaLabel: '刷新 RabbitMQ 节点列表',
-        }}
-      >
+      <ListPageControls collectedAt={nodes.data?.meta.collected_at}>
         <ListSearchField
           label="搜索节点名称或地址"
           value={searchText}

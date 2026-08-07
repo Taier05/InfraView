@@ -289,6 +289,7 @@ func TestJavaServicesPreservesStaleMetadata(t *testing.T) {
 	clock := &javaHTTPClock{now: time.Date(2026, 8, 5, 8, 0, 0, 0, time.UTC)}
 	provider := &javaHTTPProvider{snapshot: javaapp.Snapshot{Services: []javaapp.Service{{
 		ID: javaapp.StableServiceID("fixture-java", "fixture-address"), Name: "fixture-java", Address: "fixture-address",
+		CollectionTracked: true, ReportedAt: clock.Now(),
 	}}}}
 	handler, cookie := newJavaAPIProviderTestHandler(t, provider, clock.Now, time.Second)
 	first := request(t, handler, http.MethodGet, "/api/v1/java/services", "", cookie)

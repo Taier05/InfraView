@@ -18,5 +18,5 @@ func (s *Service) DataSourceStatus(ctx context.Context) (DataSourceStatus, Meta,
 	if !ok {
 		return DataSourceStatus{}, Meta{}, fmt.Errorf("service: health cache contained %T", result.Value)
 	}
-	return DataSourceStatus{Healthy: health.Healthy, CheckedAt: health.CheckedAt}, resultMeta(result), nil
+	return DataSourceStatus{Healthy: health.Healthy, CheckedAt: health.CheckedAt}, resultMetaAt(result, health.CheckedAt), nil
 }

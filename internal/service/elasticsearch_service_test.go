@@ -49,6 +49,24 @@ func TestElasticsearchNodeStatusThresholds(t *testing.T) {
 	}
 }
 
+func TestElasticsearchServiceMetaUsesLatestClusterOrNodeSampleTime(t *testing.T) {
+	now := time.Date(2026, time.August, 7, 8, 0, 0, 0, time.UTC)
+	cluster := healthyElasticsearchCluster("fixture-cluster-a")
+	cluster.ReportedAt = now.Add(-2 * time.Minute)
+	node := healthyElasticsearchNode(cluster.Name, "fixture-node-a")
+	node.ReportedAt = now.Add(-time.Minute)
+	provider := &recordingElasticsearchProvider{snapshot: elasticsearch.Snapshot{Clusters: []elasticsearch.Cluster{cluster}, Nodes: []elasticsearch.Node{node}}}
+	service := NewElasticsearch(provider, cache.New(func() time.Time { return now }), ElasticsearchOptions{Clock: func() time.Time { return now }})
+
+	_, meta, err := service.Overview(context.Background())
+	if err != nil {
+		t.Fatalf("Overview() error = %v", err)
+	}
+	if !meta.CollectedAt.Equal(node.ReportedAt) {
+		t.Fatalf("CollectedAt = %s, want latest sample %s", meta.CollectedAt, node.ReportedAt)
+	}
+}
+
 func TestElasticsearchNodeStatusMissingResourcesAndPriority(t *testing.T) {
 	node := healthyElasticsearchNode("fixture-cluster-a", "fixture-node-a")
 	node.HeapUsedBytes = nil

@@ -76,7 +76,11 @@ func (s *MySQLService) snapshot(ctx context.Context) (mysql.Snapshot, Meta, erro
 	if !ok {
 		return mysql.Snapshot{}, Meta{}, fmt.Errorf("service: mysql cache contained %T", result.Value)
 	}
-	return cloneMySQLSnapshot(snapshot), resultMeta(result), nil
+	var collectedAt time.Time
+	for _, instance := range snapshot.Instances {
+		collectedAt = latestTime(collectedAt, instance.ReportedAt)
+	}
+	return cloneMySQLSnapshot(snapshot), resultMetaAt(result, collectedAt), nil
 }
 
 func cloneMySQLSnapshot(source mysql.Snapshot) mysql.Snapshot {

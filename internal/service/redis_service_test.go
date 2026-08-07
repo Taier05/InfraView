@@ -51,6 +51,26 @@ func TestRedisSummaryAppliesApprovedStatusBoundaries(t *testing.T) {
 	}
 }
 
+func TestRedisServiceMetaUsesLatestSampleTime(t *testing.T) {
+	now := time.Date(2026, time.August, 7, 8, 0, 0, 0, time.UTC)
+	older := healthyRedisMaster("fixture-older", "192.0.2.10:6379")
+	older.CollectionTracked = true
+	older.ReportedAt = now.Add(-2 * time.Minute)
+	latest := healthyRedisMaster("fixture-latest", "192.0.2.11:6379")
+	latest.CollectionTracked = true
+	latest.ReportedAt = now.Add(-time.Minute)
+	provider := &recordingRedisProvider{snapshot: redis.Snapshot{Instances: []redis.Instance{older, latest}}}
+	service := NewRedis(provider, cache.New(func() time.Time { return now }), RedisOptions{Clock: func() time.Time { return now }})
+
+	_, meta, err := service.Overview(context.Background())
+	if err != nil {
+		t.Fatalf("Overview() error = %v", err)
+	}
+	if !meta.CollectedAt.Equal(latest.ReportedAt) {
+		t.Fatalf("CollectedAt = %s, want latest sample %s", meta.CollectedAt, latest.ReportedAt)
+	}
+}
+
 func TestRedisSummaryAppliesClusterAndSlaveReplicationRules(t *testing.T) {
 	master := healthyRedisMaster("fixture-master", "192.0.2.10:6379")
 	master.Replication.ConnectedReplicas = redisInt64Pointer(0)

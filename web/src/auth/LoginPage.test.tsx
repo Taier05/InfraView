@@ -104,20 +104,16 @@ it('已认证会话 bootstrap 后直接进入基础设施总览', async () => {
   expect(screen.queryByLabelText('用户名')).not.toBeInTheDocument()
 })
 
-it('已认证总览只保留刷新控制而不显示时间范围', async () => {
+it('已认证总览展示模块数据时间且不显示刷新或时间范围控件', async () => {
   mockAuthenticatedRequests()
   render(<App />)
 
-  const overviewControls = await screen.findByRole('group', {
-    name: '总览控制',
+  const hostCard = await screen.findByRole('link', {
+    name: '查看 Linux 主机板块',
   })
-  expect(
-    within(overviewControls).getByRole('button', { name: '刷新' }),
-  ).toBeInTheDocument()
-  expect(screen.getAllByRole('button', { name: '刷新' })).toHaveLength(1)
-  expect(
-    within(overviewControls).queryByRole('group', { name: '时间范围' }),
-  ).not.toBeInTheDocument()
+  expect(within(hostCard).getByText('2026/07/21 00:30:00')).toBeVisible()
+  expect(screen.queryByRole('button', { name: '刷新' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('group', { name: '总览控制' })).not.toBeInTheDocument()
   expect(
     screen.queryByRole('combobox', { name: '时间范围' }),
   ).not.toBeInTheDocument()
@@ -294,7 +290,9 @@ it('容器重启导致受保护 API 会话失效时清空缓存并回到登录�
   expect(
     await screen.findByRole('heading', { name: '基础设施总览' }),
   ).toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: '刷新' }))
+  await user.click(screen.getByRole('link', { name: '主机' }))
+  await waitFor(() => expect(window.location.pathname).toBe('/hosts'))
+  await user.click(screen.getByRole('link', { name: '总览' }))
 
   expect(
     await screen.findByRole('heading', { name: '登录 InfraView' }),

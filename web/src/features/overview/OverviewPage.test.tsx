@@ -51,6 +51,7 @@ function renderOverview() {
       </QueryClientProvider>
     </MemoryRouter>,
   )
+  return queryClient
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -362,11 +363,20 @@ it('总览按顺序展示七张模块卡并保留四列桌面网格', async () =
   expect(within(mysqlCard).getByText('复制延迟')).toBeVisible()
   expect(within(mysqlCard).getByText('复制数据缺失')).toBeVisible()
   expect(within(mysqlCard).queryByText(/连接|QPS/)).not.toBeInTheDocument()
-  const controls = screen.getByRole('group', { name: '总览控制' })
-  expect(
-    within(controls).getByText(/上次刷新 \d{2}:\d{2}:\d{2}/),
-  ).toBeInTheDocument()
-  expect(within(controls).getByText(/每 15 秒自动刷新/)).toBeInTheDocument()
+  for (const [card, time] of [
+    [hostCard, '2026/07/21 00:30:00'],
+    [diskCard, '2026/07/30 08:30:00'],
+    [mysqlCard, '2026/07/28 08:00:00'],
+    [redisCard, '2026/08/01 08:00:00'],
+    [elasticsearchCard, '2026/08/01 08:00:00'],
+    [rabbitMQCard, '2026/08/04 08:00:00'],
+    [javaCard, '2026/08/05 08:00:00'],
+  ] as const) {
+    expect(within(card).getByText(time)).toBeVisible()
+  }
+  expect(screen.queryByRole('group', { name: '总览控制' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '刷新' })).not.toBeInTheDocument()
+  expect(screen.queryByText(/上次刷新|自动刷新/)).not.toBeInTheDocument()
 })
 
 it('RabbitMQ 集群和节点都为空时显示中性空状态且不渲染告警网格', async () => {
@@ -837,7 +847,7 @@ it('Java 服务为空时显示中性空状态', async () => {
   expect(within(emptyCard).getByText('暂无 Java 服务')).toBeVisible()
 })
 
-it('Java 初始加载只显示局部状态，不改变前六卡全局刷新状态', async () => {
+it('Java 初始加载只显示局部状态且不出现全局刷新控件', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
     if (path === '/api/v1/java/overview') {
@@ -868,13 +878,11 @@ it('Java 初始加载只显示局部状态，不改变前六卡全局刷新状�
   expect(
     screen.getByRole('status', { name: 'Java 服务板块加载中' }),
   ).toBeVisible()
-  const controls = screen.getByRole('group', { name: '总览控制' })
-  expect(within(controls).getByRole('button', { name: '刷新' })).toBeEnabled()
-  expect(within(controls).getByText(/上次刷新 \d{2}:\d{2}:\d{2}/)).toBeVisible()
-  expect(within(controls).queryByText('正在刷新…')).not.toBeInTheDocument()
+  expect(screen.queryByRole('group', { name: '总览控制' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '刷新' })).not.toBeInTheDocument()
 })
 
-it('Java 首次 503 保持全局刷新状态且重试只刷新独立查询', async () => {
+it('Java 首次 503 不影响其他卡且重试只刷新独立查询', async () => {
   const pathCounts = new Map<string, number>()
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
@@ -919,10 +927,7 @@ it('Java 首次 503 保持全局刷新状态且重试只刷新独立查询', asy
   ).toBeVisible()
   const error = screen.getByRole('alert', { name: 'Java 服务板块加载失败' })
   expect(error).toHaveTextContent('Java 数据源暂时不可用')
-  const controls = screen.getByRole('group', { name: '总览控制' })
-  expect(within(controls).getByRole('button', { name: '刷新' })).toBeEnabled()
-  expect(within(controls).getByText(/上次刷新 \d{2}:\d{2}:\d{2}/)).toBeVisible()
-  expect(within(controls).queryByText('正在刷新…')).not.toBeInTheDocument()
+  expect(screen.queryByRole('group', { name: '总览控制' })).not.toBeInTheDocument()
   await user.click(within(error).getByRole('button', { name: '重试' }))
 
   expect(
@@ -1312,13 +1317,12 @@ it('Elasticsearch 后台刷新失败时保留旧卡并显示独立重试状态',
     }
     return Promise.resolve(jsonResponse(overviewFixture()))
   })
-  const user = userEvent.setup()
-  renderOverview()
+  const queryClient = renderOverview()
 
   const card = await screen.findByRole('link', {
     name: '查看 Elasticsearch 板块',
   })
-  await user.click(screen.getByRole('button', { name: '刷新' }))
+  await queryClient.invalidateQueries({ queryKey: ['elasticsearch-overview'] })
 
   expect(card).toBeVisible()
   const error = await screen.findByRole('alert', {
@@ -1764,13 +1768,12 @@ it('硬盘刷新失败时保留旧卡并显示独立重试状态', async () => {
     }
     return Promise.resolve(jsonResponse(overviewFixture()))
   })
-  const user = userEvent.setup()
-  renderOverview()
+  const queryClient = renderOverview()
 
   const card = await screen.findByRole('link', {
     name: '查看主机硬盘板块',
   })
-  await user.click(screen.getByRole('button', { name: '刷新' }))
+  await queryClient.invalidateQueries({ queryKey: ['disk-overview'] })
 
   expect(card).toBeVisible()
   const error = await screen.findByRole('alert', {
@@ -2011,11 +2014,10 @@ it('MySQL 刷新失败时保留旧卡并显示独立重试状态', async () => {
           ),
     )
   })
-  const user = userEvent.setup()
-  renderOverview()
+  const queryClient = renderOverview()
 
   const card = await screen.findByRole('link', { name: '查看 MySQL 板块' })
-  await user.click(screen.getByRole('button', { name: '刷新' }))
+  await queryClient.invalidateQueries({ queryKey: ['mysql-overview'] })
 
   expect(card).toBeVisible()
   const error = await screen.findByRole('alert', {
@@ -2083,33 +2085,14 @@ it('使用固定查询范围且不显示总览时间范围控件', async () => {
   expect(screen.queryByRole('button', { name: '7天' })).not.toBeInTheDocument()
 })
 
-it('手动刷新会同时重新请求七个总览模块', async () => {
-  const user = userEvent.setup()
+it('不提供全局手动刷新控件', async () => {
   renderOverview()
 
   await screen.findByRole('link', { name: '查看 Linux 主机板块' })
   await screen.findByRole('link', { name: '查看主机硬盘板块' })
   expect(globalThis.fetch).toHaveBeenCalledTimes(7)
-  await user.click(screen.getByRole('button', { name: '刷新' }))
-
-  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(14))
-  const calls = vi.mocked(globalThis.fetch).mock.calls
-  expect(calls.map(([input]) => requestedPath(input))).toEqual(
-    expect.arrayContaining([
-      '/api/v1/overview',
-      '/api/v1/disks/overview',
-      '/api/v1/mysql/overview',
-      '/api/v1/redis/overview',
-      '/api/v1/elasticsearch/overview',
-      '/api/v1/rabbitmq/overview',
-      '/api/v1/java/overview',
-    ]),
-  )
-  const hostCalls = calls.filter(
-    ([input]) => requestedPath(input) === '/api/v1/overview',
-  )
-  expect(hostCalls).toHaveLength(2)
-  expect(requestedRange(hostCalls[1][0])).toBe('24h')
+  expect(screen.queryByRole('button', { name: '刷新' })).not.toBeInTheDocument()
+  expect(screen.queryByText(/上次刷新|自动刷新/)).not.toBeInTheDocument()
 })
 
 it('每 15 秒刷新且前一请求未完成时不发起重叠请求', async () => {
@@ -2178,7 +2161,7 @@ it('过期数据提示显示服务端给出的精确采集时间', async () => {
     name: 'Linux 主机数据已过期',
   })
   expect(banner).toHaveTextContent('Linux 主机数据已过期')
-  expect(banner).toHaveTextContent('2026-07-21T00:30:00.000Z')
+  expect(banner).toHaveTextContent('最新数据时间：2026/07/21 00:30:00')
   expect(within(banner).getByRole('time')).toHaveAttribute(
     'dateTime',
     '2026-07-21T00:30:00.000Z',

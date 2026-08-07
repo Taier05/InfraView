@@ -195,7 +195,7 @@ it('节点名称缺失时显示暂无数据且不复用实例地址', async () =
   expect(cells[0].textContent).not.toBe(cells[2].textContent)
 })
 
-it('只用共享列表模板在同一控制行渲染搜索筛选页数与刷新', async () => {
+it('只用共享列表模板在同一控制行渲染搜索筛选页数与最新数据时间', async () => {
   renderPage()
 
   const search = await screen.findByRole('searchbox', {
@@ -214,10 +214,10 @@ it('只用共享列表模板在同一控制行渲染搜索筛选页数与刷新'
   for (const label of ['所属集群', '节点状态', '每页数量']) {
     expect(within(controls).getByRole('combobox', { name: label })).toBeVisible()
   }
-  expect(
-    within(controls).getByRole('button', { name: '刷新 RabbitMQ 节点列表' }),
-  ).toBeVisible()
-  expect(within(controls).getByText(/每 15 秒自动刷新/)).toBeVisible()
+  const dataTime = await within(controls).findByText('2026/08/04 08:00:00')
+  expect(dataTime.closest('.data-time')).toHaveTextContent('最新数据时间：2026/08/04 08:00:00')
+  expect(within(controls).queryByRole('button', { name: /刷新/ })).not.toBeInTheDocument()
+  expect(within(controls).queryByText(/上次刷新|自动刷新/)).not.toBeInTheDocument()
   expect(controls.querySelector('.rabbitmq-search, .rabbitmq-select')).toBeNull()
   const table = await screen.findByRole('table', { name: 'RabbitMQ 节点列表' })
   expect(table.closest('.host-table-scroll')).toHaveClass(
@@ -248,7 +248,7 @@ it('服务端选项暂缺当前集群时仍保留 URL 与下拉框选择', async
   )
 })
 
-it('从白名单 URL 恢复筛选排序分页且刷新不改变 URL', async () => {
+it('从白名单 URL 恢复筛选排序分页', async () => {
   renderPage(
     '/rabbitmq?search=fixture&cluster=fixture-rabbit-cluster-b&status=warning&sort=messages&direction=desc&page=2&page_size=50&unknown=value',
   )
@@ -273,12 +273,7 @@ it('从白名单 URL 恢复筛选排序分页且刷新不改变 URL', async () =
     expect(parameters?.get('page_size')).toBe('50')
     expect(parameters?.has('unknown')).toBe(false)
   })
-  const canonicalURL = window.location.href
-  await userEvent.click(
-    screen.getByRole('button', { name: '刷新 RabbitMQ 节点列表' }),
-  )
-  await waitFor(() => expect(requests.length).toBeGreaterThan(1))
-  expect(window.location.href).toBe(canonicalURL)
+  expect(screen.queryByRole('button', { name: /刷新/ })).not.toBeInTheDocument()
 })
 
 it('搜索精确等待 300ms 后写入 URL 并重置页码', async () => {
@@ -488,7 +483,7 @@ it('初次 503 可重试且刷新错误保留旧数据', async () => {
   responseBody = errorFixture()
   responseStatus = 503
   const user = userEvent.setup()
-  renderPage()
+  const { queryClient } = renderPage()
 
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'RabbitMQ 节点列表加载失败',
@@ -502,7 +497,7 @@ it('初次 503 可重试且刷新错误保留旧数据', async () => {
 
   responseBody = errorFixture()
   responseStatus = 503
-  await user.click(screen.getByRole('button', { name: '刷新 RabbitMQ 节点列表' }))
+  await queryClient.invalidateQueries({ queryKey: ['rabbitmq-nodes'] })
   expect(await screen.findByText('RabbitMQ 节点列表刷新失败')).toBeVisible()
   expect(screen.getByText('fixture-rabbit-node-normal')).toBeVisible()
   expect(screen.getByText('数据已过期')).toBeVisible()

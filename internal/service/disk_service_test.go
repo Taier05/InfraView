@@ -86,6 +86,39 @@ func TestDiskServiceStatusMatrix(t *testing.T) {
 	}
 }
 
+func TestDiskServiceMetaUsesLatestSampleTime(t *testing.T) {
+	now := time.Date(2026, time.August, 7, 8, 0, 0, 0, time.UTC)
+	older := now.Add(-2 * time.Minute)
+	latest := now.Add(-time.Minute)
+	first := oneHealthyDisk(older).Devices[0]
+	second := oneHealthyDisk(latest).Devices[0]
+	second.ID = "fixture-device-latest"
+	provider := &diskTestProvider{snapshot: disk.Snapshot{Devices: []disk.Device{first, second}}}
+	service := NewDisk(provider, cache.New(func() time.Time { return now }), DiskOptions{Clock: func() time.Time { return now }})
+
+	_, meta, err := service.Overview(context.Background())
+	if err != nil {
+		t.Fatalf("Overview() error = %v", err)
+	}
+	if !meta.CollectedAt.Equal(latest) {
+		t.Fatalf("CollectedAt = %s, want latest sample %s", meta.CollectedAt, latest)
+	}
+}
+
+func TestMergeMetaUsesLatestSampleTimeRegardlessOfStaleState(t *testing.T) {
+	older := time.Date(2026, time.August, 7, 7, 58, 0, 0, time.UTC)
+	latest := older.Add(time.Minute)
+
+	fresh := mergeMeta(Meta{CollectedAt: older}, Meta{CollectedAt: latest})
+	if fresh.Stale || !fresh.CollectedAt.Equal(latest) {
+		t.Fatalf("fresh meta = %#v, want latest time", fresh)
+	}
+	stale := mergeMeta(Meta{Stale: true, CollectedAt: older}, Meta{CollectedAt: latest})
+	if !stale.Stale || !stale.CollectedAt.Equal(latest) {
+		t.Fatalf("stale meta = %#v, want latest sample", stale)
+	}
+}
+
 func TestDiskServiceCollectionLevelOnlyChangesWithObservedSampleProgress(t *testing.T) {
 	now := time.Date(2026, time.July, 30, 12, 0, 0, 0, time.UTC)
 	clock := &diskTestClock{now: now}

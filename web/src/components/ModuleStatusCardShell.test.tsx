@@ -17,6 +17,7 @@ describe("ModuleStatusCardShell", () => {
           levelLabel="存在警告"
           actionLabel="查看 Redis"
           className="redis-overview-card"
+          collectedAt="2026-08-06T13:50:52Z"
         >
           <div>业务告警摘要</div>
         </ModuleStatusCardShell>
@@ -31,6 +32,7 @@ describe("ModuleStatusCardShell", () => {
     expect(within(card).getByRole("heading", { name: "Redis" })).toBeVisible();
     expect(within(card).getByText("存在警告")).toBeVisible();
     expect(within(card).getByText("业务告警摘要")).toBeVisible();
+    expect(within(card).getByText("2026/08/06 13:50:52")).toBeVisible();
     expect(within(card).getByText("查看 Redis")).toBeVisible();
   });
 
@@ -59,6 +61,7 @@ describe("ModuleStatusCardShell", () => {
     expect(card).toHaveAttribute("data-level", "empty");
     expect(within(card).getByText("暂无 Redis 实例")).toBeVisible();
     expect(within(card).getByText("尚无可展示的实例健康数据")).toBeVisible();
+    expect(within(card).getByText("最新数据时间：暂无数据")).toBeVisible();
     expect(within(card).queryByText("不应显示的指标")).not.toBeInTheDocument();
   });
 });

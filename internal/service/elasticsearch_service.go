@@ -100,7 +100,14 @@ func (service *ElasticsearchService) snapshotState(ctx context.Context) (elastic
 	if !ok {
 		return elasticsearchSnapshotState{}, Meta{}, fmt.Errorf("service: elasticsearch cache contained %T", result.Value)
 	}
-	return cloneElasticsearchSnapshotState(state), resultMeta(result), nil
+	var collectedAt time.Time
+	for _, cluster := range state.snapshot.Clusters {
+		collectedAt = latestTime(collectedAt, cluster.ReportedAt)
+	}
+	for _, node := range state.snapshot.Nodes {
+		collectedAt = latestTime(collectedAt, node.ReportedAt)
+	}
+	return cloneElasticsearchSnapshotState(state), resultMetaAt(result, collectedAt), nil
 }
 
 func (service *ElasticsearchService) Overview(ctx context.Context) (ElasticsearchOverview, Meta, error) {

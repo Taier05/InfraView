@@ -2,6 +2,19 @@
 
 最后更新：2026-08-07
 
+## 当前数据时间与 Elasticsearch 容错恢复入口（未提交、已部署至现有 8080）
+
+当前改动位于隔离工作树 `/root/github/InfraView/.worktrees/refresh-data-time-es-stale`、分支 `feature/refresh-data-time-es-stale`，基线为 `main` 的 `b619ac9`。用户已授权实现和原位部署，但尚未授权提交或推送；主工作区不应被本分支改动污染。恢复时先读本节、对应 design/plan、`docs/PROJECT_STATUS.md`、`docs/TODO.md` 和 `docs/datasources/NIGHTINGALE.md`，再以 Git 只读检查为准。
+
+本轮把 API 既有字段 `meta.collected_at` 的语义统一为“本次响应内最新有效上游样本时间”：Service 从 Nightingale 样本 `Timestamp`/`ReportedAt`/`CheckedAt` 取最大非零值并转 UTC；缓存 stale 只改变 `meta.stale`，不能把缓存时间、API 响应时间或浏览器刷新时间写入 `collected_at`；空快照省略该字段。前端保留 15 秒自动轮询和错误态“重试”，删除正常态刷新按钮及“上次刷新/每 N 秒自动刷新”，列表展示 `最新数据时间：YYYY/MM/DD HH:mm:ss`，总览七张卡分别展示各自模块时间，不能合成全局时间。
+
+Elasticsearch 仍恰好一次固定 26 查询 batch、无 N+1。第 25/26 组 inventory 是构建集群/节点身份的硬依赖；第 1–24 组是可选观测指标，单组 `null` 只表示该项暂缺，不再令整个快照 503。批次数量不等于 26，或第 25/26 组为 `null`，仍安全返回数据源不可用。最终验证已通过前端 16 文件/273 项、typecheck/build、Playwright 5 文件/27 项静态发现、Go gofmt/vet/全仓普通/race/编译和无缓存生产镜像。经用户授权，现有 `infraview` 8080 已用当前隔离工作树原位重建，继续沿用既有测试 Nightingale 私密配置；健康、唯一服务/8080、非 root、只读根文件系统、cap drop `ALL`、禁止提权及未认证 API 拒绝均通过。未创建额外端口，未读取私密配置内容，未访问生产 Nightingale/Elasticsearch；登录态视觉验收待用户完成。
+
+对应文档：
+
+- `docs/superpowers/specs/2026-08-07-refresh-data-time-and-elasticsearch-stale-design.md`
+- `docs/superpowers/plans/2026-08-07-refresh-data-time-and-elasticsearch-stale.md`
+
 ## 当前 main / Java 服务恢复入口
 
 当前工作目录为 `/root/github/InfraView`，分支为 `main`。Java 服务功能提交 `5ed392a fix: preserve Java service integer precision` 已快进合并并推送到 `origin/main`。恢复时先读取本文件、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/TESTING.md`、`docs/datasources/NIGHTINGALE.md`、Java 服务设计/计划，再只读执行 `git status --short --branch`、`git log -3 --oneline`、`git diff --check` 与 `git diff --cached --check`；必须以实时 Git 结果为准，不把下方 RabbitMQ 历史基线误作当前状态。

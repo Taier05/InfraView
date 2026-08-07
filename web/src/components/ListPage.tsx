@@ -4,7 +4,7 @@ import type {
   ReactNode,
 } from "react";
 
-import { RefreshControl } from "./RefreshControl";
+import { DataTime } from "./DataTime";
 
 interface ListPageHeaderProps {
   eyebrow: string;
@@ -13,17 +13,9 @@ interface ListPageHeaderProps {
   titleId: string;
 }
 
-interface ListPageRefresh {
-  isFetching: boolean;
-  dataUpdatedAt: number;
-  onRefresh: () => void;
-  refreshIntervalSeconds: number;
-  ariaLabel: string;
-}
-
 interface ListPageControlsProps extends PropsWithChildren {
   className?: string;
-  refresh: ListPageRefresh;
+  collectedAt?: string;
 }
 
 interface ListSearchFieldProps {
@@ -80,12 +72,12 @@ export function ListPageHeader({
 export function ListPageControls({
   children,
   className,
-  refresh,
+  collectedAt,
 }: ListPageControlsProps) {
   return (
     <div className={classes("host-list-controls", className)}>
       {children}
-      <RefreshControl {...refresh} />
+      <DataTime collectedAt={collectedAt} className="data-time" />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   ListPageControls,
@@ -27,13 +27,7 @@ function ControlsFixture() {
       />
       <ListPageControls
         className="redis-list-controls"
-        refresh={{
-          isFetching: false,
-          dataUpdatedAt: Date.now(),
-          onRefresh: vi.fn(),
-          refreshIntervalSeconds: 15,
-          ariaLabel: "刷新 Redis 实例列表",
-        }}
+        collectedAt="2026-08-06T13:50:52Z"
       >
         <ListSearchField
           label="搜索实例地址"
@@ -60,7 +54,7 @@ function ControlsFixture() {
 }
 
 describe("ListPage shared template", () => {
-  it("keeps labelled fields and refresh status in one control bar", async () => {
+  it("keeps labelled fields and latest data time in one control bar", async () => {
     const user = userEvent.setup();
     render(<ControlsFixture />);
 
@@ -79,10 +73,9 @@ describe("ListPage shared template", () => {
     expect(
       within(controls).getByRole("combobox", { name: "实例状态" }),
     ).toBeVisible();
-    expect(
-      within(controls).getByRole("button", { name: "刷新 Redis 实例列表" }),
-    ).toBeVisible();
-    expect(within(controls).getByText(/自动刷新/)).toBeVisible();
+    expect(within(controls).queryByRole("button", { name: /刷新/ })).not.toBeInTheDocument();
+    expect(within(controls).queryByText(/上次刷新|自动刷新/)).not.toBeInTheDocument();
+    expect(within(controls).getByText("2026/08/06 13:50:52")).toBeVisible();
     for (const label of ["20 条", "50 条", "100 条"]) {
       expect(within(controls).getByRole("option", { name: label })).toBeVisible();
     }

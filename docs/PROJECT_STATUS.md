@@ -4,6 +4,12 @@
 
 ## 当前阶段
 
+### 2026-08-07 数据时间语义与 Elasticsearch 瞬时过期修复（隔离工作树，未提交、已部署）
+
+当前分支 `feature/refresh-data-time-es-stale` 已按 TDD 完成两项核心修复：所有 Service 的 `meta.collected_at` 改为响应内最新有效 Nightingale 样本时间，空响应不伪造时间；正常页面删除无效手动刷新控件，总览与列表分别展示模块自己的格式化最新数据时间，自动轮询与错误态重试保留。前端定向回归已通过七个列表页 150/150、共享组件与总览 79/79。
+
+Elasticsearch Provider 仍使用固定一次 26 查询 batch；第 25/26 组 inventory 继续硬失败，第 1–24 组可选指标允许单组 `null` 并按字段缺失展示，避免可选序列瞬时空结果把整个模块错误标记为 stale。最终验证已通过前端 16 文件/273 项、typecheck/build、Playwright 5 文件/27 项静态发现、Go gofmt/vet/全仓普通/race/编译及无缓存生产镜像。经用户授权，现有测试 8080 已从当前隔离工作树原位重建；健康、唯一服务与 8080、安全基线和未认证 API 拒绝均通过，未创建额外端口。当前仍未提交或推送，未读取私密环境内容，也未连接生产上游；用户视觉验收待完成。
+
 ### 2026-08-07 Java 业务服务模块（已合并、推送并原位部署）
 
 Java 服务 Task 1–8 已在 `feature/java-service-status` 完成：独立 `internal/javaapp` 领域、脱敏 Mock、固定 11 查询 Nightingale Provider、共享 `JavaService`、两个认证只读 GET API、总览第七卡、侧边栏与共享 `ListPage` 的 13 列 `/java` 页面均已交付。Provider 每个共享快照恰好一次 `query-instant-batch`，稳定业务实例只由 `name + server_ip` 建立；`ident` 仅用于 Provider 内部归并，不进入任何领域对外 View、HTTP 响应或页面。`tikbee`、`rider`、`mch`、`saas`、`mch_saas` 分别精确映射为“用户端、骑手端、商家端、管理后台端、商家 PC 端”，未知值保持原值。

@@ -262,7 +262,7 @@ func TestBuildHandlerWiresAuthenticatedMockAPI(t *testing.T) {
 	}
 }
 
-func TestBuildHandlerUsesInjectedClockForElasticsearchService(t *testing.T) {
+func TestBuildHandlerUsesElasticsearchSampleTimeForCollectedAt(t *testing.T) {
 	now := time.Date(2026, 8, 1, 8, 0, 0, 0, time.UTC)
 	clock := func() time.Time { return now }
 	cfg := config.Config{
@@ -287,8 +287,12 @@ func TestBuildHandlerUsesInjectedClockForElasticsearchService(t *testing.T) {
 	request.AddCookie(login.Result().Cookies()[0])
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"collected_at":"2026-08-01T08:00:00Z"`) {
-		t.Fatalf("Elasticsearch response does not use injected clock: %d %s", response.Code, response.Body.String())
+	body := response.Body.String()
+	if response.Code != http.StatusOK || !strings.Contains(body, `"collected_at":"2026-01-01T00:00:00Z"`) {
+		t.Fatalf("Elasticsearch response does not use upstream sample time: %d %s", response.Code, body)
+	}
+	if strings.Contains(body, `"collected_at":"2026-08-01T08:00:00Z"`) {
+		t.Fatalf("Elasticsearch response must not use injected clock as collected_at: %s", body)
 	}
 }
 

@@ -85,7 +85,11 @@ func (service *JavaService) snapshotStateAt(ctx context.Context, now time.Time) 
 	if !ok {
 		return javaSnapshotState{}, Meta{}, fmt.Errorf("service: java cache contained %T", result.Value)
 	}
-	return cloneJavaSnapshotState(state), resultMeta(result), nil
+	var collectedAt time.Time
+	for _, item := range state.snapshot.Services {
+		collectedAt = latestTime(collectedAt, item.ReportedAt)
+	}
+	return cloneJavaSnapshotState(state), resultMetaAt(result, collectedAt), nil
 }
 
 func captureJavaProgress(tracker *freshnessTracker, samples map[string]time.Time) map[string]time.Time {

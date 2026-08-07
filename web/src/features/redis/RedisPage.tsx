@@ -391,13 +391,7 @@ export function RedisPage() {
 
       <ListPageControls
         className="mysql-list-controls redis-list-controls"
-        refresh={{
-          isFetching: instances.isFetching,
-          dataUpdatedAt: instances.dataUpdatedAt,
-          onRefresh: () => void instances.refetch(),
-          refreshIntervalSeconds: refreshIntervalMs / 1000,
-          ariaLabel: "刷新 Redis 实例列表",
-        }}
+        collectedAt={instances.data?.meta.collected_at}
       >
         <ListSearchField
           label="搜索实例地址"

@@ -73,7 +73,11 @@ func (service *RedisService) snapshot(ctx context.Context) (redis.Snapshot, Meta
 	if !ok {
 		return redis.Snapshot{}, Meta{}, fmt.Errorf("service: redis cache contained %T", result.Value)
 	}
-	return snapshot.Clone(), resultMeta(result), nil
+	var collectedAt time.Time
+	for _, instance := range snapshot.Instances {
+		collectedAt = latestTime(collectedAt, instance.ReportedAt)
+	}
+	return snapshot.Clone(), resultMetaAt(result, collectedAt), nil
 }
 
 func (service *RedisService) Overview(ctx context.Context) (RedisOverview, Meta, error) {

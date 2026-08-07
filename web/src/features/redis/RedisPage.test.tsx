@@ -161,6 +161,7 @@ function renderPage(entry = "/redis") {
       </BrowserRouter>
     </QueryClientProvider>,
   );
+  return client;
 }
 
 beforeEach(() => {
@@ -239,7 +240,7 @@ it("严格渲染 Redis 十一列及拆分后的指标语义", async () => {
   ).not.toBeInTheDocument();
 });
 
-it("复用现有列表控制栏并在同一区域展示刷新功能", async () => {
+it("复用现有列表控制栏并展示最新数据时间", async () => {
   renderPage();
   const search = await screen.findByRole("searchbox", { name: "搜索实例地址" });
   const controls = search.closest(".redis-list-controls");
@@ -250,10 +251,10 @@ it("复用现有列表控制栏并在同一区域展示刷新功能", async () =
   expect(controls).toHaveClass("host-list-controls", "mysql-list-controls");
   expect(search.closest(".host-search")).not.toBeNull();
   expect(within(controls).getAllByRole("combobox")).toHaveLength(3);
-  expect(
-    within(controls).getByRole("button", { name: "刷新 Redis 实例列表" }),
-  ).toBeInTheDocument();
-  expect(within(controls).getByText(/自动刷新/)).toBeVisible();
+  const dataTime = await within(controls).findByText("2026/08/01 08:00:00");
+  expect(dataTime.closest(".data-time")).toHaveTextContent("最新数据时间：2026/08/01 08:00:00");
+  expect(within(controls).queryByRole("button", { name: /刷新/ })).not.toBeInTheDocument();
+  expect(within(controls).queryByText(/上次刷新|自动刷新/)).not.toBeInTheDocument();
 });
 
 it("把角色状态排序和分页写入 URL 与固定 GET 参数", async () => {
@@ -365,8 +366,8 @@ it("展示初始加载和空列表状态", async () => {
   expect(await screen.findByText("没有符合条件的 Redis 实例")).toBeVisible();
 });
 
-it("刷新失败时保留上一次列表并显示非阻断错误", async () => {
-  renderPage();
+it("后台刷新失败时保留上一次列表并显示非阻断错误", async () => {
+  const queryClient = renderPage();
   await screen.findByText("192.0.2.40:6379");
   vi.mocked(globalThis.fetch).mockResolvedValueOnce(
     new Response(
@@ -380,9 +381,7 @@ it("刷新失败时保留上一次列表并显示非阻断错误", async () => {
     ),
   );
 
-  await userEvent.click(
-    screen.getByRole("button", { name: "刷新 Redis 实例列表" }),
-  );
+  await queryClient.invalidateQueries({ queryKey: ["redis-instances"] });
   expect(await screen.findByText("Redis 数据暂时不可用")).toBeVisible();
   expect(screen.getByText("192.0.2.40:6379")).toBeVisible();
 });

@@ -25,8 +25,8 @@ import type {
   RabbitMQOverviewData,
   RabbitMQOverviewResponse,
 } from '../../api/types'
+import { DataTime } from '../../components/DataTime'
 import { ModuleStatusCardShell } from '../../components/ModuleStatusCardShell'
-import { RefreshControl } from '../../components/RefreshControl'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useRefreshIntervalMs } from '../../app/runtime'
 
@@ -578,14 +578,20 @@ function ModuleStaleBanner({
     >
       <strong>{staleLabel}</strong>
       <span>
-        当前展示最近一次可用数据，采集时间：
-        <time dateTime={collectedAt}>{collectedAt}</time>
+        当前展示最近一次可用数据，
+        <DataTime collectedAt={collectedAt} label="最新数据时间：" />
       </span>
     </div>
   )
 }
 
-function HostStatusCard({ data }: { data: OverviewData }) {
+function HostStatusCard({
+  data,
+  collectedAt,
+}: {
+  data: OverviewData
+  collectedAt?: string
+}) {
   if (data.total === 0) {
     return (
       <Link
@@ -608,6 +614,7 @@ function HostStatusCard({ data }: { data: OverviewData }) {
           <span>尚无可展示的主机健康数据</span>
         </div>
         <div className="module-status-footer">
+          <DataTime collectedAt={collectedAt} className="data-time" />
           <span className="module-status-action">
             查看主机 <span aria-hidden="true">→</span>
           </span>
@@ -683,6 +690,7 @@ function HostStatusCard({ data }: { data: OverviewData }) {
       </div>
 
       <div className="module-status-footer">
+        <DataTime collectedAt={collectedAt} className="data-time" />
         <span className="module-status-action">
           查看主机 <span aria-hidden="true">→</span>
         </span>
@@ -691,7 +699,13 @@ function HostStatusCard({ data }: { data: OverviewData }) {
   )
 }
 
-function MySQLStatusCard({ data }: { data: MySQLOverviewData }) {
+function MySQLStatusCard({
+  data,
+  collectedAt,
+}: {
+  data: MySQLOverviewData
+  collectedAt?: string
+}) {
   if (data.total === 0) {
     return (
       <Link
@@ -714,6 +728,7 @@ function MySQLStatusCard({ data }: { data: MySQLOverviewData }) {
           <span>尚无可展示的实例健康数据</span>
         </div>
         <div className="module-status-footer">
+          <DataTime collectedAt={collectedAt} className="data-time" />
           <span className="module-status-action">
             查看 MySQL <span aria-hidden="true">→</span>
           </span>
@@ -796,6 +811,7 @@ function MySQLStatusCard({ data }: { data: MySQLOverviewData }) {
       </div>
 
       <div className="module-status-footer">
+        <DataTime collectedAt={collectedAt} className="data-time" />
         <span className="module-status-action">
           查看 MySQL <span aria-hidden="true">→</span>
         </span>
@@ -804,7 +820,13 @@ function MySQLStatusCard({ data }: { data: MySQLOverviewData }) {
   )
 }
 
-function RedisStatusCard({ data }: { data: RedisOverviewData }) {
+function RedisStatusCard({
+  data,
+  collectedAt,
+}: {
+  data: RedisOverviewData
+  collectedAt?: string
+}) {
   if (data.total === 0) {
     return (
       <ModuleStatusCardShell
@@ -816,6 +838,7 @@ function RedisStatusCard({ data }: { data: RedisOverviewData }) {
         levelLabel="暂无实例"
         actionLabel="查看 Redis"
         className="redis-overview-card"
+        collectedAt={collectedAt}
         emptyState={{
           title: '暂无 Redis 实例',
           description: '尚无可展示的实例健康数据',
@@ -847,6 +870,7 @@ function RedisStatusCard({ data }: { data: RedisOverviewData }) {
       levelLabel={label}
       actionLabel="查看 Redis"
       className="redis-overview-card"
+      collectedAt={collectedAt}
     >
       <div className="module-alert-summary">
         <div className="module-alert-total">
@@ -902,8 +926,10 @@ function elasticsearchOverviewLevel(
 
 function ElasticsearchStatusCard({
   data,
+  collectedAt,
 }: {
   data: ElasticsearchOverviewData
+  collectedAt?: string
 }) {
   if (data.clusters.total === 0 && data.nodes.total === 0) {
     return (
@@ -916,6 +942,7 @@ function ElasticsearchStatusCard({
         levelLabel="暂无节点"
         actionLabel="查看 Elasticsearch"
         className="elasticsearch-overview-card"
+        collectedAt={collectedAt}
         emptyState={{
           title: '暂无 Elasticsearch 节点',
           description: '尚无可展示的集群与节点健康数据',
@@ -953,6 +980,7 @@ function ElasticsearchStatusCard({
       levelLabel={levelLabel}
       actionLabel="查看 Elasticsearch"
       className="elasticsearch-overview-card"
+      collectedAt={collectedAt}
     >
       <div className="module-alert-summary">
         <div className="module-alert-total">
@@ -1010,7 +1038,13 @@ function rabbitMQOverviewLevel(data: RabbitMQOverviewData): MetricLevel {
   return 'normal'
 }
 
-function RabbitMQStatusCard({ data }: { data: RabbitMQOverviewData }) {
+function RabbitMQStatusCard({
+  data,
+  collectedAt,
+}: {
+  data: RabbitMQOverviewData
+  collectedAt?: string
+}) {
   if (data.clusters.total === 0 && data.nodes.total === 0) {
     return (
       <ModuleStatusCardShell
@@ -1022,6 +1056,7 @@ function RabbitMQStatusCard({ data }: { data: RabbitMQOverviewData }) {
         levelLabel="暂无节点"
         actionLabel="查看 RabbitMQ"
         className="rabbitmq-overview-card"
+        collectedAt={collectedAt}
         emptyState={{
           title: '暂无 RabbitMQ 节点',
           description: '尚无可展示的集群与节点健康数据',
@@ -1059,6 +1094,7 @@ function RabbitMQStatusCard({ data }: { data: RabbitMQOverviewData }) {
       levelLabel={levelLabel}
       actionLabel="查看 RabbitMQ"
       className="rabbitmq-overview-card"
+      collectedAt={collectedAt}
     >
       <div className="module-alert-summary">
         <div className="module-alert-total">
@@ -1098,7 +1134,13 @@ function RabbitMQStatusCard({ data }: { data: RabbitMQOverviewData }) {
   )
 }
 
-function JavaStatusCard({ data }: { data: JavaOverviewData }) {
+function JavaStatusCard({
+  data,
+  collectedAt,
+}: {
+  data: JavaOverviewData
+  collectedAt?: string
+}) {
   if (data.services.total === 0) {
     return (
       <ModuleStatusCardShell
@@ -1110,6 +1152,7 @@ function JavaStatusCard({ data }: { data: JavaOverviewData }) {
         levelLabel="暂无服务"
         actionLabel="查看 Java 服务"
         className="java-overview-card"
+        collectedAt={collectedAt}
         emptyState={{
           title: '暂无 Java 服务',
           description: '尚无可展示的 Java 服务健康数据',
@@ -1147,6 +1190,7 @@ function JavaStatusCard({ data }: { data: JavaOverviewData }) {
       levelLabel={levelLabel}
       actionLabel="查看 Java 服务"
       className="java-overview-card"
+      collectedAt={collectedAt}
     >
       <div className="module-alert-summary">
         <div className="module-alert-total">
@@ -1177,7 +1221,13 @@ function JavaStatusCard({ data }: { data: JavaOverviewData }) {
   )
 }
 
-function DiskStatusCard({ data }: { data: DiskOverviewData }) {
+function DiskStatusCard({
+  data,
+  collectedAt,
+}: {
+  data: DiskOverviewData
+  collectedAt?: string
+}) {
   if (data.total === 0) {
     return (
       <Link
@@ -1200,6 +1250,7 @@ function DiskStatusCard({ data }: { data: DiskOverviewData }) {
           <span>尚无可展示的硬盘健康数据</span>
         </div>
         <div className="module-status-footer">
+          <DataTime collectedAt={collectedAt} className="data-time" />
           <span className="module-status-action">
             查看硬盘 <span aria-hidden="true">→</span>
           </span>
@@ -1276,6 +1327,7 @@ function DiskStatusCard({ data }: { data: DiskOverviewData }) {
       </div>
 
       <div className="module-status-footer">
+        <DataTime collectedAt={collectedAt} className="data-time" />
         <span className="module-status-action">
           查看硬盘 <span aria-hidden="true">→</span>
         </span>
@@ -1332,23 +1384,6 @@ export function OverviewPage() {
     refetchInterval: refreshIntervalMs,
     refetchIntervalInBackground: false,
   })
-  const allDataUpdatedAt =
-    hostOverview.data !== undefined &&
-    diskOverview.data !== undefined &&
-    mysqlOverview.data !== undefined &&
-    redisOverview.data !== undefined &&
-    elasticsearchOverview.data !== undefined &&
-    rabbitMQOverview.data !== undefined
-      ? Math.min(
-          hostOverview.dataUpdatedAt,
-          diskOverview.dataUpdatedAt,
-          mysqlOverview.dataUpdatedAt,
-          redisOverview.dataUpdatedAt,
-          elasticsearchOverview.dataUpdatedAt,
-          rabbitMQOverview.dataUpdatedAt,
-        )
-      : 0
-
   return (
     <section aria-labelledby="overview-title">
       <div className="overview-heading">
@@ -1356,34 +1391,8 @@ export function OverviewPage() {
           <p className="eyebrow">运行态势</p>
           <h1 id="overview-title">基础设施总览</h1>
           <p className="page-description">
-            集中查看各基础设施板块状态，每{' '}
-            {refreshIntervalMs / 1_000} 秒自动刷新。
+            集中查看各基础设施板块状态与最新数据时间。
           </p>
-        </div>
-        <div className="overview-controls" role="group" aria-label="总览控制">
-          <RefreshControl
-            isFetching={
-              hostOverview.isFetching ||
-              diskOverview.isFetching ||
-              mysqlOverview.isFetching ||
-              redisOverview.isFetching ||
-              elasticsearchOverview.isFetching ||
-              rabbitMQOverview.isFetching
-            }
-            dataUpdatedAt={allDataUpdatedAt}
-            onRefresh={() => {
-              void Promise.all([
-                hostOverview.refetch(),
-                diskOverview.refetch(),
-                mysqlOverview.refetch(),
-                redisOverview.refetch(),
-                elasticsearchOverview.refetch(),
-                rabbitMQOverview.refetch(),
-                javaOverview.refetch(),
-              ])
-            }}
-            refreshIntervalSeconds={refreshIntervalMs / 1_000}
-          />
         </div>
       </div>
 
@@ -1503,7 +1512,10 @@ export function OverviewPage() {
             />
           )
         ) : (
-          <HostStatusCard data={hostOverview.data.data} />
+          <HostStatusCard
+            data={hostOverview.data.data}
+            collectedAt={hostOverview.data.meta.collected_at}
+          />
         )}
 
         {diskOverview.data === undefined ? (
@@ -1517,7 +1529,10 @@ export function OverviewPage() {
             />
           )
         ) : (
-          <DiskStatusCard data={diskOverview.data.data} />
+          <DiskStatusCard
+            data={diskOverview.data.data}
+            collectedAt={diskOverview.data.meta.collected_at}
+          />
         )}
 
         {mysqlOverview.data === undefined ? (
@@ -1531,7 +1546,10 @@ export function OverviewPage() {
             />
           )
         ) : (
-          <MySQLStatusCard data={mysqlOverview.data.data} />
+          <MySQLStatusCard
+            data={mysqlOverview.data.data}
+            collectedAt={mysqlOverview.data.meta.collected_at}
+          />
         )}
 
         {redisOverview.data === undefined ? (
@@ -1545,7 +1563,10 @@ export function OverviewPage() {
             />
           )
         ) : (
-          <RedisStatusCard data={redisOverview.data.data} />
+          <RedisStatusCard
+            data={redisOverview.data.data}
+            collectedAt={redisOverview.data.meta.collected_at}
+          />
         )}
 
         {elasticsearchOverview.data === undefined ? (
@@ -1559,7 +1580,10 @@ export function OverviewPage() {
             />
           )
         ) : (
-          <ElasticsearchStatusCard data={elasticsearchOverview.data.data} />
+          <ElasticsearchStatusCard
+            data={elasticsearchOverview.data.data}
+            collectedAt={elasticsearchOverview.data.meta.collected_at}
+          />
         )}
 
         {rabbitMQOverview.data === undefined ? (
@@ -1573,7 +1597,10 @@ export function OverviewPage() {
             />
           )
         ) : (
-          <RabbitMQStatusCard data={rabbitMQOverview.data.data} />
+          <RabbitMQStatusCard
+            data={rabbitMQOverview.data.data}
+            collectedAt={rabbitMQOverview.data.meta.collected_at}
+          />
         )}
 
         {javaOverview.data === undefined ? (
@@ -1587,7 +1614,10 @@ export function OverviewPage() {
             />
           )
         ) : (
-          <JavaStatusCard data={javaOverview.data.data} />
+          <JavaStatusCard
+            data={javaOverview.data.data}
+            collectedAt={javaOverview.data.meta.collected_at}
+          />
         )}
       </div>
     </section>

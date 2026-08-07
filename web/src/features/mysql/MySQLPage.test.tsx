@@ -50,6 +50,7 @@ function renderMySQLPage(initialEntry = '/mysql') {
       </BrowserRouter>
     </QueryClientProvider>,
   )
+  return queryClient
 }
 
 function lastRequest() {
@@ -177,9 +178,9 @@ it('renders the ten compact MySQL columns with QPS and TPS combined', async () =
     throw new Error('MySQL 控制区未渲染为 HTML 元素')
   }
   expect(within(controls).getAllByRole('combobox')).toHaveLength(4)
-  expect(
-    within(controls).getByRole('button', { name: '刷新 MySQL 实例列表' }),
-  ).toBeInTheDocument()
+  const dataTime = await within(controls).findByText('2026/07/28 08:00:00')
+  expect(dataTime.closest('.data-time')).toHaveTextContent('最新数据时间：2026/07/28 08:00:00')
+  expect(within(controls).queryByRole('button', { name: /刷新/ })).not.toBeInTheDocument()
   expect(screen.getByRole('option', { name: '读写' })).toHaveValue('writable')
   expect(screen.queryByRole('option', { name: '可写' })).not.toBeInTheDocument()
   const table = screen.getByRole('table')
@@ -352,7 +353,7 @@ it('selecting an instance label preserves filters and resets to page one', async
 })
 
 it('requests the fixed endpoint with GET and an AbortSignal', async () => {
-  renderMySQLPage()
+  const queryClient = renderMySQLPage()
   await screen.findByText('192.0.2.101:3306')
 
   const [input, init] = vi.mocked(globalThis.fetch).mock.calls[0]
@@ -632,12 +633,12 @@ it('keeps stale data visible and reports background errors', async () => {
         503,
       ),
     )
-  renderMySQLPage()
+  const queryClient = renderMySQLPage()
   expect(await screen.findByText('192.0.2.101:3306')).toBeVisible()
   expect(screen.getByText('数据已过期')).toBeVisible()
-  await userEvent
-    .setup()
-    .click(screen.getByRole('button', { name: '刷新 MySQL 实例列表' }))
+  await act(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['mysql-instances'] })
+  })
   expect(await screen.findByText('MySQL 实例列表刷新失败')).toBeVisible()
   expect(screen.getByText('数据已过期')).toBeVisible()
   expect(screen.getAllByRole('alert')).toHaveLength(2)

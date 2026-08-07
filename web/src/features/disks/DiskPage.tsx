@@ -18,7 +18,7 @@ import type {
 } from '../../api/types'
 import { useRefreshIntervalMs } from '../../app/runtime'
 import { ErrorPanel } from '../../components/ErrorPanel'
-import { RefreshControl } from '../../components/RefreshControl'
+import { DataTime } from '../../components/DataTime'
 import { StaleBanner } from '../../components/StaleBanner'
 import { StatusBadge } from '../../components/StatusBadge'
 
@@ -511,12 +511,9 @@ export function DiskPage() {
             ))}
           </select>
         </label>
-        <RefreshControl
-          isFetching={devices.isFetching}
-          dataUpdatedAt={devices.dataUpdatedAt}
-          onRefresh={() => void devices.refetch()}
-          refreshIntervalSeconds={refreshIntervalMs / 1_000}
-          ariaLabel="刷新硬盘设备列表"
+        <DataTime
+          collectedAt={devices.data?.meta.collected_at}
+          className="data-time"
         />
       </div>
 

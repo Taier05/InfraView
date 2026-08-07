@@ -415,11 +415,7 @@ export function JavaPage() {
 
   return <section aria-labelledby="java-title">
     <ListPageHeader eyebrow="Java 业务观测" title="Java 业务服务" description="只读展示业务服务健康、进程资源与采集状态。" titleId="java-title" />
-    <ListPageControls refresh={{
-      isFetching: services.isFetching, dataUpdatedAt: services.dataUpdatedAt,
-      onRefresh: () => void services.refetch(), refreshIntervalSeconds: refreshIntervalMs / 1_000,
-      ariaLabel: '刷新 Java 业务服务列表',
-    }}>
+    <ListPageControls collectedAt={services.data?.meta.collected_at}>
       <ListSearchField label="搜索业务端、服务名称或地址" value={searchText} onChange={(event) => setSearchText(event.target.value)} />
       <ListSelectField label="业务端" value={name} onChange={(event) => updateParameter('name', event.target.value)} options={[{ value: '', label: '全部业务端' }, ...nameOptions.map((value) => ({ value, label: value }))]} />
       <ListSelectField label="服务状态" value={status} onChange={(event) => updateParameter('status', event.target.value)} options={[{ value: '', label: '全部服务状态' }, ...metricLevels.map((value) => ({ value, label: levelText[value] }))]} />

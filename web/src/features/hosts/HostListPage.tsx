@@ -16,7 +16,7 @@ import type {
   MetricValue,
 } from '../../api/types'
 import { ErrorPanel } from '../../components/ErrorPanel'
-import { RefreshControl } from '../../components/RefreshControl'
+import { DataTime } from '../../components/DataTime'
 import { StaleBanner } from '../../components/StaleBanner'
 import { useRefreshIntervalMs } from '../../app/runtime'
 
@@ -438,12 +438,9 @@ export function HostListPage() {
             ))}
           </select>
         </label>
-        <RefreshControl
-          isFetching={hosts.isFetching}
-          dataUpdatedAt={hosts.dataUpdatedAt}
-          onRefresh={() => void hosts.refetch()}
-          refreshIntervalSeconds={refreshIntervalMs / 1_000}
-          ariaLabel="刷新主机列表"
+        <DataTime
+          collectedAt={hosts.data?.meta.collected_at}
+          className="data-time"
         />
       </div>
 

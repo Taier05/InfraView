@@ -170,7 +170,7 @@ it('桌面表格使用固定紧凑布局并为可裁剪身份保留完整提示'
   expect(identityValues[2]).toHaveAttribute('title', '192.0.2.31:9200')
 })
 
-it('只用共享列表模板在同一控制行渲染搜索、四个筛选、页数与刷新', async () => {
+it('只用共享列表模板在同一控制行渲染搜索、四个筛选、页数与最新数据时间', async () => {
   renderPage()
 
   const search = await screen.findByRole('searchbox', {
@@ -193,12 +193,10 @@ it('只用共享列表模板在同一控制行渲染搜索、四个筛选、页�
   ]) {
     expect(within(controls).getByRole('combobox', { name: label })).toBeVisible()
   }
-  expect(
-    within(controls).getByRole('button', {
-      name: '刷新 Elasticsearch 节点列表',
-    }),
-  ).toBeVisible()
-  expect(within(controls).getByText(/每 15 秒自动刷新/)).toBeVisible()
+  const dataTime = await within(controls).findByText('2026/08/01 08:00:00')
+  expect(dataTime.closest('.data-time')).toHaveTextContent('最新数据时间：2026/08/01 08:00:00')
+  expect(within(controls).queryByRole('button', { name: /刷新/ })).not.toBeInTheDocument()
+  expect(within(controls).queryByText(/上次刷新|自动刷新/)).not.toBeInTheDocument()
   expect(controls.querySelector('.elasticsearch-search')).toBeNull()
   expect(controls.querySelector('.elasticsearch-select')).toBeNull()
   const table = await screen.findByRole('table', {
@@ -598,7 +596,7 @@ it('初次 503 可重试，成功后刷新错误仍保留旧数据', async () =>
   responseBody = errorFixture()
   responseStatus = 503
   const user = userEvent.setup()
-  renderPage()
+  const { queryClient } = renderPage()
 
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'Elasticsearch 节点列表加载失败',
@@ -610,9 +608,7 @@ it('初次 503 可重试，成功后刷新错误仍保留旧数据', async () =>
 
   responseBody = errorFixture()
   responseStatus = 503
-  await user.click(
-    screen.getByRole('button', { name: '刷新 Elasticsearch 节点列表' }),
-  )
+  await queryClient.invalidateQueries({ queryKey: ['elasticsearch-nodes'] })
   expect(await screen.findByText('Elasticsearch 节点列表刷新失败')).toBeVisible()
   expect(screen.getByText('fixture-es-node-a')).toBeVisible()
 })

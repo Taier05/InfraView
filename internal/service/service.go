@@ -152,7 +152,11 @@ func (s *Service) currentMetrics(ctx context.Context, ids []string) (map[string]
 	if !ok {
 		return nil, Meta{}, fmt.Errorf("service: current metrics cache contained %T", result.Value)
 	}
-	return metrics, resultMeta(result), nil
+	var collectedAt time.Time
+	for _, current := range metrics {
+		collectedAt = latestTime(collectedAt, current.Timestamp)
+	}
+	return metrics, resultMetaAt(result, collectedAt), nil
 }
 
 func (s *Service) currentView(metrics datasource.CurrentMetrics) CurrentMetrics {
@@ -219,17 +223,38 @@ func cloneFloat(value *float64) *float64 {
 }
 
 func resultMeta(result cache.Result) Meta {
-	return Meta{Stale: result.State == cache.Stale, CollectedAt: result.StoredAt}
+	return Meta{Stale: result.State == cache.Stale}
+}
+
+func resultMetaAt(result cache.Result, collectedAt time.Time) Meta {
+	meta := resultMeta(result)
+	if !collectedAt.IsZero() {
+		meta.CollectedAt = collectedAt.UTC()
+	}
+	return meta
+}
+
+func latestTime(current, candidate time.Time) time.Time {
+	if candidate.IsZero() {
+		return current
+	}
+	candidate = candidate.UTC()
+	if current.IsZero() || candidate.After(current) {
+		return candidate
+	}
+	return current
 }
 
 func mergeMeta(metas ...Meta) Meta {
 	var merged Meta
 	for _, meta := range metas {
 		merged.Stale = merged.Stale || meta.Stale
+	}
+	for _, meta := range metas {
 		if meta.CollectedAt.IsZero() {
 			continue
 		}
-		if merged.CollectedAt.IsZero() || meta.CollectedAt.Before(merged.CollectedAt) {
+		if merged.CollectedAt.IsZero() || meta.CollectedAt.After(merged.CollectedAt) {
 			merged.CollectedAt = meta.CollectedAt
 		}
 	}

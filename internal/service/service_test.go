@@ -57,6 +57,25 @@ func TestOverviewCountsHostsAndAveragesAvailableMetrics(t *testing.T) {
 	}
 }
 
+func TestHostPageMetaUsesLatestMetricSampleTime(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	older := clock.Now().Add(-2 * time.Minute)
+	latest := clock.Now().Add(-time.Minute)
+	provider.metrics["h1"] = datasource.CurrentMetrics{Timestamp: older}
+	provider.metrics["h2"] = datasource.CurrentMetrics{Timestamp: latest}
+	provider.metrics["h3"] = datasource.CurrentMetrics{}
+	svc := newService(provider, clock)
+
+	_, meta, err := svc.Hosts(context.Background(), service.HostQuery{Sort: "name", Order: "asc", Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatalf("Hosts() error = %v", err)
+	}
+	if !meta.CollectedAt.Equal(latest) {
+		t.Fatalf("CollectedAt = %s, want latest sample %s", meta.CollectedAt, latest)
+	}
+}
+
 func TestOverviewSummarizesMetricAlertsAndUsesHighestHostLevel(t *testing.T) {
 	clock := newServiceClock()
 	provider := fixtureProvider(clock.Now())

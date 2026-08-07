@@ -37,7 +37,13 @@ func (s *Service) Metrics(ctx context.Context, id, rangeName string) (MetricRang
 	if !ok {
 		return MetricRange{}, Meta{}, fmt.Errorf("service: range cache contained %T", result.Value)
 	}
-	return cloneMetricRange(metricRange), resultMeta(result), nil
+	var collectedAt time.Time
+	for _, series := range metricRange.Series {
+		for _, point := range series.Points {
+			collectedAt = latestTime(collectedAt, point.Timestamp)
+		}
+	}
+	return cloneMetricRange(metricRange), resultMetaAt(result, collectedAt), nil
 }
 
 func (s *Service) loadMetricRange(ctx context.Context, id, rangeName string, duration time.Duration) (MetricRange, error) {

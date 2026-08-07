@@ -50,6 +50,7 @@ function renderDiskPage(initialEntry = '/disks') {
       </BrowserRouter>
     </QueryClientProvider>,
   )
+  return queryClient
 }
 
 function lastRequest() {
@@ -452,7 +453,7 @@ it('使用 URL 分页并在后端总页数缩小时替换为末页重新请求',
   expect(screen.queryByText(/第 999 \/ 3 页/)).not.toBeInTheDocument()
 })
 
-it('首次加载、手动刷新和刷新失败保留已有表格并提供重试', async () => {
+it('首次加载、后台刷新失败时保留已有表格并提供重试', async () => {
   let resolveInitial!: (response: Response) => void
   let resolveRefresh!: (response: Response) => void
   vi.mocked(globalThis.fetch)
@@ -482,19 +483,19 @@ it('首次加载、手动刷新和刷新失败保留已有表格并提供重试'
     .mockResolvedValueOnce(jsonResponse(diskDevicePageFixture()))
 
   const user = userEvent.setup()
-  renderDiskPage()
+  const queryClient = renderDiskPage()
   expect(screen.getByRole('status')).toHaveTextContent('正在加载硬盘设备列表…')
 
   await act(async () => resolveInitial(jsonResponse(diskDevicePageFixture())))
   await screen.findByText('node-alpha')
-  const refresh = screen.getByRole('button', { name: '刷新硬盘设备列表' })
-  await user.click(refresh)
-  expect(refresh).toBeDisabled()
-  expect(screen.getByText(/正在刷新…/)).toBeInTheDocument()
+  await act(async () => {
+    void queryClient.invalidateQueries({ queryKey: ['disk-devices'] })
+  })
   await act(async () => resolveRefresh(jsonResponse(diskDevicePageFixture())))
-  await waitFor(() => expect(refresh).toBeEnabled())
 
-  await user.click(refresh)
+  await act(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['disk-devices'] })
+  })
   const error = await screen.findByRole('alert')
   expect(error).toHaveTextContent('硬盘设备列表刷新失败')
   expect(error).toHaveTextContent('数据源暂时不可用，请稍后重试')

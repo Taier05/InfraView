@@ -52,6 +52,7 @@ function renderPage(entry = '/java') {
       </BrowserRouter>
     </QueryClientProvider>,
   )
+  return queryClient
 }
 
 function cloneFixture() {
@@ -112,7 +113,7 @@ it('严格渲染固定顺序的十三个单值单行列', async () => {
 })
 
 it('身份字段单行省略并通过原生 title 保留完整值', async () => {
-  renderPage()
+  const queryClient = renderPage()
 
   await screen.findByText('fixture-business-a')
   const cells = within(screen.getAllByRole('row')[1]).getAllByRole('cell')
@@ -304,14 +305,14 @@ it('展示初始加载、空、过期和后台刷新错误状态', async () => {
     data: { services: [], total: 0, total_pages: 0 },
     meta: { stale: true },
   })
-  renderPage()
+  const queryClient = renderPage()
   expect(screen.getByRole('status')).toHaveTextContent('正在加载 Java 业务服务')
   expect(await screen.findByText('没有符合条件的 Java 业务服务')).toBeVisible()
   expect(screen.getByRole('alert')).toHaveTextContent('数据已过期')
 
   responseBody = javaErrorFixture()
   responseStatus = 503
-  await userEvent.click(screen.getByRole('button', { name: '刷新 Java 业务服务列表' }))
+  await queryClient.invalidateQueries({ queryKey: ['java-services'] })
   expect(await screen.findByText('Java 业务服务列表刷新失败')).toBeVisible()
   expect(screen.getByText('数据已过期')).toBeVisible()
 })
@@ -320,7 +321,7 @@ it('初次错误可重试，且不安全响应被拒绝', async () => {
   responseBody = javaErrorFixture()
   responseStatus = 503
   const user = userEvent.setup()
-  renderPage()
+  const queryClient = renderPage()
   expect(await screen.findByRole('alert')).toHaveTextContent('Java 业务服务列表加载失败')
 
   responseBody = javaServicePageFixture()
@@ -329,7 +330,7 @@ it('初次错误可重试，且不安全响应被拒绝', async () => {
   expect(await screen.findByText('fixture-business-a')).toBeVisible()
 
   responseBody = { ...cloneFixture(), data: { services: [{ id: 42 }] } }
-  await user.click(screen.getByRole('button', { name: '刷新 Java 业务服务列表' }))
+  await queryClient.invalidateQueries({ queryKey: ['java-services'] })
   expect(await screen.findByText('服务器响应格式无效')).toBeVisible()
 })
 

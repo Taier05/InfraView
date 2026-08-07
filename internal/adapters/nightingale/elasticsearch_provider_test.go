@@ -177,6 +177,23 @@ func TestBuildElasticsearchSnapshotRejectsUnsafeInventoryShapes(t *testing.T) {
 	}
 }
 
+func TestBuildElasticsearchSnapshotAllowsNilOptionalQueryGroups(t *testing.T) {
+	for queryIndex := 0; queryIndex < elasticsearchClusterInventoryQuery; queryIndex++ {
+		t.Run(elasticsearchPromQL()[queryIndex], func(t *testing.T) {
+			groups := elasticsearchGroups()
+			groups[queryIndex] = nil
+
+			snapshot, err := buildElasticsearchSnapshot(groups)
+			if err != nil {
+				t.Fatalf("buildElasticsearchSnapshot() error = %v", err)
+			}
+			if len(snapshot.Clusters) != 1 || len(snapshot.Nodes) != 1 {
+				t.Fatalf("snapshot cardinality = %d/%d, want 1/1", len(snapshot.Clusters), len(snapshot.Nodes))
+			}
+		})
+	}
+}
+
 func TestBuildElasticsearchSnapshotIgnoresInventoryWithoutDomainIdentity(t *testing.T) {
 	groups := elasticsearchGroups()
 	clusterWithoutIdentity := elasticsearchSeries(

@@ -73,13 +73,23 @@ func TestDiskOverviewReturnsExactReadOnlyViewAndMeta(t *testing.T) {
 			t.Fatalf("%s = %#v, want 0", field, got)
 		}
 	}
-	assertDiskResponseMetaSchema(t, body)
+	assertJSONObjectKeys(t, body, "meta", "request_id", "stale")
+	if !jsonPathIsString(t, body, "meta.request_id") {
+		t.Fatal("empty disk response request_id is invalid")
+	}
+	if _, ok := jsonPathValue(t, body, "meta.stale").(bool); !ok {
+		t.Fatal("empty disk response stale is not a boolean")
+	}
 }
 
 func TestDiskOverviewReturnsStaleMetaAfterRefreshFailure(t *testing.T) {
 	now := testNow()
 	clock := func() time.Time { return now }
-	provider := &diskSnapshotProvider{snapshot: disk.Snapshot{}}
+	snapshot := fixtureDiskSnapshot()
+	for index := range snapshot.Devices {
+		snapshot.Devices[index].ReportedAt = now.Add(-time.Minute)
+	}
+	provider := &diskSnapshotProvider{snapshot: snapshot}
 	handler, sessionCookie := newDiskAPIProviderTestHandler(t, provider, clock)
 
 	first := request(t, handler, http.MethodGet, "/api/v1/disks/overview", "", sessionCookie)
@@ -373,6 +383,7 @@ func fixtureDiskSnapshot() disk.Snapshot {
 			Errors: disk.ErrorCounters{
 				ReallocatedSectors: &reallocatedSectors,
 			},
+			ReportedAt: time.Date(2026, time.July, 30, 8, 0, 0, 0, time.UTC),
 		},
 		{
 			ID:          "public-device-id-b",
@@ -380,6 +391,7 @@ func fixtureDiskSnapshot() disk.Snapshot {
 			Device:      "/dev/nvme0n1",
 			Model:       "fixture model b",
 			SMARTHealth: disk.HealthUnknown,
+			ReportedAt:  time.Date(2026, time.July, 30, 8, 0, 0, 0, time.UTC),
 		},
 	}}
 }

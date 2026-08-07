@@ -50,6 +50,7 @@ function renderHostList(initialEntry = '/hosts') {
       </BrowserRouter>
     </QueryClientProvider>,
   )
+  return queryClient
 }
 
 function lastRequest() {
@@ -112,8 +113,12 @@ it('按真实 hosts schema 渲染筛选器、可排序列、状态和空指标',
 
   const appName = await screen.findByText('linux-app-01')
 
-  expect(screen.getByText(/上次刷新 \d{2}:\d{2}:\d{2}/)).toBeInTheDocument()
-  expect(screen.getByText(/每 15 秒自动刷新/)).toBeInTheDocument()
+  const dataTime = await screen.findByText('2026/07/21 00:30:00')
+  expect(dataTime.closest('.data-time')).toHaveTextContent(
+    '最新数据时间：2026/07/21 00:30:00',
+  )
+  expect(screen.queryByRole('button', { name: /刷新/ })).not.toBeInTheDocument()
+  expect(screen.queryByText(/上次刷新|自动刷新/)).not.toBeInTheDocument()
 
   for (const label of [
     '主机名',
@@ -486,31 +491,6 @@ it('连续快速输入只在最后一次变更 300ms 后请求最终搜索词', 
   expect(window.location.search).toContain('q=abc')
 })
 
-it('支持手动刷新并在请求期间禁用刷新按钮', async () => {
-  let resolveRefresh!: (response: Response) => void
-  vi.mocked(globalThis.fetch)
-    .mockResolvedValueOnce(jsonResponse(hostPageFixture()))
-    .mockImplementationOnce(
-      () =>
-        new Promise<Response>((resolve) => {
-          resolveRefresh = resolve
-        }),
-    )
-  const user = userEvent.setup()
-  renderHostList()
-
-  await screen.findByText('linux-app-01')
-  const refresh = screen.getByRole('button', { name: '刷新主机列表' })
-  await user.click(refresh)
-
-  expect(refresh).toBeDisabled()
-  expect(screen.getByText(/正在刷新…/)).toBeInTheDocument()
-  expect(globalThis.fetch).toHaveBeenCalledTimes(2)
-  await act(async () => resolveRefresh(jsonResponse(hostPageFixture())))
-  await waitFor(() => expect(refresh).toBeEnabled())
-  expect(screen.getByText(/上次刷新 \d{2}:\d{2}:\d{2}/)).toBeInTheDocument()
-})
-
 it('每 15 秒非重叠自动刷新主机列表', async () => {
   vi.useFakeTimers()
   let resolveInitial!: (response: Response) => void
@@ -555,10 +535,12 @@ it('后台刷新失败时保留已有表格并显示可重试提示', async () =
     )
     .mockResolvedValueOnce(jsonResponse(hostPageFixture()))
   const user = userEvent.setup()
-  renderHostList()
+  const queryClient = renderHostList()
 
   await screen.findByText('linux-app-01')
-  await user.click(screen.getByRole('button', { name: '刷新主机列表' }))
+  await act(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['hosts'] })
+  })
 
   const error = await screen.findByRole('alert')
   expect(error).toHaveTextContent('主机列表刷新失败')

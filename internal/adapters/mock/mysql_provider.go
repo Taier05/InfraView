@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"time"
 
 	"github.com/Taier05/InfraView/internal/mysql"
 )
@@ -52,10 +53,12 @@ func mysqlFixtureInstance(host, name, address string, availability mysql.Availab
 
 func mockMySQLInstance(host, name, address string) mysql.Instance {
 	return mysql.Instance{
-		ID:      mysql.StableInstanceID(host, name, address),
-		Host:    host,
-		Name:    name,
-		Address: address,
+		ID:                mysql.StableInstanceID(host, name, address),
+		Host:              host,
+		Name:              name,
+		Address:           address,
+		CollectionTracked: true,
+		ReportedAt:        time.Date(2026, time.July, 28, 8, 0, 0, 0, time.UTC),
 	}
 }
 

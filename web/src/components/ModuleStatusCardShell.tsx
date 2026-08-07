@@ -1,6 +1,8 @@
 import type { PropsWithChildren } from "react";
 import { Link } from "react-router-dom";
 
+import { DataTime } from "./DataTime";
+
 type ModuleCardLevel =
   | "normal"
   | "warning"
@@ -23,6 +25,7 @@ interface ModuleStatusCardShellProps extends PropsWithChildren {
   actionLabel: string;
   emptyState?: ModuleEmptyState;
   className?: string;
+  collectedAt?: string;
 }
 
 export function ModuleStatusCardShell({
@@ -35,6 +38,7 @@ export function ModuleStatusCardShell({
   actionLabel,
   emptyState,
   className,
+  collectedAt,
   children,
 }: ModuleStatusCardShellProps) {
   const classes = ["module-status-card", className].filter(Boolean).join(" ");
@@ -67,6 +71,7 @@ export function ModuleStatusCardShell({
       )}
 
       <div className="module-status-footer">
+        <DataTime collectedAt={collectedAt} className="data-time" />
         <span className="module-status-action">
           {actionLabel} <span aria-hidden="true">→</span>
         </span>

@@ -28,6 +28,30 @@ func TestJavaBusinessNameUsesExactMapping(t *testing.T) {
 	}
 }
 
+func TestJavaServiceMetaUsesLatestSampleTimeAndLeavesEmptySnapshotUnset(t *testing.T) {
+	now := time.Date(2026, time.August, 7, 8, 0, 0, 0, time.UTC)
+	older := healthyJavaService("fixture-older", "tikbee", "fixture-address-older", now.Add(-2*time.Minute))
+	latest := healthyJavaService("fixture-latest", "rider", "fixture-address-latest", now.Add(-time.Minute))
+	service := newJavaServiceWithSnapshot(now, javaapp.Snapshot{Services: []javaapp.Service{older, latest}})
+
+	_, meta, err := service.Overview(context.Background())
+	if err != nil {
+		t.Fatalf("Overview() error = %v", err)
+	}
+	if !meta.CollectedAt.Equal(latest.ReportedAt) {
+		t.Fatalf("CollectedAt = %s, want latest sample %s", meta.CollectedAt, latest.ReportedAt)
+	}
+
+	emptyService := newJavaServiceWithSnapshot(now, javaapp.Snapshot{})
+	_, emptyMeta, err := emptyService.Overview(context.Background())
+	if err != nil {
+		t.Fatalf("empty Overview() error = %v", err)
+	}
+	if !emptyMeta.CollectedAt.IsZero() {
+		t.Fatalf("empty CollectedAt = %s, want zero", emptyMeta.CollectedAt)
+	}
+}
+
 func TestJavaStatusUsesCriticalBusinessSignalsBeforeCollection(t *testing.T) {
 	now := time.Date(2026, time.August, 5, 0, 0, 0, 0, time.UTC)
 	tests := []struct {

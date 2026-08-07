@@ -131,6 +131,10 @@ Nightingale API 响应外层使用 `dat`、`err`、`request_id` 字段；不能�
 
 任何真实凭据都不得进入仓库、测试夹具、错误消息或日志。
 
+## 上游样本时间契约
+
+API 的既有 `meta.collected_at` 统一表示“本次响应内最新有效 Nightingale 样本时间”，来源只能是已解析样本的 `Timestamp`、领域快照的 `ReportedAt` 或健康检查的 `CheckedAt`。多组数据合并时取最大非零值并输出 UTC；缓存命中或 stale 回退仍保留最近一次样本时间，不能使用缓存写入时间、HTTP 响应时间、Service Clock 或浏览器时间替代。响应中没有任何有效样本时省略 `collected_at`。该字段只表达样本时间，是否 stale 仍由 `meta.stale` 独立表达。
+
 ## 当前凭据与后续动作
 
 真实部署必须配置专用最小只读 Token；公开仓库不记录 Token 值、绑定账号或权限。InfraView 仍只调用已确认的只读接口，但应用只读边界不能替代上游最小权限。
@@ -177,6 +181,8 @@ tlast_over_time(elasticsearch_jvm_uptime_seconds[24h])
 ```
 
 第 25 组只建立最近 24 小时集群集合并提供原始最后样本时间，第 26 组只建立最近 24 小时节点集合并提供原始最后样本时间；其他指标不能创建未知身份。集群身份只使用规范化 `cluster`，节点身份只使用 `cluster + name`；`host` 仅用于地址展示，`ident`、`instance`、原始角色标志、PromQL 和数据源信息不进入领域输出或 API。多采集器序列按领域身份去重，最新同时间冲突保持缺失。
+
+26 组返回数量必须精确一致。第 25/26 组 inventory 是身份集合硬依赖，任一为 `null` 时整个快照安全失败；第 1–24 组均为可选观测数据，单组 `null` 只令对应字段暂缺，不能把整个 Elasticsearch 快照判为不可用或 stale。此规则不改变查询文本、顺序、批次数和无 N+1 边界。
 
 集群和节点共用一次快照、无 N+1，但状态与 freshness 分离。集群来源同级优先为 availability、health、collection；节点来源同级优先为 collection、disk、jvm、thread_pool。默认 15 秒周期下连续 2/5 周期未推进为 warning/critical。节点磁盘使用率 85%/90%、JVM 堆使用率 75%/85% 分别为 warning/critical；最近 5 分钟拒绝速率大于 0 为 warning。`elasticsearch_node_stats_up` 仅表达集群级采集状态，集群黄/红不传播为单节点异常。
 

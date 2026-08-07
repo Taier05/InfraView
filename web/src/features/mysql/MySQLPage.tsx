@@ -18,7 +18,7 @@ import type {
 } from '../../api/types'
 import { useRefreshIntervalMs } from '../../app/runtime'
 import { ErrorPanel } from '../../components/ErrorPanel'
-import { RefreshControl } from '../../components/RefreshControl'
+import { DataTime } from '../../components/DataTime'
 import { StaleBanner } from '../../components/StaleBanner'
 
 const pageSizes = [20, 50, 100] as const
@@ -575,12 +575,9 @@ export function MySQLPage() {
             ))}
           </select>
         </label>
-        <RefreshControl
-          isFetching={instances.isFetching}
-          dataUpdatedAt={instances.dataUpdatedAt}
-          onRefresh={() => void instances.refetch()}
-          refreshIntervalSeconds={refreshIntervalMs / 1_000}
-          ariaLabel="刷新 MySQL 实例列表"
+        <DataTime
+          collectedAt={instances.data?.meta.collected_at}
+          className="data-time"
         />
       </div>
 

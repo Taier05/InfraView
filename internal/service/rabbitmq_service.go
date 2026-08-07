@@ -81,7 +81,11 @@ func (service *RabbitMQService) snapshotState(ctx context.Context) (rabbitMQSnap
 	if !ok {
 		return rabbitMQSnapshotState{}, Meta{}, fmt.Errorf("service: rabbitmq cache contained %T", result.Value)
 	}
-	return cloneRabbitMQSnapshotState(state), resultMeta(result), nil
+	var collectedAt time.Time
+	for _, node := range state.snapshot.Nodes {
+		collectedAt = latestTime(collectedAt, node.ReportedAt)
+	}
+	return cloneRabbitMQSnapshotState(state), resultMetaAt(result, collectedAt), nil
 }
 
 func captureRabbitMQProgress(tracker *freshnessTracker, samples map[string]time.Time) map[string]time.Time {
