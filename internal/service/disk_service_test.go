@@ -677,6 +677,63 @@ func TestDiskServiceErrorSortUsesDisplayedCountersKeepsMissingLastAndUsesIDTieBr
 	}
 }
 
+func TestDiskServiceErrorSortIncludesEveryDisplayedCounter(t *testing.T) {
+	one := float64(1)
+	two := float64(2)
+	tests := []struct {
+		name string
+		set  func(*disk.ErrorCounters, *float64)
+	}{
+		{name: "pending sectors", set: func(errors *disk.ErrorCounters, value *float64) { errors.PendingSectors = value }},
+		{name: "reallocated sectors", set: func(errors *disk.ErrorCounters, value *float64) { errors.ReallocatedSectors = value }},
+		{name: "uncorrectable sectors", set: func(errors *disk.ErrorCounters, value *float64) { errors.UncorrectableSectors = value }},
+		{name: "udma crc errors", set: func(errors *disk.ErrorCounters, value *float64) { errors.UDMACRCErrors = value }},
+		{name: "media integrity errors", set: func(errors *disk.ErrorCounters, value *float64) { errors.MediaIntegrityErrors = value }},
+		{name: "error log entries", set: func(errors *disk.ErrorCounters, value *float64) { errors.ErrorLogEntries = value }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			lowerErrors := disk.ErrorCounters{}
+			test.set(&lowerErrors, &one)
+			higherErrors := disk.ErrorCounters{}
+			test.set(&higherErrors, &two)
+			service := NewDisk(&diskTestProvider{snapshot: disk.Snapshot{Devices: []disk.Device{
+				{ID: "id-a-higher", HostID: "host", Device: "disk1", SMARTHealth: disk.HealthHealthy, Errors: higherErrors},
+				{ID: "id-z-lower", HostID: "host", Device: "disk2", SMARTHealth: disk.HealthHealthy, Errors: lowerErrors},
+			}}}, nil, DiskOptions{})
+
+			page, _, err := service.Devices(context.Background(), DiskQuery{
+				Sort: "errors", Order: "asc", Page: 1, PageSize: 20,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := fmt.Sprint(diskDeviceIDs(page.Devices)); got != "[id-z-lower id-a-higher]" {
+				t.Fatalf("IDs = %s, want displayed counter to set ascending order", got)
+			}
+		})
+	}
+}
+
+func TestDiskServiceErrorSortExcludesUnsafeShutdowns(t *testing.T) {
+	zero := float64(0)
+	one := float64(1)
+	service := NewDisk(&diskTestProvider{snapshot: disk.Snapshot{Devices: []disk.Device{
+		{ID: "id-a-unsafe-only", HostID: "host", Device: "disk1", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{UnsafeShutdowns: &zero}},
+		{ID: "id-z-displayed", HostID: "host", Device: "disk2", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{PendingSectors: &one}},
+	}}}, nil, DiskOptions{})
+
+	page, _, err := service.Devices(context.Background(), DiskQuery{
+		Sort: "errors", Order: "asc", Page: 1, PageSize: 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(diskDeviceIDs(page.Devices)); got != "[id-z-displayed id-a-unsafe-only]" {
+		t.Fatalf("IDs = %s, want unsafe shutdowns excluded and unavailable values last", got)
+	}
+}
+
 func TestDiskServiceExplicitTextAndStatusSorts(t *testing.T) {
 	devices := []disk.Device{
 		{ID: "critical", HostID: "host10", Device: "disk10", SMARTHealth: disk.HealthFailed},
@@ -699,6 +756,35 @@ func TestDiskServiceExplicitTextAndStatusSorts(t *testing.T) {
 		})
 		if err != nil || page.Devices[0].ID != test.want {
 			t.Errorf("%s/%s page/error = %#v/%v, want first %q", test.field, test.order, page, err, test.want)
+		}
+	}
+}
+
+func TestDiskServiceStatusSortUsesListRankAndIDTieBreaker(t *testing.T) {
+	devices := []disk.Device{
+		{ID: "id-critical", HostID: "host", Device: "disk1", SMARTHealth: disk.HealthFailed},
+		{ID: "id-warning-b", HostID: "host", Device: "disk2", SMARTHealth: disk.HealthHealthy, AttributeFailure: disk.AttributeFailurePast},
+		{ID: "id-normal", HostID: "host", Device: "disk3", SMARTHealth: disk.HealthHealthy},
+		{ID: "id-unknown", HostID: "host", Device: "disk4", SMARTHealth: disk.HealthUnknown},
+		{ID: "id-warning-a", HostID: "host", Device: "disk5", SMARTHealth: disk.HealthHealthy, AttributeFailure: disk.AttributeFailurePast},
+	}
+	service := NewDisk(&diskTestProvider{snapshot: disk.Snapshot{Devices: devices}}, nil, DiskOptions{})
+
+	for _, test := range []struct {
+		order string
+		want  string
+	}{
+		{order: "asc", want: "[id-normal id-warning-a id-warning-b id-critical id-unknown]"},
+		{order: "desc", want: "[id-unknown id-critical id-warning-a id-warning-b id-normal]"},
+	} {
+		page, _, err := service.Devices(context.Background(), DiskQuery{
+			Sort: "status", Order: test.order, Page: 1, PageSize: 20,
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", test.order, err)
+		}
+		if got := fmt.Sprint(diskDeviceIDs(page.Devices)); got != test.want {
+			t.Fatalf("%s IDs = %s, want %s", test.order, got, test.want)
 		}
 	}
 }
