@@ -397,6 +397,27 @@ it('筛选页数和全部十三个排序键都重置页码', async () => {
   })
 })
 
+it('通过每页数量下拉切换到 500 并发送最后 GET', async () => {
+  respondWithRequestedPage()
+  const user = userEvent.setup()
+  renderPage('/java?page=3&page_size=20')
+
+  await screen.findByText('第 3 / 3 页，共 60 个服务')
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: '每页数量' }),
+    '500',
+  )
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=500')
+    expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+      sort: 'business',
+      direction: 'asc',
+      page: '1',
+      page_size: '500',
+    })
+  })
+})
+
 it('展示初始加载、空、过期和后台刷新错误状态', async () => {
   responseDelay = 20
   responseBody = javaServicePageFixture({

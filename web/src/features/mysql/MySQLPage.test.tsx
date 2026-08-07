@@ -15,6 +15,7 @@ import { mysqlInstancePageFixture } from '../../test/fixtures'
 import { MySQLPage } from './MySQLPage'
 
 const requestedURLs: URL[] = []
+let pageSize500Total = 1001
 const mysqlSortFields = [
   ['实例地址', 'instance'],
   ['版本', 'version'],
@@ -77,13 +78,14 @@ function lastRequest() {
 
 beforeEach(() => {
   requestedURLs.length = 0
+  pageSize500Total = 1001
   window.history.replaceState({}, '', '/')
   vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
     const url = requestURL(input)
     requestedURLs.push(url)
     const page = Number(url.searchParams.get('page') ?? '1')
     const pageSize = Number(url.searchParams.get('page_size') ?? '20')
-    const total = pageSize === 500 ? 1001 : 64
+    const total = pageSize === 500 ? pageSize500Total : 64
     return Promise.resolve(
       jsonResponse(
         mysqlInstancePageFixture({
@@ -346,6 +348,42 @@ it('writes filters sort and pagination to the URL', async () => {
       sort: 'qps',
       order: 'asc',
       page: '1',
+      page_size: '500',
+    })
+  })
+})
+
+it('uses the page-size control for the exact 501-row boundary without truncation', async () => {
+  pageSize500Total = 501
+  const user = userEvent.setup()
+  renderMySQLPage('/mysql?page=3&page_size=20')
+
+  await screen.findByText('第 3 / 4 页，共 64 个实例')
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: '每页数量' }),
+    '500',
+  )
+
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=500')
+    expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+      sort: 'instance',
+      order: 'asc',
+      page: '1',
+      page_size: '500',
+    })
+  })
+  expect(await screen.findByText('第 1 / 2 页，共 501 个实例')).toBeVisible()
+  const nextPage = screen.getByRole('button', { name: '下一页' })
+  expect(nextPage).toBeEnabled()
+
+  await user.click(nextPage)
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=2&page_size=500')
+    expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+      sort: 'instance',
+      order: 'asc',
+      page: '2',
       page_size: '500',
     })
   })

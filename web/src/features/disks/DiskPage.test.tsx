@@ -418,9 +418,21 @@ it('搜索、状态和每页数量变化写入 URL 并回到第一页', async ()
     target: { value: '500' },
   })
   await act(async () => vi.advanceTimersByTimeAsync(0))
-  expect(lastRequest().searchParams.get('page_size')).toBe('500')
-  expect(lastRequest().searchParams.get('page')).toBe('1')
-  expect(window.location.search).toContain('search=atlas')
+  vi.useRealTimers()
+  await waitFor(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    expect(searchParams.get('page')).toBe('1')
+    expect(searchParams.get('page_size')).toBe('500')
+    expect(searchParams.get('search')).toBe('atlas')
+    expectRequestParameters(lastRequest(), {
+      search: 'atlas',
+      status: 'critical',
+      sort: 'host',
+      order: 'asc',
+      page: '1',
+      page_size: '500',
+    })
+  })
 })
 
 it('从第 3 页恢复 500 条多页契约并在排序后保留页大小', async () => {

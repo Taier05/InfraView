@@ -263,6 +263,27 @@ it('把四种筛选、分页大小与固定白名单写入 URL 和请求', async
   expect(requests.at(-1)?.searchParams.has('unknown')).toBe(false)
 })
 
+it('通过每页数量下拉切换到 500 并发送最后 GET', async () => {
+  respondWithRequestedPage()
+  const user = userEvent.setup()
+  renderPage('/elasticsearch?page=3&page_size=20')
+
+  await screen.findByText('第 3 / 3 页，共 60 个节点')
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: '每页数量' }),
+    '500',
+  )
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=500')
+    expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+      sort: 'node',
+      order: 'asc',
+      page: '1',
+      page_size: '500',
+    })
+  })
+})
+
 it('搜索等待精确 300ms 后写入 URL 并重置页码', async () => {
   respondWithRequestedPage()
   renderPage('/elasticsearch?page=3')

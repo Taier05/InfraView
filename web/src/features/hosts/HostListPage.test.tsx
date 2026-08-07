@@ -415,13 +415,83 @@ it('切换每页数量会回到第一页并写入 URL', async () => {
   )
 
   await waitFor(() => {
-    expect(lastRequest().searchParams.get('page')).toBe('1')
-    expect(lastRequest().searchParams.get('page_size')).toBe('500')
+    expect(window.location.search).toContain('page=1')
+    expect(window.location.search).toContain('page_size=500')
+    expectRequestParameters(lastRequest(), {
+      q: '',
+      status: '',
+      sort: 'name',
+      order: 'asc',
+      page: '1',
+      page_size: '500',
+    })
   })
-  expect(window.location.search).toContain('page=1')
-  expect(window.location.search).toContain('page_size=500')
   expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('500')
   expect(await screen.findByText('第 1 / 3 页，共 1001 台')).toBeInTheDocument()
+})
+
+it('通过浏览器后退和前进恢复每页数量及对应 GET', async () => {
+  const user = userEvent.setup()
+  renderHostList('/hosts?page=2&page_size=20')
+
+  await screen.findByText('第 2 / 3 页，共 41 台')
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: '每页数量' }),
+    '500',
+  )
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=500')
+    expectRequestParameters(lastRequest(), {
+      q: '',
+      status: '',
+      sort: 'name',
+      order: 'asc',
+      page: '1',
+      page_size: '500',
+    })
+  })
+
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: '每页数量' }),
+    '50',
+  )
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=50')
+    expectRequestParameters(lastRequest(), {
+      q: '',
+      status: '',
+      sort: 'name',
+      order: 'asc',
+      page: '1',
+      page_size: '50',
+    })
+  })
+
+  act(() => window.history.back())
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=500')
+    expectRequestParameters(lastRequest(), {
+      q: '',
+      status: '',
+      sort: 'name',
+      order: 'asc',
+      page: '1',
+      page_size: '500',
+    })
+  })
+
+  act(() => window.history.forward())
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=50')
+    expectRequestParameters(lastRequest(), {
+      q: '',
+      status: '',
+      sort: 'name',
+      order: 'asc',
+      page: '1',
+      page_size: '50',
+    })
+  })
 })
 
 it('把超出服务端总页数的 URL 替换为末页并直接重新请求', async () => {

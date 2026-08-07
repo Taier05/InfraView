@@ -426,6 +426,27 @@ it("把角色状态排序和分页写入 URL 与固定 GET 参数", async () => 
   });
 });
 
+it("通过每页数量下拉切换到 500 并发送最后 GET", async () => {
+  mockPaginatedRedisRequests();
+  const user = userEvent.setup();
+  renderPage("/redis?page=3&page_size=20");
+
+  await screen.findByText("第 3 / 4 页，共 64 个实例");
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "每页数量" }),
+    "500",
+  );
+  await waitFor(() => {
+    expect(window.location.search).toContain("page=1&page_size=500");
+    expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+      sort: "instance",
+      order: "asc",
+      page: "1",
+      page_size: "500",
+    });
+  });
+});
+
 it("搜索防抖后重置页码并仅发送固定参数", async () => {
   const user = userEvent.setup();
   renderPage("/redis?page=3");

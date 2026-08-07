@@ -50,3 +50,29 @@ git diff --check
 
 - Review fix round1 仅暂存七个 Page、七个对应测试和本报告，本地提交 `fix: normalize 500-row list URLs`。
 - 不包含已有的 `task-2-report.md` 修改；不 push、不部署、不重启。
+
+## Review fix round2
+
+### 七页 UI 切换 500
+
+- Host、Disk、MySQL、Redis、Elasticsearch、RabbitMQ、Java 均由测试实际操作“每页数量”下拉选择 500；每页都在同一个 `waitFor` 中断言 URL 回到 `page=1`、保留 `page_size=500`，并断言最后一次 GET 的完整白名单参数。
+- Disk 用例继续用 fake timers 精确验证 300ms 搜索防抖；排空业务计时器后恢复 real timers，再用 `waitFor` 等待最终 URL 与 GET，避免测试轮询被 fake timers 阻塞。
+- 有效 mutation RED：临时让共享 `ListPageSizeField` 的 `onChange` 忽略值 500，七页定向用例 7/7 失败；恢复正常 `onChange` 后相同集合 7/7 通过。一次更早的诊断误改了无关的 `ListSelectField`，结果不计为 RED，随即恢复且未留下差异。
+
+### 精确 501/2 边界
+
+- MySQL 独立用例从 `page=3&page_size=20` 实际选择 500；fixture 精确返回 `total=501,total_pages=2`，UI 显示“第 1 / 2 页，共 501 个实例”，“下一页”保持可用，点击后 URL 与最后 GET 均为 `page=2&page_size=500`。
+- round1 七页 `total=1001,total_pages=3` 的 page 3 URL 恢复证据全部保留。
+- mutation RED：临时将该用例的 500 行响应总数从 501 改为 500，用例因不存在第 2 页而失败；恢复 501 后单用例 1/1 通过。
+
+### history back/forward
+
+- Host 代表性用例先从 20 实际切到 500，再切到 50；随后调用真实 `window.history.back()` 恢复 500，再调用 `window.history.forward()` 恢复 50。四个状态均在 `waitFor` 内同时断言 URL 与最后 GET。
+- mutation RED：临时把用户分页参数写入由 push 改成 `replace`，`back()` 后仍停留在 50，测试失败；恢复 push 后单用例 1/1 通过。服务端页码规范化分支继续使用原有 `replace`，无生产代码持久差异。
+
+### Round2 验证
+
+- 七页 UI 选 500 定向集合：7/7 通过。
+- Node 22 focused：8/8 文件、222/222 测试通过；typecheck 通过。
+- Node 22 全量前端：17/17 文件、350/350 测试通过；typecheck 通过。Java/RabbitMQ POST 未匹配 MSW 的 stderr 仍为既有只读拒绝契约，测试通过。
+- round2 持久差异仅为七个页面测试和本报告；共享控件及页面产品代码的 mutation 均已恢复。已有 `task-2-report.md` 修改不纳入本轮提交；不 push、不部署、不重启。
