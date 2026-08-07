@@ -19,6 +19,7 @@ import (
 	"github.com/Taier05/InfraView/internal/datasource"
 	"github.com/Taier05/InfraView/internal/disk"
 	"github.com/Taier05/InfraView/internal/elasticsearch"
+	"github.com/Taier05/InfraView/internal/javaapp"
 	"github.com/Taier05/InfraView/internal/mysql"
 	"github.com/Taier05/InfraView/internal/mysql/mysqltest"
 	"github.com/Taier05/InfraView/internal/rabbitmq"
@@ -314,6 +315,61 @@ func TestBuildHandlerWiresAuthenticatedRabbitMQAPI(t *testing.T) {
 	}
 }
 
+func TestBuildHandlerWiresAuthenticatedJavaAPI(t *testing.T) {
+	clock := func() time.Time { return time.Date(2026, 8, 5, 8, 0, 0, 0, time.UTC) }
+	cfg := config.Config{
+		Username: "admin", Password: "correct-password", SessionTTL: 12 * time.Hour,
+		DataSource: "mock", MockHostCount: 1, ExpectedCollectionInterval: 15 * time.Second,
+		SMARTCollectionInterval: time.Minute, MaxStale: time.Minute, UpstreamTimeout: time.Second,
+	}
+	handler := buildHandler(cfg, clock, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	loginRequest := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/session", strings.NewReader(`{"username":"admin","password":"correct-password"}`))
+	login := httptest.NewRecorder()
+	handler.ServeHTTP(login, loginRequest)
+	if login.Code != http.StatusNoContent || len(login.Result().Cookies()) != 1 {
+		t.Fatalf("login response = %d", login.Code)
+	}
+	request := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/java/services", nil)
+	request.AddCookie(login.Result().Cookies()[0])
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"services":[`) {
+		t.Fatalf("Java response = %d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestProviderSetUsesMockForJava(t *testing.T) {
+	providers := dataSourceProviders(config.Config{DataSource: "mock", MockHostCount: 1}, time.Now)
+	if providers.Java == nil {
+		t.Fatal("mock provider set has nil Java provider")
+	}
+	if _, err := providers.Java.JavaSnapshot(context.Background()); err != nil {
+		t.Fatalf("JavaSnapshot() error = %v", err)
+	}
+}
+
+func TestProviderSetSharesConfiguredAndInvalidNightingaleProviderWithJava(t *testing.T) {
+	for _, mode := range []string{"nightingale", "unknown"} {
+		t.Run(mode, func(t *testing.T) {
+			providers := dataSourceProviders(config.Config{
+				DataSource: mode, NightingaleBaseURL: "https://n9e.example.com", NightingaleToken: "fixture-token",
+			}, time.Now)
+			hostProvider, hostOK := providers.Hosts.(*nightingale.Provider)
+			javaProvider, javaOK := providers.Java.(*nightingale.Provider)
+			if !hostOK || !javaOK || hostProvider != javaProvider {
+				t.Fatal("Java does not share the configured Nightingale client")
+			}
+		})
+	}
+}
+
+func TestProviderSetUsesSafeUnavailableJavaProviderForUnknownMode(t *testing.T) {
+	providers := dataSourceProviders(config.Config{DataSource: "unknown"}, time.Now)
+	if _, err := providers.Java.JavaSnapshot(context.Background()); !errors.Is(err, javaapp.ErrUnavailable) {
+		t.Fatalf("Java error = %v", err)
+	}
+}
+
 func TestDataSourceProvidersWiresNightingaleConfiguration(t *testing.T) {
 	const token = "fixture-main-token"
 	called := false
@@ -453,6 +509,15 @@ func TestRabbitMQTimeoutProviderAddsDeadlineAndCancelsSlowSnapshot(t *testing.T)
 	provider := withRabbitMQUpstreamTimeout(blockingRabbitMQProvider{}, 10*time.Millisecond)
 	started := time.Now()
 	_, err := provider.RabbitMQSnapshot(context.Background())
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) > time.Second {
+		t.Fatalf("error = %v, elapsed = %s", err, time.Since(started))
+	}
+}
+
+func TestJavaTimeoutProviderAddsDeadlineAndCancelsSlowSnapshot(t *testing.T) {
+	provider := withJavaUpstreamTimeout(blockingJavaProvider{}, 10*time.Millisecond)
+	started := time.Now()
+	_, err := provider.JavaSnapshot(context.Background())
 	if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) > time.Second {
 		t.Fatalf("error = %v, elapsed = %s", err, time.Since(started))
 	}
@@ -664,6 +729,15 @@ func (blockingRabbitMQProvider) RabbitMQSnapshot(ctx context.Context) (rabbitmq.
 }
 
 var _ rabbitmq.Provider = blockingRabbitMQProvider{}
+
+type blockingJavaProvider struct{}
+
+func (blockingJavaProvider) JavaSnapshot(ctx context.Context) (javaapp.Snapshot, error) {
+	<-ctx.Done()
+	return javaapp.Snapshot{}, ctx.Err()
+}
+
+var _ javaapp.Provider = blockingJavaProvider{}
 
 func newControlledServer() *controlledServer {
 	return &controlledServer{
