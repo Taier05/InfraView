@@ -83,13 +83,15 @@ beforeEach(() => {
     requestedURLs.push(url)
     const page = Number(url.searchParams.get('page') ?? '1')
     const pageSize = Number(url.searchParams.get('page_size') ?? '20')
+    const total = pageSize === 500 ? 1001 : 64
     return Promise.resolve(
       jsonResponse(
         mysqlInstancePageFixture({
           data: {
             page,
             page_size: pageSize,
-            total_pages: Math.ceil(64 / pageSize),
+            total,
+            total_pages: Math.ceil(total / pageSize),
           },
         }),
       ),
@@ -302,8 +304,15 @@ it('uses only service-valid fixture replication combinations', () => {
 
 it('writes filters sort and pagination to the URL', async () => {
   const user = userEvent.setup()
-  renderMySQLPage('/mysql?page=3')
-  await screen.findByText('192.0.2.101:3306')
+  renderMySQLPage('/mysql?page=3&page_size=500')
+  expect(await screen.findByText('第 3 / 3 页，共 1001 个实例')).toBeVisible()
+  expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('500')
+  expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+    sort: 'instance',
+    order: 'asc',
+    page: '3',
+    page_size: '500',
+  })
   await user.selectOptions(
     screen.getByRole('combobox', { name: '实例状态' }),
     'warning',
@@ -315,10 +324,6 @@ it('writes filters sort and pagination to the URL', async () => {
   await user.selectOptions(
     screen.getByRole('combobox', { name: '实例标签' }),
     'tier-fixture',
-  )
-  await user.selectOptions(
-    screen.getByRole('combobox', { name: '每页数量' }),
-    '500',
   )
   await user.click(
     screen.getByRole('button', {
@@ -660,7 +665,7 @@ it('normalizes invalid URL state and out-of-range response pages', async () => {
   })
   const historyLength = window.history.length
   renderMySQLPage(
-    '/mysql?label=%20%20&status=broken&role=admin&sort=sql&order=sideways&page=999&page_size=9',
+    '/mysql?label=%20%20&status=broken&role=admin&sort=sql&order=sideways&page=999&page_size=20',
   )
   expect(await screen.findByText('第 4 / 4 页，共 64 个实例')).toBeVisible()
   expect(requestedURLs.map((url) => url.searchParams.get('page'))).toEqual([
@@ -675,7 +680,7 @@ it('normalizes invalid URL state and out-of-range response pages', async () => {
 })
 
 it.each([499, 501])('normalizes page_size=%i to 20 on the first page', async (pageSize) => {
-  renderMySQLPage(`/mysql?page=1&page_size=${pageSize}`)
+  renderMySQLPage(`/mysql?page=3&page_size=${pageSize}`)
 
   await screen.findByText('192.0.2.101:3306')
   await waitFor(() => {

@@ -65,13 +65,14 @@ function respondWithRequestedPage() {
       const url = new URL(request.url)
       requests.push(url)
       const pageSize = Number(url.searchParams.get('page_size'))
+      const total = pageSize === 500 ? 1001 : 60
       return HttpResponse.json(
         javaServicePageFixture({
           data: {
             page: Number(url.searchParams.get('page')),
             page_size: pageSize,
-            total: 60,
-            total_pages: Math.ceil(60 / pageSize),
+            total,
+            total_pages: Math.ceil(total / pageSize),
           },
         }),
       )
@@ -245,7 +246,8 @@ it('从白名单 URL 恢复筛选排序分页并规范非法参数', async () =>
 })
 
 it.each([499, 501])('将非法 page_size=%i 规范为 20 且回到第一页', async (pageSize) => {
-  renderPage(`/java?page=1&page_size=${pageSize}`)
+  respondWithRequestedPage()
+  renderPage(`/java?page=3&page_size=${pageSize}`)
 
   await screen.findByText('fixture-business-a')
   await waitFor(() => {
@@ -367,18 +369,32 @@ it('空白搜索在 URL 和 300ms 输入后都删除且不透传给后端', asyn
 it('筛选页数和全部十三个排序键都重置页码', async () => {
   respondWithRequestedPage()
   const user = userEvent.setup()
-  renderPage('/java?page=3')
-  await screen.findByText('fixture-business-a')
+  renderPage('/java?page=3&page_size=500')
+  expect(await screen.findByText('第 3 / 3 页，共 1001 个服务')).toBeVisible()
+  expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('500')
+  expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+    sort: 'business',
+    direction: 'asc',
+    page: '3',
+    page_size: '500',
+  })
 
   await user.selectOptions(screen.getByRole('combobox', { name: '业务端' }), 'fixture-service-a')
   await user.selectOptions(screen.getByRole('combobox', { name: '服务状态' }), 'critical')
-  await user.selectOptions(screen.getByRole('combobox', { name: '每页数量' }), '500')
   for (const [index, header] of exactHeaders.entries()) {
     await user.click(screen.getByRole('button', { name: new RegExp(`^${header}排序`) }))
     await waitFor(() => expect(requests.at(-1)?.searchParams.get('sort')).toBe(sortFields[index]))
   }
   expect(new URLSearchParams(window.location.search).get('page')).toBe('1')
   expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('500')
+  expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+    name: 'fixture-service-a',
+    status: 'critical',
+    sort: 'status',
+    direction: 'asc',
+    page: '1',
+    page_size: '500',
+  })
 })
 
 it('展示初始加载、空、过期和后台刷新错误状态', async () => {

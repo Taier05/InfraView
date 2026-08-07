@@ -114,13 +114,15 @@ beforeEach(() => {
     requestedURLs.push(url)
     const page = Number(url.searchParams.get('page') ?? '1')
     const pageSize = Number(url.searchParams.get('page_size') ?? '20')
+    const total = pageSize === 500 ? 1001 : 45
     return Promise.resolve(
       jsonResponse(
         (() => {
           const fixture = diskPageFixtureForDisplayTests()
           fixture.data.page = page
           fixture.data.page_size = pageSize
-          fixture.data.total_pages = Math.ceil(45 / pageSize)
+          fixture.data.total = total
+          fixture.data.total_pages = Math.ceil(total / pageSize)
           return fixture
         })(),
       ),
@@ -421,8 +423,33 @@ it('搜索、状态和每页数量变化写入 URL 并回到第一页', async ()
   expect(window.location.search).toContain('search=atlas')
 })
 
+it('从第 3 页恢复 500 条多页契约并在排序后保留页大小', async () => {
+  const user = userEvent.setup()
+  renderDiskPage('/disks?page=3&page_size=500')
+
+  expect(await screen.findByText('第 3 / 3 页，共 1001 块')).toBeVisible()
+  expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('500')
+  expectRequestParameters(lastRequest(), {
+    sort: 'host',
+    order: 'asc',
+    page: '3',
+    page_size: '500',
+  })
+
+  await user.click(screen.getByRole('button', { name: '温度排序，当前未排序' }))
+  await waitFor(() => {
+    expect(window.location.search).toContain('page=1&page_size=500')
+    expectRequestParameters(lastRequest(), {
+      sort: 'temperature',
+      order: 'asc',
+      page: '1',
+      page_size: '500',
+    })
+  })
+})
+
 it.each([499, 501])('将非法 page_size=%i 规范为 20 且回到第一页', async (pageSize) => {
-  renderDiskPage(`/disks?page=1&page_size=${pageSize}`)
+  renderDiskPage(`/disks?page=3&page_size=${pageSize}`)
 
   await screen.findByText('node-alpha')
   await waitFor(() => {

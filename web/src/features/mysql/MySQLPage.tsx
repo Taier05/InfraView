@@ -199,8 +199,12 @@ export function MySQLPage() {
     ? requestedSort
     : 'instance'
   const order: SortOrder = searchParams.get('order') === 'desc' ? 'desc' : 'asc'
-  const page = positivePage(searchParams.get('page'))
-  const pageSize = mysqlPageSize(searchParams.get('page_size'))
+  const requestedPageSize = searchParams.get('page_size')
+  const pageSize = mysqlPageSize(requestedPageSize)
+  const page =
+    requestedPageSize !== null && !pageSizes.includes(Number(requestedPageSize) as PageSize)
+      ? 1
+      : positivePage(searchParams.get('page'))
   const [searchText, setSearchText] = useState(querySearch)
 
   useEffect(() => {

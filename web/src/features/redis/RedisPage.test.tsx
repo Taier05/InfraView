@@ -190,6 +190,7 @@ function mockPaginatedRedisRequests() {
     const url = new URL(raw, "http://localhost");
     requests.push(url);
     const pageSize = Number(url.searchParams.get("page_size"));
+    const total = pageSize === 500 ? 1001 : 64;
     return Promise.resolve(
       new Response(
         JSON.stringify({
@@ -198,8 +199,8 @@ function mockPaginatedRedisRequests() {
             ...fixture.data,
             page: Number(url.searchParams.get("page")),
             page_size: pageSize,
-            total: 64,
-            total_pages: Math.ceil(64 / pageSize),
+            total,
+            total_pages: Math.ceil(total / pageSize),
           },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
@@ -394,8 +395,15 @@ it("复用现有列表控制栏并展示最新数据时间", async () => {
 it("把角色状态排序和分页写入 URL 与固定 GET 参数", async () => {
   mockPaginatedRedisRequests();
   const user = userEvent.setup();
-  renderPage("/redis?page=3");
-  await screen.findByText("192.0.2.40:6379");
+  renderPage("/redis?page=3&page_size=500");
+  expect(await screen.findByText("第 3 / 3 页，共 1001 个实例")).toBeVisible();
+  expect(screen.getByRole("combobox", { name: "每页数量" })).toHaveValue("500");
+  expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+    sort: "instance",
+    order: "asc",
+    page: "3",
+    page_size: "500",
+  });
   await user.selectOptions(
     screen.getByRole("combobox", { name: "Redis 角色" }),
     "slave",
@@ -406,20 +414,15 @@ it("把角色状态排序和分页写入 URL 与固定 GET 参数", async () => 
     "warning",
   );
   await user.click(screen.getByRole("button", { name: /内存使用率排序/ }));
-  await user.selectOptions(
-    screen.getByRole("combobox", { name: "每页数量" }),
-    "500",
-  );
-  await waitFor(() =>
-    expect(requests.at(-1)?.pathname).toBe("/api/v1/redis/instances"),
-  );
-  expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
-    role: "slave",
-    status: "warning",
-    sort: "memory",
-    order: "asc",
-    page: "1",
-    page_size: "500",
+  await waitFor(() => {
+    expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+      role: "slave",
+      status: "warning",
+      sort: "memory",
+      order: "asc",
+      page: "1",
+      page_size: "500",
+    });
   });
 });
 
@@ -482,7 +485,8 @@ it("展示分页并按服务端响应归一化越界页码", async () => {
 });
 
 it.each([499, 501])("将非法 page_size=%i 规范为 20 且回到第一页", async (pageSize) => {
-  renderPage(`/redis?page=1&page_size=${pageSize}`);
+  mockPaginatedRedisRequests();
+  renderPage(`/redis?page=3&page_size=${pageSize}`);
 
   await screen.findByText("192.0.2.40:6379");
   await waitFor(() => {

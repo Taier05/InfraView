@@ -97,13 +97,14 @@ function respondWithRequestedPage() {
       const url = new URL(request.url)
       requests.push(url)
       const pageSize = Number(url.searchParams.get('page_size'))
+      const total = pageSize === 500 ? 1001 : 60
       return HttpResponse.json(
         rabbitMQNodePageFixture({
           data: {
             page: Number(url.searchParams.get('page')),
             page_size: pageSize,
-            total: 60,
-            total_pages: Math.ceil(60 / pageSize),
+            total,
+            total_pages: Math.ceil(total / pageSize),
           },
         }),
       )
@@ -300,8 +301,15 @@ it('搜索精确等待 300ms 后写入 URL 并重置页码', async () => {
 it('筛选与每页数量都重置页码且请求只含白名单参数', async () => {
   respondWithRequestedPage()
   const user = userEvent.setup()
-  renderPage('/rabbitmq?page=3')
-  await screen.findByText('fixture-rabbit-node-normal')
+  renderPage('/rabbitmq?page=3&page_size=500')
+  expect(await screen.findByText('第 3 / 3 页，共 1001 个节点')).toBeVisible()
+  expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('500')
+  expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+    sort: 'node',
+    direction: 'asc',
+    page: '3',
+    page_size: '500',
+  })
 
   await user.selectOptions(
     screen.getByRole('combobox', { name: '所属集群' }),
@@ -311,11 +319,6 @@ it('筛选与每页数量都重置页码且请求只含白名单参数', async (
     screen.getByRole('combobox', { name: '节点状态' }),
     'critical',
   )
-  await user.selectOptions(
-    screen.getByRole('combobox', { name: '每页数量' }),
-    '500',
-  )
-
   await waitFor(() => {
     const parameters = new URLSearchParams(window.location.search)
     expect(parameters.get('cluster')).toBe('fixture-rabbit-cluster-a')
@@ -323,9 +326,16 @@ it('筛选与每页数量都重置页码且请求只含白名单参数', async (
     expect(parameters.get('page_size')).toBe('500')
     expect(parameters.get('page')).toBe('1')
   })
-  expect([...requests.at(-1)!.searchParams.keys()].sort()).toEqual(
-    ['cluster', 'direction', 'page', 'page_size', 'sort', 'status'].sort(),
-  )
+  await waitFor(() => {
+    expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+      cluster: 'fixture-rabbit-cluster-a',
+      status: 'critical',
+      sort: 'node',
+      direction: 'asc',
+      page: '1',
+      page_size: '500',
+    })
+  })
 })
 
 it('十五个表头使用精确排序白名单并切换 direction', async () => {
@@ -370,7 +380,8 @@ it('规范非法 URL 参数并按服务端结果修正越界页码', async () =>
 })
 
 it.each([499, 501])('将非法 page_size=%i 规范为 20 且回到第一页', async (pageSize) => {
-  renderPage(`/rabbitmq?page=1&page_size=${pageSize}`)
+  respondWithRequestedPage()
+  renderPage(`/rabbitmq?page=3&page_size=${pageSize}`)
 
   await screen.findByText('fixture-rabbit-node-normal')
   await waitFor(() => {

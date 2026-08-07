@@ -105,13 +105,15 @@ beforeEach(() => {
     requestedURLs.push(url)
     const page = Number(url.searchParams.get('page') ?? '1')
     const pageSize = Number(url.searchParams.get('page_size') ?? '20')
+    const total = pageSize === 500 ? 1001 : 41
     return Promise.resolve(
       jsonResponse(
         hostPageFixture({
           data: {
             page,
             page_size: pageSize,
-            total_pages: Math.ceil(41 / pageSize),
+            total,
+            total_pages: Math.ceil(total / pageSize),
           },
         }),
       ),
@@ -295,10 +297,20 @@ it('从 URL 恢复列表筛选和排序状态', async () => {
 
 it('搜索等待 300ms 后请求并把页码重置为 1', async () => {
   vi.useFakeTimers()
-  renderHostList('/hosts?page=3')
+  renderHostList('/hosts?page=3&page_size=500')
 
   await act(async () => vi.advanceTimersByTimeAsync(0))
   expect(requestedURLs).toHaveLength(1)
+  expect(screen.getByText('第 3 / 3 页，共 1001 台')).toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('500')
+  expectRequestParameters(lastRequest(), {
+    q: '',
+    status: '',
+    sort: 'name',
+    order: 'asc',
+    page: '3',
+    page_size: '500',
+  })
   fireEvent.change(
     screen.getByRole('searchbox', { name: '搜索主机名或 IP' }),
     { target: { value: 'linux' } },
@@ -314,7 +326,7 @@ it('搜索等待 300ms 后请求并把页码重置为 1', async () => {
     sort: 'name',
     order: 'asc',
     page: '1',
-    page_size: '20',
+    page_size: '500',
   })
   expect(window.location.search).toContain('q=linux')
   expect(window.location.search).toContain('page=1')
@@ -409,7 +421,7 @@ it('切换每页数量会回到第一页并写入 URL', async () => {
   expect(window.location.search).toContain('page=1')
   expect(window.location.search).toContain('page_size=500')
   expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('500')
-  expect(await screen.findByText('第 1 / 1 页，共 41 台')).toBeInTheDocument()
+  expect(await screen.findByText('第 1 / 3 页，共 1001 台')).toBeInTheDocument()
 })
 
 it('把超出服务端总页数的 URL 替换为末页并直接重新请求', async () => {
@@ -474,7 +486,7 @@ it('零结果时规范为第一页并显示空状态而不是 1/0 页', async ()
 it('用 replace 规范非法 URL 参数并保留搜索词', async () => {
   const historyLength = window.history.length
   renderHostList(
-    '/hosts?q=keep&status=broken&sort=password&order=sideways&page=nope&page_size=499',
+    '/hosts?q=keep&status=broken&sort=password&order=sideways&page=3&page_size=499',
   )
 
   await screen.findByText('linux-app-01')
@@ -494,8 +506,8 @@ it('用 replace 规范非法 URL 参数并保留搜索词', async () => {
   })
 })
 
-it('用 replace 把 501 页数规范为 20 且页码为 1', async () => {
-  renderHostList('/hosts?page=1&page_size=501')
+it('用 replace 把第 3 页的 501 页数规范为 20 且页码为 1', async () => {
+  renderHostList('/hosts?page=3&page_size=501')
 
   await screen.findByText('linux-app-01')
   await waitFor(() =>

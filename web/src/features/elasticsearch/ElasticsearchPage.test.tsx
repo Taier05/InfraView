@@ -99,7 +99,7 @@ function respondWithRequestedPage() {
       const url = new URL(request.url)
       requests.push(url)
       const pageSize = Number(url.searchParams.get('page_size'))
-      const total = pageSize === 500 ? 501 : 60
+      const total = pageSize === 500 ? 1001 : 60
       return HttpResponse.json(
         elasticsearchNodePageFixture({
           data: {
@@ -214,8 +214,15 @@ it('只用共享列表模板在同一控制行渲染搜索、四个筛选、页�
 it('把四种筛选、分页大小与固定白名单写入 URL 和请求', async () => {
   respondWithRequestedPage()
   const user = userEvent.setup()
-  renderPage('/elasticsearch?unknown=value&page=3')
-  await screen.findByText('fixture-es-node-a')
+  renderPage('/elasticsearch?unknown=value&page=3&page_size=500')
+  expect(await screen.findByText('第 3 / 3 页，共 1001 个节点')).toBeVisible()
+  expect(screen.getByRole('combobox', { name: '每页数量' })).toHaveValue('500')
+  expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+    sort: 'node',
+    order: 'asc',
+    page: '3',
+    page_size: '500',
+  })
 
   await user.selectOptions(
     screen.getByRole('combobox', { name: '所属集群' }),
@@ -233,11 +240,6 @@ it('把四种筛选、分页大小与固定白名单写入 URL 和请求', async
     screen.getByRole('combobox', { name: '节点状态' }),
     'warning',
   )
-  await user.selectOptions(
-    screen.getByRole('combobox', { name: '每页数量' }),
-    '500',
-  )
-
   await waitFor(() => {
     const parameters = new URLSearchParams(window.location.search)
     expect(parameters.get('cluster')).toBe('fixture-es-cluster-a')
@@ -247,20 +249,17 @@ it('把四种筛选、分页大小与固定白名单写入 URL 和请求', async
     expect(parameters.get('page_size')).toBe('500')
     expect(parameters.get('page')).toBe('1')
   })
-  await waitFor(() => expect(requests.at(-1)?.searchParams.get('page_size')).toBe('500'))
-  expect(await screen.findByText('第 1 / 2 页，共 501 个节点')).toBeVisible()
-  expect([...requests.at(-1)!.searchParams.keys()].sort()).toEqual(
-    [
-      'cluster',
-      'cluster_health',
-      'order',
-      'page',
-      'page_size',
-      'role',
-      'sort',
-      'status',
-    ].sort(),
-  )
+  expect(await screen.findByText('第 1 / 3 页，共 1001 个节点')).toBeVisible()
+  expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+    cluster: 'fixture-es-cluster-a',
+    role: 'data_hot',
+    cluster_health: 'yellow',
+    status: 'warning',
+    sort: 'node',
+    order: 'asc',
+    page: '1',
+    page_size: '500',
+  })
   expect(requests.at(-1)?.searchParams.has('unknown')).toBe(false)
 })
 
@@ -324,7 +323,8 @@ it('规范非法 URL 参数并按服务端结果修正越界页码', async () =>
 })
 
 it.each([499, 501])('将非法 page_size=%i 规范为 20 且回到第一页', async (pageSize) => {
-  renderPage(`/elasticsearch?page=1&page_size=${pageSize}`)
+  respondWithRequestedPage()
+  renderPage(`/elasticsearch?page=3&page_size=${pageSize}`)
 
   await screen.findByText('fixture-es-node-a')
   await waitFor(() => {

@@ -308,8 +308,12 @@ export function ElasticsearchPage() {
   const status = statusFilter(searchParams.get('status'))
   const sort = sortField(searchParams.get('sort'))
   const order: SortOrder = searchParams.get('order') === 'desc' ? 'desc' : 'asc'
-  const page = positivePage(searchParams.get('page'))
-  const size = pageSize(searchParams.get('page_size'))
+  const requestedPageSize = searchParams.get('page_size')
+  const size = pageSize(requestedPageSize)
+  const page =
+    requestedPageSize !== null && !pageSizes.includes(Number(requestedPageSize) as PageSize)
+      ? 1
+      : positivePage(searchParams.get('page'))
   const [searchText, setSearchText] = useState(querySearch)
 
   useEffect(() => {
