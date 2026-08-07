@@ -187,6 +187,59 @@ it('renders the fourteen independent MySQL metric columns', async () => {
   expect(table.closest('.mysql-table-scroll')).not.toBeNull()
 })
 
+it('uses shared duration text and matching native titles for MySQL uptime', async () => {
+  const fixture = mysqlInstancePageFixture()
+  const [template] = fixture.data.instances
+  const instances = [
+    {
+      ...template,
+      id: 'mysql-duration-minute',
+      address: '192.0.2.201:3306',
+      uptime_seconds: 90,
+    },
+    {
+      ...template,
+      id: 'mysql-duration-day',
+      address: '192.0.2.202:3306',
+      uptime_seconds: 90_180,
+    },
+    {
+      ...template,
+      id: 'mysql-duration-year',
+      address: '192.0.2.203:3306',
+      uptime_seconds: 43_912_800,
+    },
+    {
+      ...template,
+      id: 'mysql-duration-missing',
+      address: '192.0.2.204:3306',
+      uptime_seconds: null,
+    },
+  ]
+  vi.mocked(globalThis.fetch).mockResolvedValue(
+    jsonResponse(
+      mysqlInstancePageFixture({
+        data: { instances, total: 4, page: 1, page_size: 20, total_pages: 1 },
+      }),
+    ),
+  )
+
+  renderMySQLPage()
+
+  for (const [address, text] of [
+    ['192.0.2.201:3306', '1分钟'],
+    ['192.0.2.202:3306', '1天 1小时 3分钟'],
+    ['192.0.2.203:3306', '1年 143天 6小时'],
+    ['192.0.2.204:3306', '暂无数据'],
+  ]) {
+    const row = (await screen.findByText(address)).closest('tr')
+    expect(row).not.toBeNull()
+    const uptime = within(row!).getAllByRole('cell')[12].firstElementChild
+    expect(uptime).toHaveTextContent(text)
+    expect(uptime).toHaveAttribute('title', text)
+  }
+})
+
 it.each(mysqlSortFields)('sorts MySQL %s from a fresh later page with exact URL and request parameters', async (label, sort) => {
   const user = userEvent.setup()
   const initialSort = sort === 'status' ? 'instance' : 'status'

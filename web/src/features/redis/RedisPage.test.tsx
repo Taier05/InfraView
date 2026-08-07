@@ -51,7 +51,7 @@ const fixture = {
           master_sync_in_progress: null,
           worst_replica_lag_seconds: 2,
         },
-        uptime_seconds: 90000,
+        uptime_seconds: 90,
         status: "normal",
         status_source: "normal",
         collection_level: "normal",
@@ -113,7 +113,7 @@ const fixture = {
           master_sync_in_progress: false,
           worst_replica_lag_seconds: 7,
         },
-        uptime_seconds: 3600,
+        uptime_seconds: 90180,
         status: "critical",
         status_source: "replication",
         collection_level: "normal",
@@ -144,7 +144,7 @@ const fixture = {
           master_sync_in_progress: null,
           worst_replica_lag_seconds: null,
         },
-        uptime_seconds: 1800,
+        uptime_seconds: 43912800,
         status: "unknown",
         status_source: "unknown",
         collection_level: "normal",
@@ -275,20 +275,30 @@ it("严格渲染 Redis 十三列及拆分后的指标语义", async () => {
   expect(master[7]).toHaveTextContent("75.0%");
   expect(master[9]).toHaveTextContent("—");
   expect(master[10]).toHaveTextContent("2s");
-  expect(master[11]).toHaveTextContent("1天 1小时");
+  expect(master[11]).toHaveTextContent("1分钟");
+  expect(master[11].firstElementChild).toHaveAttribute("title", "1分钟");
 
   expect(healthySlave[2]).toHaveTextContent("未设置上限");
   expect(healthySlave[3]).toHaveTextContent("暂无数据");
   expect(healthySlave[9]).toHaveTextContent("正常");
   expect(healthySlave[10]).toHaveTextContent("—");
   expect(healthySlave[11]).toHaveTextContent("暂无数据");
+  expect(healthySlave[11].firstElementChild).toHaveAttribute("title", "暂无数据");
 
   expect(disconnectedSlave[2]).toHaveTextContent("暂无数据");
   expect(disconnectedSlave[9]).toHaveTextContent("断开");
   expect(disconnectedSlave[10]).toHaveTextContent("7s");
-  expect(disconnectedSlave[11]).toHaveTextContent("1小时");
+  expect(disconnectedSlave[11]).toHaveTextContent("1天 1小时 3分钟");
+  expect(disconnectedSlave[11].firstElementChild).toHaveAttribute(
+    "title",
+    "1天 1小时 3分钟",
+  );
   expect(unknown[9]).toHaveTextContent("未知");
-  expect(unknown[11]).toHaveTextContent("0小时");
+  expect(unknown[11]).toHaveTextContent("1年 143天 6小时");
+  expect(unknown[11].firstElementChild).toHaveAttribute(
+    "title",
+    "1年 143天 6小时",
+  );
   expect(
     screen.queryByRole("columnheader", { name: /过期|淘汰/ }),
   ).not.toBeInTheDocument();

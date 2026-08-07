@@ -220,6 +220,59 @@ it('按固定顺序渲染十二个单值单行列，并使用共享列表壳', a
   })
 })
 
+it('使用共享时长文本显示主机运行时间并保留完整 title', async () => {
+  const fixture = hostPageFixture()
+  const [template] = fixture.data.hosts
+  const hosts = [
+    {
+      ...template,
+      id: 'host-duration-minute',
+      name: 'duration-host-minute',
+      uptime_seconds: 90,
+    },
+    {
+      ...template,
+      id: 'host-duration-day',
+      name: 'duration-host-day',
+      uptime_seconds: 90_180,
+    },
+    {
+      ...template,
+      id: 'host-duration-year',
+      name: 'duration-host-year',
+      uptime_seconds: 43_912_800,
+    },
+    {
+      ...template,
+      id: 'host-duration-missing',
+      name: 'duration-host-missing',
+      uptime_seconds: null,
+    },
+  ] as unknown as typeof fixture.data.hosts
+  vi.mocked(globalThis.fetch).mockResolvedValue(
+    jsonResponse(
+      hostPageFixture({
+        data: { hosts, total: 4, page: 1, page_size: 20, total_pages: 1 },
+      }),
+    ),
+  )
+
+  renderHostList()
+
+  for (const [name, text] of [
+    ['duration-host-minute', '1分钟'],
+    ['duration-host-day', '1天 1小时 3分钟'],
+    ['duration-host-year', '1年 143天 6小时'],
+    ['duration-host-missing', '暂无数据'],
+  ]) {
+    const row = (await screen.findByText(name)).closest('tr')
+    expect(row).not.toBeNull()
+    const uptimeCell = within(row!).getAllByRole('cell')[10]
+    expect(uptimeCell).toHaveTextContent(text)
+    expect(uptimeCell.firstElementChild).toHaveAttribute('title', text)
+  }
+})
+
 it('主机采集延迟使用 warning 等级而不是灰色 unknown', async () => {
   const fixture = hostPageFixture()
   const delayed = {

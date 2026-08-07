@@ -26,6 +26,7 @@ import {
   ListTablePanel,
 } from "../../components/ListPage";
 import { StaleBanner } from "../../components/StaleBanner";
+import { formatDurationSeconds } from "../../formatters/duration";
 
 const pageSizes = [20, 50, 100, 500] as const;
 const sortFields = [
@@ -92,15 +93,6 @@ function byteSize(value: number | null) {
     unitIndex += 1;
   }
   return `${size.toFixed(1).replace(/\.0$/, "")} ${units[unitIndex]}`;
-}
-
-function uptime(seconds: number | null) {
-  if (seconds === null) return "暂无数据";
-  const days = Math.floor(seconds / 86_400);
-  const hours = Math.floor((seconds % 86_400) / 3_600);
-  if (days > 0 && hours > 0) return `${days}天 ${hours}小时`;
-  if (days > 0) return `${days}天`;
-  return `${hours}小时`;
 }
 
 function connections(instance: RedisInstance) {
@@ -365,7 +357,10 @@ export function RedisPage() {
     {
       id: "uptime",
       header: () => sortButton("uptime", "运行时间"),
-      cell: ({ row }) => uptime(row.original.uptime_seconds),
+      cell: ({ row }) => {
+        const value = formatDurationSeconds(row.original.uptime_seconds);
+        return <span title={value}>{value}</span>;
+      },
     },
     {
       id: "status",

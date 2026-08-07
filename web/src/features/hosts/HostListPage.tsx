@@ -25,6 +25,7 @@ import {
   ListTablePanel,
 } from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
+import { formatDurationSeconds } from '../../formatters/duration'
 import { useRefreshIntervalMs } from '../../app/runtime'
 
 const pageSizes = [20, 50, 100, 500] as const
@@ -106,14 +107,6 @@ function MetricText({ metric, text }: { metric: MetricValue; text: string }) {
       {text}
     </span>
   )
-}
-
-function uptime(seconds: number) {
-  const days = Math.floor(seconds / 86_400)
-  const hours = Math.floor((seconds % 86_400) / 3_600)
-  if (days > 0 && hours > 0) return `${days}天 ${hours}小时`
-  if (days > 0) return `${days}天`
-  return `${hours}小时`
 }
 
 function StatusText({
@@ -386,7 +379,10 @@ export function HostListPage() {
     {
       id: 'uptime',
       header: () => sortButton('uptime', '运行时间'),
-      cell: ({ row }) => uptime(row.original.uptime_seconds),
+      cell: ({ row }) => {
+        const value = formatDurationSeconds(row.original.uptime_seconds)
+        return <span title={value}>{value}</span>
+      },
     },
     {
       id: 'status',

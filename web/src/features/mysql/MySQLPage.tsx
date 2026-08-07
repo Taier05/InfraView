@@ -27,6 +27,7 @@ import {
   ListTablePanel,
 } from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
+import { formatDurationSeconds } from '../../formatters/duration'
 
 const pageSizes = [20, 50, 100, 500] as const
 type PageSize = (typeof pageSizes)[number]
@@ -136,15 +137,6 @@ function connectionCount(instance: MySQLInstance) {
 function version(instance: MySQLInstance) {
   const version = instance.version.trim()
   return version === '' || version.toLowerCase() === 'unknown' ? '未知' : version
-}
-
-function uptime(seconds: number | null) {
-  if (seconds === null) return '暂无数据'
-  const days = Math.floor(seconds / 86_400)
-  const hours = Math.floor((seconds % 86_400) / 3_600)
-  if (days > 0 && hours > 0) return `${days}天 ${hours}小时`
-  if (days > 0) return `${days}天`
-  return `${hours}小时`
 }
 
 function ReplicationStateText({
@@ -457,7 +449,7 @@ export function MySQLPage() {
       id: 'uptime',
       header: () => sortButton('uptime', '运行时间'),
       cell: ({ row }) => {
-        const value = uptime(row.original.uptime_seconds)
+        const value = formatDurationSeconds(row.original.uptime_seconds)
         return (
           <span className="mysql-uptime" title={value}>
             {value}
