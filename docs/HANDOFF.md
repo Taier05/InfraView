@@ -8,7 +8,7 @@
 
 本轮仅交付分页。共享运行时长格式化、硬盘错误摘要和命令超时均未实施或验证，后续不得据此声称完成。一次性容器 Node 22 全量测试、typecheck、production build、Playwright `--list`，以及 Go 1.24 gofmt 检查、vet、全仓普通/race 和 Linux 编译均已通过；whitespace、固定查询、只读和敏感静态扫描也已通过。未启动服务、端口或浏览器，未访问 Nightingale、上游或私密环境。
 
-本节对应的文档提交 `docs: record 500-row list delivery` 仅存在于该 feature 分支；未 merge、push、deploy 或 restart。编辑前只读 Git 核对：本地 `main` 为 `7ff1cea`，`origin/main` 为 `4b9f9f7`，均不包含本 feature 分支基线；继续前必须以实时 Git 结果为准。
+本节对应的文档提交 `docs: record 500-row list delivery` 仅存在于该 feature 分支；未 merge、push、deploy 或 restart。编辑前只读 Git 核对：本地 `main` 为 `7ff1cea`，`origin/main` 为 `4b9f9f7`，均不包含本 feature 的 500 条分页交付提交；继续前必须以实时 Git 结果为准。
 
 继续时先完整阅读本节、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/superpowers/specs/2026-08-07-list-all-duration-and-disk-error-summary-design.md`、`docs/superpowers/plans/2026-08-07-list-page-size-500.md` 和 `.superpowers/sdd/2026-08-07-list-page-size-500/progress.md`，再只读运行 `git status --short --branch`、`git log --reverse 7ff1cea..HEAD --oneline`、`git diff --check` 与 `git diff --cached --check`。保留任何新差异，不得 reset、clean 或把本 feature 分支的本地状态写成 main/远端状态。
 
