@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"reflect"
 	"testing"
@@ -576,14 +577,22 @@ func TestJavaServicesQueryDefaultsValidationPaginationAndOverflow(t *testing.T) 
 	if len(page.Services) != 1 || page.Services[0].ID != "id-u" {
 		t.Fatalf("second page = %#v", page)
 	}
-	for _, pageSize := range []int{20, 50, 100} {
+	if page := mustJavaPage(t, service, JavaQuery{Page: 1, PageSize: 0}); page.PageSize != 20 {
+		t.Fatalf("explicit zero page size page = %#v", page)
+	}
+	for _, pageSize := range []int{20, 50, 100, 500} {
 		if got := mustJavaPage(t, service, JavaQuery{Page: 1, PageSize: pageSize}); got.PageSize != pageSize {
 			t.Fatalf("page size %d => %#v", pageSize, got)
 		}
 	}
 	invalid := []JavaQuery{
 		{Page: -1, PageSize: 20},
-		{Page: 1, PageSize: 10},
+		{Page: 1, PageSize: 1},
+		{Page: 1, PageSize: 19},
+		{Page: 1, PageSize: 21},
+		{Page: 1, PageSize: 499},
+		{Page: 1, PageSize: 501},
+		{Page: 1, PageSize: -1},
 		{Page: 1, PageSize: 20, Status: Level("bad")},
 		{Page: 1, PageSize: 20, Sort: "bad"},
 		{Page: 1, PageSize: 20, Order: "bad"},
@@ -593,6 +602,24 @@ func TestJavaServicesQueryDefaultsValidationPaginationAndOverflow(t *testing.T) 
 		if _, _, err := service.Services(context.Background(), query); !errors.Is(err, ErrInvalidQuery) {
 			t.Fatalf("query %#v error = %v, want ErrInvalidQuery", query, err)
 		}
+	}
+}
+
+func TestJavaServicesPageSize500PaginatesAfterDescendingSort(t *testing.T) {
+	now := time.Date(2026, time.August, 5, 0, 0, 0, 0, time.UTC)
+	snapshot := javaapp.Snapshot{Services: make([]javaapp.Service, 0, 501)}
+	for index := 1; index <= 501; index++ {
+		value := fmt.Sprintf("fixture-%03d", index)
+		snapshot.Services = append(snapshot.Services, healthyJavaService(value, "saas", value, now))
+	}
+	service := newJavaServiceWithSnapshot(now, snapshot)
+	first := mustJavaPage(t, service, JavaQuery{Sort: "address", Order: "desc", Page: 1, PageSize: 500})
+	if first.Total != 501 || len(first.Services) != 500 || first.Services[499].Address != "fixture-002" {
+		t.Fatalf("first page = %#v", first)
+	}
+	second := mustJavaPage(t, service, JavaQuery{Sort: "address", Order: "desc", Page: 2, PageSize: 500})
+	if len(second.Services) != 1 || second.Services[0].Address != "fixture-001" {
+		t.Fatalf("second page = %#v", second)
 	}
 }
 

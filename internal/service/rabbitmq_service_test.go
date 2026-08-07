@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"reflect"
 	"testing"
@@ -378,14 +379,17 @@ func TestRabbitMQNodesSortNodeByNameAcrossClusters(t *testing.T) {
 	}
 }
 
-func TestRabbitMQNodesNormalizeDefaultsValidateBeforeLoadAndRejectOverflow(t *testing.T) {
+func TestRabbitMQNodesNormalizesDefaultsValidatesPageSizesBeforeLoadAndRejectsOverflow(t *testing.T) {
 	provider := &recordingRabbitMQProvider{snapshot: rabbitMQQuerySnapshot()}
 	service := NewRabbitMQ(provider, nil, RabbitMQOptions{})
 	page, _, err := service.Nodes(context.Background(), RabbitMQQuery{})
 	if err != nil || page.Page != 1 || page.PageSize != 20 || page.Nodes == nil || page.AvailableClusters == nil {
 		t.Fatalf("default page = %#v, err = %v", page, err)
 	}
-	for _, pageSize := range []int{20, 50, 100} {
+	if page, _, err = service.Nodes(context.Background(), RabbitMQQuery{Page: 1, PageSize: 0}); err != nil || page.PageSize != 20 {
+		t.Fatalf("explicit zero page size page = %#v, err = %v", page, err)
+	}
+	for _, pageSize := range []int{20, 50, 100, 500} {
 		if page, _, err = service.Nodes(context.Background(), RabbitMQQuery{Page: 1, PageSize: pageSize}); err != nil || page.PageSize != pageSize {
 			t.Fatalf("page size %d page = %#v, err = %v", pageSize, page, err)
 		}
@@ -394,7 +398,12 @@ func TestRabbitMQNodesNormalizeDefaultsValidateBeforeLoadAndRejectOverflow(t *te
 	invalidService := NewRabbitMQ(invalidProvider, nil, RabbitMQOptions{})
 	invalid := []RabbitMQQuery{
 		{Page: -1, PageSize: 20},
-		{Page: 1, PageSize: 10},
+		{Page: 1, PageSize: 1},
+		{Page: 1, PageSize: 19},
+		{Page: 1, PageSize: 21},
+		{Page: 1, PageSize: 499},
+		{Page: 1, PageSize: 501},
+		{Page: 1, PageSize: -1},
 		{Page: 1, PageSize: 20, Status: "bad"},
 		{Page: 1, PageSize: 20, Sort: "bad"},
 		{Page: 1, PageSize: 20, Order: "bad"},
@@ -411,16 +420,21 @@ func TestRabbitMQNodesNormalizeDefaultsValidateBeforeLoadAndRejectOverflow(t *te
 	}
 }
 
-func TestRabbitMQNodesPaginatesAfterFilteringAndStableSorting(t *testing.T) {
+func TestRabbitMQNodesPageSize500PaginatesAfterDescendingSort(t *testing.T) {
 	snapshot := rabbitmq.Snapshot{Clusters: []rabbitmq.Cluster{{ID: "cluster-a", Name: "cluster-a", UnreachablePeers: rabbitMQInt64(0)}}}
-	for index := 20; index >= 0; index-- {
-		id := string(rune('a' + index))
-		node := rabbitMQHealthyNode(id, "node-"+id, "cluster-a", "fixture-address-"+id)
+	for index := 1; index <= 501; index++ {
+		id := fmt.Sprintf("fixture-%03d", index)
+		node := rabbitMQHealthyNode(id, "node-"+fmt.Sprintf("%03d", index), "cluster-a", "fixture-address-"+id)
 		snapshot.Nodes = append(snapshot.Nodes, node)
 	}
-	page := mustRabbitMQPage(t, newRabbitMQTestService(snapshot), RabbitMQQuery{Page: 2, PageSize: 20})
-	if page.Total != 21 || len(page.Nodes) != 1 || page.Nodes[0].ID != "u" {
-		t.Fatalf("page = %#v", page)
+	service := newRabbitMQTestService(snapshot)
+	first := mustRabbitMQPage(t, service, RabbitMQQuery{Sort: "node", Order: "desc", Page: 1, PageSize: 500})
+	if first.Total != 501 || len(first.Nodes) != 500 || first.Nodes[499].Name != "node-002" {
+		t.Fatalf("first page = %#v", first)
+	}
+	second := mustRabbitMQPage(t, service, RabbitMQQuery{Sort: "node", Order: "desc", Page: 2, PageSize: 500})
+	if len(second.Nodes) != 1 || second.Nodes[0].Name != "node-001" {
+		t.Fatalf("second page = %#v", second)
 	}
 }
 

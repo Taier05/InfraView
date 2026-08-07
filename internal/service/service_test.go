@@ -233,15 +233,12 @@ func TestOverviewPropagatesStaleAggregateTrendMetadata(t *testing.T) {
 func TestHostsSearchFilterStableSortAndPaginate(t *testing.T) {
 	clock := newServiceClock()
 	provider := fixtureProvider(clock.Now())
-	provider.hosts = []datasource.Host{
-		{ID: "h3", Name: "db", IP: "192.0.2.30", Status: datasource.StatusOffline},
-		{ID: "h2", Name: "web", IP: "192.0.2.20", Status: datasource.StatusOnline},
-		{ID: "h1", Name: "web", IP: "192.0.2.10", Status: datasource.StatusOnline},
-	}
-	provider.metrics = map[string]datasource.CurrentMetrics{
-		"h1": {Timestamp: clock.Now(), CPUUsage: float64Pointer(10)},
-		"h2": {Timestamp: clock.Now(), CPUUsage: nil},
-		"h3": {Timestamp: clock.Now(), CPUUsage: float64Pointer(90)},
+	provider.hosts = []datasource.Host{{ID: "db", Name: "db", IP: "192.0.2.30", Status: datasource.StatusOffline}}
+	provider.metrics = map[string]datasource.CurrentMetrics{"db": {Timestamp: clock.Now(), CPUUsage: float64Pointer(90)}}
+	for index := 1; index <= 21; index++ {
+		id := fmt.Sprintf("web-%03d", index)
+		provider.hosts = append(provider.hosts, datasource.Host{ID: id, Name: "web", IP: fmt.Sprintf("192.0.2.%d", index), Status: datasource.StatusOnline})
+		provider.metrics[id] = datasource.CurrentMetrics{Timestamp: clock.Now()}
 	}
 	svc := newService(provider, clock)
 
@@ -251,12 +248,12 @@ func TestHostsSearchFilterStableSortAndPaginate(t *testing.T) {
 		Sort:     "name",
 		Order:    "asc",
 		Page:     2,
-		PageSize: 1,
+		PageSize: 20,
 	})
 	if err != nil {
 		t.Fatalf("Hosts() error = %v", err)
 	}
-	if page.Total != 2 || page.Page != 2 || page.PageSize != 1 || len(page.Hosts) != 1 || page.Hosts[0].ID != "h2" {
+	if page.Total != 21 || page.Page != 2 || page.PageSize != 20 || len(page.Hosts) != 1 || page.Hosts[0].ID != "web-021" {
 		t.Fatalf("page = %#v", page)
 	}
 	if page.Hosts[0].Metrics.CPUUsage.Level != service.LevelUnknown {
@@ -628,9 +625,17 @@ func TestHostsSortsStatusByDisplayedCollectionLevelThenStableID(t *testing.T) {
 	}
 }
 
-func TestHostsRejectsPageSizesOutsideOneToOneHundred(t *testing.T) {
+func TestHostsAcceptsOnlyListPageSizes(t *testing.T) {
 	clock := newServiceClock()
-	for _, pageSize := range []int{0, 101} {
+	for _, pageSize := range []int{20, 50, 100, 500} {
+		t.Run(fmt.Sprintf("valid_page_size_%d", pageSize), func(t *testing.T) {
+			svc := newService(fixtureProvider(clock.Now()), clock)
+			if _, _, err := svc.Hosts(context.Background(), service.HostQuery{Page: 1, PageSize: pageSize}); err != nil {
+				t.Fatalf("Hosts() error = %v", err)
+			}
+		})
+	}
+	for _, pageSize := range []int{0, 1, 19, 21, 499, 501, -1} {
 		t.Run(fmt.Sprintf("page_size_%d", pageSize), func(t *testing.T) {
 			svc := newService(fixtureProvider(clock.Now()), clock)
 			_, _, err := svc.Hosts(context.Background(), service.HostQuery{Page: 1, PageSize: pageSize})
@@ -638,6 +643,27 @@ func TestHostsRejectsPageSizesOutsideOneToOneHundred(t *testing.T) {
 				t.Fatalf("Hosts() error = %v, want ErrInvalidQuery", err)
 			}
 		})
+	}
+}
+
+func TestHostsPageSize500PaginatesAfterDescendingSort(t *testing.T) {
+	clock := newServiceClock()
+	provider := fixtureProvider(clock.Now())
+	provider.hosts = make([]datasource.Host, 0, 501)
+	for index := 1; index <= 501; index++ {
+		value := fmt.Sprintf("fixture-host-%03d", index)
+		provider.hosts = append(provider.hosts, datasource.Host{
+			ID: value, Name: value, Status: datasource.StatusOnline, StatusTime: clock.Now(),
+		})
+	}
+	svc := newService(provider, clock)
+	first, _, err := svc.Hosts(context.Background(), service.HostQuery{Sort: "name", Order: "desc", Page: 1, PageSize: 500})
+	if err != nil || first.Total != 501 || len(first.Hosts) != 500 || first.Hosts[499].Name != "fixture-host-002" {
+		t.Fatalf("first page = %#v, err = %v", first, err)
+	}
+	second, _, err := svc.Hosts(context.Background(), service.HostQuery{Sort: "name", Order: "desc", Page: 2, PageSize: 500})
+	if err != nil || len(second.Hosts) != 1 || second.Hosts[0].Name != "fixture-host-001" {
+		t.Fatalf("second page = %#v, err = %v", second, err)
 	}
 }
 

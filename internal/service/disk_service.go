@@ -295,9 +295,7 @@ func normalizeDiskQuery(query DiskQuery) (DiskQuery, error) {
 	if query.Page < 1 {
 		return DiskQuery{}, fmt.Errorf("%w: page must be positive", ErrInvalidQuery)
 	}
-	switch query.PageSize {
-	case 20, 50, 100:
-	default:
+	if !validListPageSize(query.PageSize) {
 		return DiskQuery{}, fmt.Errorf("%w: unsupported page size %d", ErrInvalidQuery, query.PageSize)
 	}
 	maxInt := int(^uint(0) >> 1)

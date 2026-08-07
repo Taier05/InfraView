@@ -456,8 +456,18 @@ func TestDiskServiceQuerySearchNaturalSortAndPagination(t *testing.T) {
 	}
 }
 
-func TestDiskServiceQueryValidation(t *testing.T) {
+func TestDiskServiceQueryValidationAndPageSizes(t *testing.T) {
 	service := NewDisk(&diskTestProvider{}, nil, DiskOptions{})
+	for _, pageSize := range []int{20, 50, 100, 500} {
+		if _, _, err := service.Devices(context.Background(), DiskQuery{Page: 1, PageSize: pageSize}); err != nil {
+			t.Fatalf("page size %d error = %v", pageSize, err)
+		}
+	}
+	for _, pageSize := range []int{0, 1, 19, 21, 499, 501, -1} {
+		if _, _, err := service.Devices(context.Background(), DiskQuery{Page: 1, PageSize: pageSize}); !errors.Is(err, ErrInvalidQuery) {
+			t.Fatalf("page size %d error = %v, want ErrInvalidQuery", pageSize, err)
+		}
+	}
 	tests := []DiskQuery{
 		{Page: 0, PageSize: 20},
 		{Page: 1, PageSize: 10},
@@ -481,6 +491,23 @@ func TestDiskServiceQueryValidation(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestDiskServicePageSize500PaginatesAfterDescendingSort(t *testing.T) {
+	devices := make([]disk.Device, 0, 501)
+	for index := 1; index <= 501; index++ {
+		value := fmt.Sprintf("disk-%03d", index)
+		devices = append(devices, disk.Device{ID: value, HostID: "fixture-host", Device: value, SMARTHealth: disk.HealthHealthy})
+	}
+	service := NewDisk(&diskTestProvider{snapshot: disk.Snapshot{Devices: devices}}, nil, DiskOptions{})
+	first, _, err := service.Devices(context.Background(), DiskQuery{Sort: "device", Order: "desc", Page: 1, PageSize: 500})
+	if err != nil || first.Total != 501 || len(first.Devices) != 500 || first.Devices[499].Device != "disk-002" {
+		t.Fatalf("first page = %#v, err = %v", first, err)
+	}
+	second, _, err := service.Devices(context.Background(), DiskQuery{Sort: "device", Order: "desc", Page: 2, PageSize: 500})
+	if err != nil || len(second.Devices) != 1 || second.Devices[0].Device != "disk-001" {
+		t.Fatalf("second page = %#v, err = %v", second, err)
 	}
 }
 

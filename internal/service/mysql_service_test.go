@@ -733,13 +733,13 @@ func TestMySQLInstancesRejectsUnsupportedQueryBeforeLoadingSnapshot(t *testing.T
 }
 
 func TestMySQLInstancesAcceptsOnlySupportedPageSizesAndHandlesOverflow(t *testing.T) {
-	for _, pageSize := range []int{0, 1, 19, 21, 101} {
+	for _, pageSize := range []int{0, 1, 19, 21, 499, 501, -1} {
 		_, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{Page: 1, PageSize: pageSize})
 		if !errors.Is(err, ErrInvalidQuery) {
 			t.Fatalf("page size %d error = %v", pageSize, err)
 		}
 	}
-	for _, pageSize := range []int{20, 50, 100} {
+	for _, pageSize := range []int{20, 50, 100, 500} {
 		if _, _, err := fixtureMySQLService().Instances(context.Background(), MySQLQuery{Page: 1, PageSize: pageSize}); err != nil {
 			t.Fatalf("page size %d error = %v", pageSize, err)
 		}
@@ -752,23 +752,23 @@ func TestMySQLInstancesAcceptsOnlySupportedPageSizesAndHandlesOverflow(t *testin
 	}
 }
 
-func TestMySQLInstancesPaginatesAfterFilteringAndSorting(t *testing.T) {
+func TestMySQLInstancesPageSize500PaginatesAfterDescendingSort(t *testing.T) {
 	svc := newMySQLServiceWithSnapshot(pagedMySQLFixtureSnapshot())
 	first, _, err := svc.Instances(context.Background(), MySQLQuery{
-		Page: 1, PageSize: 20,
+		Sort: "instance", Order: "desc", Page: 1, PageSize: 500,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	second, _, err := svc.Instances(context.Background(), MySQLQuery{
-		Page: 2, PageSize: 20,
+		Sort: "instance", Order: "desc", Page: 2, PageSize: 500,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.Total != 21 || len(first.Instances) != 20 ||
-		second.Total != 21 || len(second.Instances) != 1 ||
-		second.Instances[0].Name != "fixture-mysql-21" {
+	if first.Total != 501 || len(first.Instances) != 500 || first.Instances[499].Name != "fixture-mysql-002" ||
+		second.Total != 501 || len(second.Instances) != 1 ||
+		second.Instances[0].Name != "fixture-mysql-001" {
 		t.Fatalf("first = %#v, second = %#v", first, second)
 	}
 }
@@ -884,14 +884,14 @@ func assertMySQLInstanceIDs(t *testing.T, items []MySQLInstanceSummary, want []s
 }
 
 func pagedMySQLFixtureSnapshot() mysql.Snapshot {
-	instances := make([]mysql.Instance, 21)
+	instances := make([]mysql.Instance, 501)
 	for i := range instances {
-		name := fmt.Sprintf("fixture-mysql-%02d", i+1)
+		name := fmt.Sprintf("fixture-mysql-%03d", i+1)
 		instances[i] = mysql.Instance{
 			ID:           name,
 			Name:         name,
-			Address:      fmt.Sprintf("192.0.2.%d:3306", i+1),
-			Host:         fmt.Sprintf("fixture-host-%02d", i+1),
+			Address:      fmt.Sprintf("fixture-address-%03d", i+1),
+			Host:         fmt.Sprintf("fixture-host-%03d", i+1),
 			Availability: mysql.AvailabilityUp,
 			Role:         mysql.RoleWritable,
 		}

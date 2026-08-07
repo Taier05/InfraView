@@ -214,9 +214,7 @@ func normalizeRabbitMQQuery(query RabbitMQQuery) (RabbitMQQuery, error) {
 	if query.Page < 1 {
 		return RabbitMQQuery{}, fmt.Errorf("%w: page must be positive", ErrInvalidQuery)
 	}
-	switch query.PageSize {
-	case 20, 50, 100:
-	default:
+	if !validListPageSize(query.PageSize) {
 		return RabbitMQQuery{}, fmt.Errorf("%w: unsupported page size %d", ErrInvalidQuery, query.PageSize)
 	}
 	maxInt := int(^uint(0) >> 1)

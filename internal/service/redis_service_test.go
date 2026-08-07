@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"reflect"
 	"testing"
@@ -188,6 +189,39 @@ func TestRedisInstancesFiltersSortsAndPaginates(t *testing.T) {
 	}
 	if _, _, err := service.Instances(context.Background(), RedisQuery{Sort: "invalid", Page: 1, PageSize: 20}); !errors.Is(err, ErrInvalidQuery) {
 		t.Fatalf("invalid query error = %v", err)
+	}
+}
+
+func TestRedisInstancesAcceptsOnlyListPageSizes(t *testing.T) {
+	service := newRedisServiceWithSnapshot(redis.Snapshot{Instances: []redis.Instance{
+		healthyRedisMaster("fixture", "192.0.2.10:6379"),
+	}})
+	for _, pageSize := range []int{20, 50, 100, 500} {
+		if _, _, err := service.Instances(context.Background(), RedisQuery{Page: 1, PageSize: pageSize}); err != nil {
+			t.Fatalf("page size %d error = %v", pageSize, err)
+		}
+	}
+	for _, pageSize := range []int{0, 1, 19, 21, 499, 501, -1} {
+		if _, _, err := service.Instances(context.Background(), RedisQuery{Page: 1, PageSize: pageSize}); !errors.Is(err, ErrInvalidQuery) {
+			t.Fatalf("page size %d error = %v, want ErrInvalidQuery", pageSize, err)
+		}
+	}
+}
+
+func TestRedisInstancesPageSize500PaginatesAfterDescendingSort(t *testing.T) {
+	snapshot := redis.Snapshot{Instances: make([]redis.Instance, 0, 501)}
+	for index := 1; index <= 501; index++ {
+		value := fmt.Sprintf("fixture-%03d", index)
+		snapshot.Instances = append(snapshot.Instances, healthyRedisMaster(value, value))
+	}
+	service := newRedisServiceWithSnapshot(snapshot)
+	first, _, err := service.Instances(context.Background(), RedisQuery{Sort: "instance", Order: "desc", Page: 1, PageSize: 500})
+	if err != nil || first.Total != 501 || len(first.Instances) != 500 || first.Instances[499].ID != "fixture-002" {
+		t.Fatalf("first page = %#v, err = %v", first, err)
+	}
+	second, _, err := service.Instances(context.Background(), RedisQuery{Sort: "instance", Order: "desc", Page: 2, PageSize: 500})
+	if err != nil || len(second.Instances) != 1 || second.Instances[0].ID != "fixture-001" {
+		t.Fatalf("second page = %#v, err = %v", second, err)
 	}
 }
 

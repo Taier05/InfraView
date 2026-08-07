@@ -614,13 +614,16 @@ func TestElasticsearchNodesUsesNaturalDefaultOrderAndStableIDTieBreak(t *testing
 	}
 }
 
-func TestElasticsearchNodesNormalizesDefaultsAndValidatesQuery(t *testing.T) {
+func TestElasticsearchNodesNormalizesDefaultsAndValidatesPageSizes(t *testing.T) {
 	service := newElasticsearchServiceWithSnapshot(elasticsearchQueryFixture())
 	page, _, err := service.Nodes(context.Background(), ElasticsearchQuery{})
 	if err != nil || page.Page != 1 || page.PageSize != 20 {
 		t.Fatalf("default page = %#v, err = %v", page, err)
 	}
-	for _, pageSize := range []int{20, 50, 100} {
+	if page, _, err = service.Nodes(context.Background(), ElasticsearchQuery{Page: 1, PageSize: 0}); err != nil || page.PageSize != 20 {
+		t.Fatalf("explicit zero page size page = %#v, err = %v", page, err)
+	}
+	for _, pageSize := range []int{20, 50, 100, 500} {
 		page, _, err = service.Nodes(context.Background(), ElasticsearchQuery{Page: 1, PageSize: pageSize})
 		if err != nil || page.PageSize != pageSize {
 			t.Fatalf("page size %d page = %#v, err = %v", pageSize, page, err)
@@ -628,7 +631,12 @@ func TestElasticsearchNodesNormalizesDefaultsAndValidatesQuery(t *testing.T) {
 	}
 	invalid := []ElasticsearchQuery{
 		{Page: -1, PageSize: 20},
-		{Page: 1, PageSize: 10},
+		{Page: 1, PageSize: 1},
+		{Page: 1, PageSize: 19},
+		{Page: 1, PageSize: 21},
+		{Page: 1, PageSize: 499},
+		{Page: 1, PageSize: 501},
+		{Page: 1, PageSize: -1},
 		{Page: 1, PageSize: 20, Status: Level("bad")},
 		{Page: 1, PageSize: 20, Role: elasticsearch.Role("bad")},
 		{Page: 1, PageSize: 20, ClusterHealth: elasticsearch.Health("bad")},
@@ -642,17 +650,21 @@ func TestElasticsearchNodesNormalizesDefaultsAndValidatesQuery(t *testing.T) {
 	}
 }
 
-func TestElasticsearchNodesPaginatesAfterStableSorting(t *testing.T) {
+func TestElasticsearchNodesPageSize500PaginatesAfterDescendingSort(t *testing.T) {
 	snapshot := elasticsearch.Snapshot{Clusters: []elasticsearch.Cluster{healthyElasticsearchCluster("fixture-cluster-a")}}
-	for index := 0; index < 21; index++ {
-		name := fmt.Sprintf("fixture-node-%02d", index)
+	for index := 1; index <= 501; index++ {
+		name := fmt.Sprintf("fixture-node-%03d", index)
 		node := healthyElasticsearchNode("fixture-cluster-a", name)
 		snapshot.Nodes = append(snapshot.Nodes, node)
 	}
 	service := newElasticsearchServiceWithSnapshot(snapshot)
-	page, _, err := service.Nodes(context.Background(), ElasticsearchQuery{Page: 2, PageSize: 20})
-	if err != nil || page.Total != 21 || len(page.Nodes) != 1 || page.Nodes[0].Name != "fixture-node-20" {
-		t.Fatalf("page = %#v, err = %v", page, err)
+	first, _, err := service.Nodes(context.Background(), ElasticsearchQuery{Sort: "node", Order: "desc", Page: 1, PageSize: 500})
+	if err != nil || first.Total != 501 || len(first.Nodes) != 500 || first.Nodes[499].Name != "fixture-node-002" {
+		t.Fatalf("first page = %#v, err = %v", first, err)
+	}
+	second, _, err := service.Nodes(context.Background(), ElasticsearchQuery{Sort: "node", Order: "desc", Page: 2, PageSize: 500})
+	if err != nil || len(second.Nodes) != 1 || second.Nodes[0].Name != "fixture-node-001" {
+		t.Fatalf("second page = %#v, err = %v", second, err)
 	}
 }
 

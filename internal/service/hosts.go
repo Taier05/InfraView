@@ -103,8 +103,11 @@ func (s *Service) hostSummary(host datasource.Host, metrics datasource.CurrentMe
 }
 
 func normalizeHostQuery(query HostQuery) (HostQuery, error) {
-	if query.Page < 1 || query.PageSize < 1 || query.PageSize > 100 {
-		return HostQuery{}, fmt.Errorf("%w: page must be positive and page size must be between 1 and 100", ErrInvalidQuery)
+	if query.Page < 1 {
+		return HostQuery{}, fmt.Errorf("%w: page must be positive", ErrInvalidQuery)
+	}
+	if !validListPageSize(query.PageSize) {
+		return HostQuery{}, fmt.Errorf("%w: unsupported page size %d", ErrInvalidQuery, query.PageSize)
 	}
 	if query.Status != "" && query.Status != datasource.StatusOnline && query.Status != datasource.StatusOffline && query.Status != datasource.StatusUnknown {
 		return HostQuery{}, fmt.Errorf("%w: unsupported status %q", ErrInvalidQuery, query.Status)
