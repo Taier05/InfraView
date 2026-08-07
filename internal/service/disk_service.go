@@ -313,7 +313,7 @@ func normalizeDiskQuery(query DiskQuery) (DiskQuery, error) {
 		query.Sort = diskDefaultSort
 	} else {
 		switch query.Sort {
-		case "host", "device", "capacity", "temperature", "lifetime", "power_on_hours", "status":
+		case "host", "device", "model", "capacity", "smart", "temperature", "lifetime", "power_on_hours", "errors", "status":
 		default:
 			return DiskQuery{}, fmt.Errorf("%w: unsupported sort %q", ErrInvalidQuery, query.Sort)
 		}
@@ -352,6 +352,24 @@ func sortDiskDevices(items []DiskDeviceSummary, field, order string) {
 			}
 			return comparison < 0
 		}
+		if field == "model" {
+			leftAvailable := strings.TrimSpace(items[i].Model) != ""
+			rightAvailable := strings.TrimSpace(items[j].Model) != ""
+			if leftAvailable != rightAvailable {
+				return leftAvailable
+			}
+			comparison := 0
+			if leftAvailable {
+				comparison = compareNatural(items[i].Model, items[j].Model)
+			}
+			if comparison == 0 {
+				return items[i].ID < items[j].ID
+			}
+			if order == "desc" {
+				return comparison > 0
+			}
+			return comparison < 0
+		}
 		leftValue, leftAvailable, numeric := diskNumericSortValue(items[i], field)
 		rightValue, rightAvailable, _ := diskNumericSortValue(items[j], field)
 		if numeric && leftAvailable != rightAvailable {
@@ -381,8 +399,42 @@ func diskNumericSortValue(device DiskDeviceSummary, field string) (float64, bool
 		return metricSortValue(device.LifetimeUsedPercent)
 	case "power_on_hours":
 		return metricSortValue(device.PowerOnHours)
+	case "errors":
+		value, available := diskErrorSortValue(device.Errors)
+		return value, available, true
 	default:
 		return 0, false, false
+	}
+}
+
+func diskErrorSortValue(errors disk.ErrorCounters) (float64, bool) {
+	values := []*float64{
+		errors.PendingSectors,
+		errors.ReallocatedSectors,
+		errors.UncorrectableSectors,
+		errors.UDMACRCErrors,
+		errors.MediaIntegrityErrors,
+		errors.ErrorLogEntries,
+	}
+	var total float64
+	available := false
+	for _, value := range values {
+		if value != nil {
+			total += *value
+			available = true
+		}
+	}
+	return total, available
+}
+
+func diskHealthRank(value disk.Health) int {
+	switch value {
+	case disk.HealthHealthy:
+		return 0
+	case disk.HealthFailed:
+		return 2
+	default:
+		return 3
 	}
 }
 
@@ -400,8 +452,10 @@ func compareDiskDevices(left, right DiskDeviceSummary, field string) int {
 		return compareNatural(left.Device, right.Device)
 	case "device":
 		return compareNatural(left.Device, right.Device)
+	case "smart":
+		return diskHealthRank(left.SMARTHealth) - diskHealthRank(right.SMARTHealth)
 	case "status":
-		return strings.Compare(string(left.Status), string(right.Status))
+		return listLevelSortRank(left.Status) - listLevelSortRank(right.Status)
 	default:
 		return 0
 	}

@@ -250,7 +250,7 @@ func TestDiskDevicesReturnsFixedViewDefaultsAndPreservesNulls(t *testing.T) {
 }
 
 func TestDiskDevicesAcceptsEverySupportedSortAndOrder(t *testing.T) {
-	for _, sortField := range []string{"host", "device", "capacity", "temperature", "lifetime", "power_on_hours", "status"} {
+	for _, sortField := range []string{"host", "device", "model", "capacity", "smart", "temperature", "lifetime", "power_on_hours", "errors", "status"} {
 		for _, order := range []string{"asc", "desc"} {
 			t.Run(sortField+"/"+order, func(t *testing.T) {
 				handler, sessionCookie := newDiskAPITestHandler(t, fixtureDiskSnapshot())

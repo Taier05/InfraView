@@ -471,7 +471,7 @@ func TestDiskServiceQueryValidation(t *testing.T) {
 		}
 	}
 	for _, status := range []Level{"", LevelNormal, LevelWarning, LevelCritical, LevelUnknown} {
-		for _, sortField := range []string{"", "host", "device", "capacity", "temperature", "lifetime", "power_on_hours", "status"} {
+		for _, sortField := range []string{"", "host", "device", "model", "capacity", "smart", "temperature", "lifetime", "power_on_hours", "errors", "status"} {
 			for _, order := range []string{"", "asc", "desc"} {
 				_, _, err := service.Devices(context.Background(), DiskQuery{
 					Status: status, Sort: sortField, Order: order, Page: 1, PageSize: 20,
@@ -587,6 +587,96 @@ func TestDiskServiceCapacitySortKeepsMissingLastAndUsesStableTieBreaker(t *testi
 	}
 }
 
+func TestDiskServiceModelSortUsesNaturalOrderKeepsBlankLastAndUsesIDTieBreaker(t *testing.T) {
+	devices := []disk.Device{
+		{ID: "id-model-10", HostID: "host", Device: "disk10", Model: "Disk 10", SMARTHealth: disk.HealthHealthy},
+		{ID: "id-missing", HostID: "host", Device: "disk0", Model: " \t", SMARTHealth: disk.HealthHealthy},
+		{ID: "id-model-2b", HostID: "host", Device: "disk2b", Model: "disk 2", SMARTHealth: disk.HealthHealthy},
+		{ID: "id-model-2a", HostID: "host", Device: "disk2a", Model: "Disk 2", SMARTHealth: disk.HealthHealthy},
+	}
+	service := NewDisk(&diskTestProvider{snapshot: disk.Snapshot{Devices: devices}}, nil, DiskOptions{})
+
+	for _, test := range []struct {
+		order string
+		want  string
+	}{
+		{order: "asc", want: "[id-model-2a id-model-2b id-model-10 id-missing]"},
+		{order: "desc", want: "[id-model-10 id-model-2a id-model-2b id-missing]"},
+	} {
+		page, _, err := service.Devices(context.Background(), DiskQuery{
+			Sort: "model", Order: test.order, Page: 1, PageSize: 20,
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", test.order, err)
+		}
+		if got := fmt.Sprint(diskDeviceIDs(page.Devices)); got != test.want {
+			t.Fatalf("%s IDs = %s, want %s", test.order, got, test.want)
+		}
+	}
+}
+
+func TestDiskServiceSMARTSortUsesBusinessRankAndIDTieBreaker(t *testing.T) {
+	devices := []disk.Device{
+		{ID: "id-unknown", HostID: "host", Device: "disk0", SMARTHealth: disk.HealthUnknown},
+		{ID: "id-failed-b", HostID: "host", Device: "disk1", SMARTHealth: disk.HealthFailed},
+		{ID: "id-healthy-b", HostID: "host", Device: "disk2", SMARTHealth: disk.HealthHealthy},
+		{ID: "id-failed-a", HostID: "host", Device: "disk3", SMARTHealth: disk.HealthFailed},
+		{ID: "id-healthy-a", HostID: "host", Device: "disk4", SMARTHealth: disk.HealthHealthy},
+	}
+	service := NewDisk(&diskTestProvider{snapshot: disk.Snapshot{Devices: devices}}, nil, DiskOptions{})
+
+	for _, test := range []struct {
+		order string
+		want  string
+	}{
+		{order: "asc", want: "[id-healthy-a id-healthy-b id-failed-a id-failed-b id-unknown]"},
+		{order: "desc", want: "[id-unknown id-failed-a id-failed-b id-healthy-a id-healthy-b]"},
+	} {
+		page, _, err := service.Devices(context.Background(), DiskQuery{
+			Sort: "smart", Order: test.order, Page: 1, PageSize: 20,
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", test.order, err)
+		}
+		if got := fmt.Sprint(diskDeviceIDs(page.Devices)); got != test.want {
+			t.Fatalf("%s IDs = %s, want %s", test.order, got, test.want)
+		}
+	}
+}
+
+func TestDiskServiceErrorSortUsesDisplayedCountersKeepsMissingLastAndUsesIDTieBreaker(t *testing.T) {
+	zero := float64(0)
+	one := float64(1)
+	two := float64(2)
+	unsafe := float64(999)
+	devices := []disk.Device{
+		{ID: "id-missing", HostID: "host", Device: "disk0", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{UnsafeShutdowns: &unsafe}},
+		{ID: "id-two-b", HostID: "host", Device: "disk1", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{PendingSectors: &two}},
+		{ID: "id-one", HostID: "host", Device: "disk2", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{PendingSectors: &one, UnsafeShutdowns: &unsafe}},
+		{ID: "id-zero", HostID: "host", Device: "disk3", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{PendingSectors: &zero}},
+		{ID: "id-two-a", HostID: "host", Device: "disk4", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{ReallocatedSectors: &one, ErrorLogEntries: &one}},
+	}
+	service := NewDisk(&diskTestProvider{snapshot: disk.Snapshot{Devices: devices}}, nil, DiskOptions{})
+
+	for _, test := range []struct {
+		order string
+		want  string
+	}{
+		{order: "asc", want: "[id-zero id-one id-two-a id-two-b id-missing]"},
+		{order: "desc", want: "[id-two-a id-two-b id-one id-zero id-missing]"},
+	} {
+		page, _, err := service.Devices(context.Background(), DiskQuery{
+			Sort: "errors", Order: test.order, Page: 1, PageSize: 20,
+		})
+		if err != nil {
+			t.Fatalf("%s: %v", test.order, err)
+		}
+		if got := fmt.Sprint(diskDeviceIDs(page.Devices)); got != test.want {
+			t.Fatalf("%s IDs = %s, want %s", test.order, got, test.want)
+		}
+	}
+}
+
 func TestDiskServiceExplicitTextAndStatusSorts(t *testing.T) {
 	devices := []disk.Device{
 		{ID: "critical", HostID: "host10", Device: "disk10", SMARTHealth: disk.HealthFailed},
@@ -600,8 +690,8 @@ func TestDiskServiceExplicitTextAndStatusSorts(t *testing.T) {
 	}{
 		{field: "host", order: "asc", want: "normal"},
 		{field: "device", order: "asc", want: "normal"},
-		{field: "status", order: "asc", want: "critical"},
-		{field: "status", order: "desc", want: "normal"},
+		{field: "status", order: "asc", want: "normal"},
+		{field: "status", order: "desc", want: "critical"},
 	}
 	for _, test := range tests {
 		page, _, err := service.Devices(context.Background(), DiskQuery{
