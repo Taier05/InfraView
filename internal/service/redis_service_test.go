@@ -191,6 +191,138 @@ func TestRedisInstancesFiltersSortsAndPaginates(t *testing.T) {
 	}
 }
 
+func TestRedisInstancesAcceptsVisibleSortColumns(t *testing.T) {
+	service := newRedisServiceWithSnapshot(redis.Snapshot{Instances: []redis.Instance{
+		healthyRedisMaster("fixture-a", "192.0.2.10:6379"),
+	}})
+	for _, sortField := range []string{
+		"instance", "role", "memory_limit", "memory", "connections",
+		"blocked_connections", "qps", "hit_rate", "keys",
+		"replication_link", "replication_lag", "uptime", "status",
+	} {
+		t.Run(sortField, func(t *testing.T) {
+			if _, _, err := service.Instances(context.Background(), RedisQuery{
+				Sort: sortField, Order: "asc", Page: 1, PageSize: 20,
+			}); err != nil {
+				t.Fatalf("sort %q error = %v", sortField, err)
+			}
+		})
+	}
+}
+
+func TestRedisInstancesSortsIntegerColumnsExactly(t *testing.T) {
+	const maximum = int64(9223372036854775807)
+	for _, sortField := range []string{"memory_limit", "blocked_connections", "keys", "uptime"} {
+		t.Run(sortField, func(t *testing.T) {
+			lower := healthyRedisMaster("a-lower", "192.0.2.10:6379")
+			higher := healthyRedisMaster("z-higher", "192.0.2.11:6379")
+			missing := healthyRedisMaster("missing", "192.0.2.12:6379")
+			setRedisIntegerSortFixture(&lower, sortField, maximum-1)
+			setRedisIntegerSortFixture(&higher, sortField, maximum)
+			setRedisIntegerSortFixture(&missing, sortField, 0)
+			setRedisIntegerSortMissing(&missing, sortField)
+			service := newRedisServiceWithSnapshot(redis.Snapshot{Instances: []redis.Instance{lower, higher, missing}})
+
+			assertRedisSortIDs(t, service, sortField, "asc", []string{"a-lower", "z-higher", "missing"})
+			assertRedisSortIDs(t, service, sortField, "desc", []string{"z-higher", "a-lower", "missing"})
+		})
+	}
+}
+
+func TestRedisInstancesSortsRole(t *testing.T) {
+	master := healthyRedisMaster("master", "192.0.2.10:6379")
+	slave := healthyRedisSlave("slave", "192.0.2.11:6379")
+	unknown := healthyRedisMaster("unknown", "192.0.2.12:6379")
+	unknown.Role = redis.RoleUnknown
+	service := newRedisServiceWithSnapshot(redis.Snapshot{Instances: []redis.Instance{unknown, slave, master}})
+
+	assertRedisSortIDs(t, service, "role", "asc", []string{"master", "slave", "unknown"})
+	assertRedisSortIDs(t, service, "role", "desc", []string{"unknown", "slave", "master"})
+}
+
+func TestRedisInstancesSortsHitRate(t *testing.T) {
+	lower := healthyRedisMaster("a-lower", "192.0.2.10:6379")
+	higher := healthyRedisMaster("z-higher", "192.0.2.11:6379")
+	missing := healthyRedisMaster("missing", "192.0.2.12:6379")
+	lower.HitRate = floatPointer(0.1)
+	higher.HitRate = floatPointer(0.9)
+	missing.HitRate = nil
+	service := newRedisServiceWithSnapshot(redis.Snapshot{Instances: []redis.Instance{lower, higher, missing}})
+
+	assertRedisSortIDs(t, service, "hit_rate", "asc", []string{"a-lower", "z-higher", "missing"})
+	assertRedisSortIDs(t, service, "hit_rate", "desc", []string{"z-higher", "a-lower", "missing"})
+}
+
+func TestRedisInstancesSortsReplicationLink(t *testing.T) {
+	normal := healthyRedisSlave("slave-normal", "192.0.2.10:6379")
+	disconnected := healthyRedisSlave("slave-disconnected", "192.0.2.11:6379")
+	unknown := healthyRedisSlave("slave-unknown", "192.0.2.12:6379")
+	master := healthyRedisMaster("master-not-applicable", "192.0.2.13:6379")
+	disconnected.Replication.MasterLinkUp = boolPointer(false)
+	unknown.Replication.MasterLinkUp = nil
+	service := newRedisServiceWithSnapshot(redis.Snapshot{Instances: []redis.Instance{unknown, master, disconnected, normal}})
+
+	assertRedisSortIDs(t, service, "replication_link", "asc", []string{"slave-normal", "slave-disconnected", "master-not-applicable", "slave-unknown"})
+	assertRedisSortIDs(t, service, "replication_link", "desc", []string{"slave-disconnected", "slave-normal", "master-not-applicable", "slave-unknown"})
+}
+
+func TestRedisInstancesSortsStatusByListOrder(t *testing.T) {
+	normal := healthyRedisMaster("normal", "192.0.2.10:6379")
+	warning := healthyRedisMaster("warning", "192.0.2.11:6379")
+	critical := healthyRedisMaster("critical", "192.0.2.12:6379")
+	unknown := healthyRedisMaster("unknown", "192.0.2.13:6379")
+	warning.UsedMemoryBytes = redisInt64Pointer(85)
+	critical.Availability = redis.AvailabilityDown
+	unknown.Availability = redis.AvailabilityUnknown
+	service := newRedisServiceWithSnapshot(redis.Snapshot{Instances: []redis.Instance{unknown, critical, warning, normal}})
+
+	assertRedisSortIDs(t, service, "status", "asc", []string{"normal", "warning", "critical", "unknown"})
+	assertRedisSortIDs(t, service, "status", "desc", []string{"unknown", "critical", "warning", "normal"})
+}
+
+func assertRedisSortIDs(t *testing.T, service *RedisService, field, order string, want []string) {
+	t.Helper()
+	page, _, err := service.Instances(context.Background(), RedisQuery{
+		Sort: field, Order: order, Page: 1, PageSize: 20,
+	})
+	if err != nil {
+		t.Fatalf("sort %s/%s error = %v", field, order, err)
+	}
+	got := make([]string, len(page.Instances))
+	for index, instance := range page.Instances {
+		got[index] = instance.ID
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("sort %s/%s IDs = %#v, want %#v", field, order, got, want)
+	}
+}
+
+func setRedisIntegerSortFixture(instance *redis.Instance, field string, value int64) {
+	switch field {
+	case "memory_limit":
+		instance.MaxMemoryBytes = redisInt64Pointer(value)
+	case "blocked_connections":
+		instance.BlockedClients = redisInt64Pointer(value)
+	case "keys":
+		instance.Keys = redisInt64Pointer(value)
+	case "uptime":
+		instance.UptimeSeconds = redisInt64Pointer(value)
+	}
+}
+
+func setRedisIntegerSortMissing(instance *redis.Instance, field string) {
+	switch field {
+	case "memory_limit":
+		instance.MaxMemoryBytes = nil
+	case "blocked_connections":
+		instance.BlockedClients = nil
+	case "keys":
+		instance.Keys = nil
+	case "uptime":
+		instance.UptimeSeconds = nil
+	}
+}
+
 func TestRedisInstancesRejectsOverflowPageOffset(t *testing.T) {
 	service := newRedisServiceWithSnapshot(redis.Snapshot{Instances: []redis.Instance{
 		healthyRedisMaster("fixture-a", "192.0.2.10:6379"),

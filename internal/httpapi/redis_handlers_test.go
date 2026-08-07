@@ -67,6 +67,23 @@ func TestRedisOverviewUsesLowercaseRoleFields(t *testing.T) {
 	}
 }
 
+func TestRedisInstancesAPIAcceptsVisibleSortColumns(t *testing.T) {
+	handler, cookie := newRedisAPIHandler(t)
+	for _, sortField := range []string{
+		"instance", "role", "memory_limit", "memory", "connections",
+		"blocked_connections", "qps", "hit_rate", "keys",
+		"replication_link", "replication_lag", "uptime", "status",
+	} {
+		t.Run(sortField, func(t *testing.T) {
+			response := request(t, handler, http.MethodGet,
+				"/api/v1/redis/instances?sort="+sortField+"&order=asc&page=1&page_size=20", "", cookie)
+			if response.Code != http.StatusOK {
+				t.Fatalf("sort %q status = %d body = %s", sortField, response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
 func TestRedisAPIsRejectInvalidQueriesAndWriteMethods(t *testing.T) {
 	handler, cookie := newRedisAPIHandler(t)
 	for _, path := range []string{

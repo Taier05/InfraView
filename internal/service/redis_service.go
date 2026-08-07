@@ -196,7 +196,7 @@ func normalizeRedisQuery(query RedisQuery) (RedisQuery, error) {
 		query.Sort = "instance"
 	}
 	switch query.Sort {
-	case "instance", "memory", "connections", "qps", "keys", "evicted", "replication_lag", "uptime", "status":
+	case "instance", "role", "memory_limit", "memory", "connections", "blocked_connections", "qps", "hit_rate", "keys", "evicted", "replication_link", "replication_lag", "uptime", "status":
 	default:
 		return RedisQuery{}, fmt.Errorf("%w: unsupported sort %q", ErrInvalidQuery, query.Sort)
 	}
@@ -398,18 +398,29 @@ func addRedisAlert(target *RedisAlertCount, level Level) {
 
 func sortRedisInstances(items []RedisInstanceSummary, field, order string) {
 	sort.SliceStable(items, func(i, j int) bool {
-		left, leftOK, numeric := redisSortValue(items[i], field)
-		right, rightOK, _ := redisSortValue(items[j], field)
-		if numeric && leftOK != rightOK {
+		leftInteger, leftOK, integer := redisIntegerSortValue(items[i], field)
+		rightInteger, rightOK, _ := redisIntegerSortValue(items[j], field)
+		if integer && leftOK != rightOK {
 			return leftOK
 		}
 		comparison := 0
-		if numeric && leftOK {
-			comparison = compareFloat64(left, right)
-		} else if field == "instance" {
-			comparison = compareAddresses(items[i].Address, items[j].Address)
-		} else if field == "status" {
-			comparison = redisLevelRank(items[i].Status) - redisLevelRank(items[j].Status)
+		if integer {
+			if leftOK {
+				comparison = compareInt64(leftInteger, rightInteger)
+			}
+		} else {
+			left, leftOK, numeric := redisSortValue(items[i], field)
+			right, rightOK, _ := redisSortValue(items[j], field)
+			if numeric && leftOK != rightOK {
+				return leftOK
+			}
+			if numeric && leftOK {
+				comparison = compareFloat64(left, right)
+			} else if field == "instance" {
+				comparison = compareAddresses(items[i].Address, items[j].Address)
+			} else if field == "status" {
+				comparison = listLevelSortRank(items[i].Status) - listLevelSortRank(items[j].Status)
+			}
 		}
 		if comparison == 0 {
 			return items[i].ID < items[j].ID
@@ -423,16 +434,24 @@ func sortRedisInstances(items []RedisInstanceSummary, field, order string) {
 
 func redisSortValue(item RedisInstanceSummary, field string) (float64, bool, bool) {
 	switch field {
+	case "role":
+		return float64(redisRoleSortRank(item.Role)), true, true
 	case "memory":
 		return metricSortValue(item.MemoryUsagePercent)
 	case "connections":
 		return metricSortValue(item.ConnectionUsagePercent)
+	case "blocked_connections":
+		return redisIntSortValue(item.BlockedClients)
 	case "qps":
 		return metricSortValue(item.QPS)
+	case "hit_rate":
+		return metricSortValue(item.HitRate)
 	case "keys":
 		return redisIntSortValue(item.Keys)
 	case "evicted":
 		return metricSortValue(item.EvictedKeysPerSecond)
+	case "replication_link":
+		return redisReplicationLinkSortValue(item)
 	case "replication_lag":
 		return metricSortValue(item.Replication.WorstReplicaLagSeconds)
 	case "uptime":
@@ -440,6 +459,47 @@ func redisSortValue(item RedisInstanceSummary, field string) (float64, bool, boo
 	default:
 		return 0, false, false
 	}
+}
+
+func redisIntegerSortValue(item RedisInstanceSummary, field string) (int64, bool, bool) {
+	var value *int64
+	switch field {
+	case "memory_limit":
+		value = item.MaxMemoryBytes
+	case "blocked_connections":
+		value = item.BlockedClients
+	case "keys":
+		value = item.Keys
+	case "uptime":
+		value = item.UptimeSeconds
+	default:
+		return 0, false, false
+	}
+	if value == nil {
+		return 0, false, true
+	}
+	return *value, true, true
+}
+
+func redisRoleSortRank(role redis.Role) int {
+	switch role {
+	case redis.RoleMaster:
+		return 0
+	case redis.RoleSlave:
+		return 1
+	default:
+		return 2
+	}
+}
+
+func redisReplicationLinkSortValue(item RedisInstanceSummary) (float64, bool, bool) {
+	if item.Role != redis.RoleSlave || item.Replication.MasterLinkUp == nil {
+		return 0, false, true
+	}
+	if *item.Replication.MasterLinkUp {
+		return 0, true, true
+	}
+	return 1, true, true
 }
 
 func redisIntSortValue(value *int64) (float64, bool, bool) {
