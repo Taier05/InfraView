@@ -134,6 +134,23 @@ func TestJavaServicesRejectsUnknownDuplicateEmptyAndInvalidParameters(t *testing
 	})
 }
 
+func TestJavaServicesRejectsWhitespaceSearchAndName(t *testing.T) {
+	for name, query := range map[string]string{
+		"search": "?search=%20",
+		"name":   "?name=%20",
+	} {
+		t.Run(name, func(t *testing.T) {
+			provider := &javaHTTPProvider{}
+			handler, cookie := newJavaAPITestHandler(t, provider)
+			response := request(t, handler, http.MethodGet, "/api/v1/java/services"+query, "", cookie)
+			assertError(t, response, http.StatusBadRequest, "invalid_query", "查询参数无效")
+			if provider.calls != 0 {
+				t.Fatalf("whitespace query loaded Java snapshot %d times", provider.calls)
+			}
+		})
+	}
+}
+
 func TestJavaServicesAcceptsEverySortField(t *testing.T) {
 	handler, cookie := newJavaAPITestHandler(t, mock.NewJava(time.Now))
 	fields := []string{

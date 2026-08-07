@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/Taier05/InfraView/internal/javaapp"
 	"github.com/Taier05/InfraView/internal/service"
@@ -153,7 +154,7 @@ func (a *api) javaServices(w http.ResponseWriter, r *http.Request) {
 
 func hasEmptyJavaQueryParameter(query url.Values) bool {
 	for _, values := range query {
-		if len(values) == 0 || values[0] == "" {
+		if len(values) == 0 || strings.TrimSpace(values[0]) == "" {
 			return true
 		}
 	}
