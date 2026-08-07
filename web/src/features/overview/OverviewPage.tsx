@@ -1159,19 +1159,11 @@ function JavaStatusCard({ data }: { data: JavaOverviewData }) {
         <div className="module-alert-levels">
           <StatusBadge
             level={data.services.critical > 0 ? 'critical' : 'normal'}
-            label={
-              data.services.critical > 0
-                ? `严重 ${data.services.critical}`
-                : '无严重'
-            }
+            label={`严重 ${data.services.critical}`}
           />
           <StatusBadge
             level={warningOrUnknownLevel}
-            label={
-              warningOrUnknown > 0
-                ? `警告/未知 ${warningOrUnknown}`
-                : '无警告/未知'
-            }
+            label={`警告/未知 ${warningOrUnknown}`}
           />
         </div>
       </div>
@@ -1346,8 +1338,7 @@ export function OverviewPage() {
     mysqlOverview.data !== undefined &&
     redisOverview.data !== undefined &&
     elasticsearchOverview.data !== undefined &&
-    rabbitMQOverview.data !== undefined &&
-    javaOverview.data !== undefined
+    rabbitMQOverview.data !== undefined
       ? Math.min(
           hostOverview.dataUpdatedAt,
           diskOverview.dataUpdatedAt,
@@ -1355,7 +1346,6 @@ export function OverviewPage() {
           redisOverview.dataUpdatedAt,
           elasticsearchOverview.dataUpdatedAt,
           rabbitMQOverview.dataUpdatedAt,
-          javaOverview.dataUpdatedAt,
         )
       : 0
 
@@ -1378,8 +1368,7 @@ export function OverviewPage() {
               mysqlOverview.isFetching ||
               redisOverview.isFetching ||
               elasticsearchOverview.isFetching ||
-              rabbitMQOverview.isFetching ||
-              javaOverview.isFetching
+              rabbitMQOverview.isFetching
             }
             dataUpdatedAt={allDataUpdatedAt}
             onRefresh={() => {

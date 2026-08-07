@@ -814,6 +814,16 @@ it('Java 服务全正常时四个摘要框显示无异常', async () => {
   const card = await screen.findByRole('link', { name: '查看 Java 服务板块' })
   expect(card).toHaveAttribute('data-level', 'normal')
   expect(within(card).getAllByText('无异常')).toHaveLength(4)
+  expect(within(card).getByText('严重 0')).toHaveAttribute(
+    'data-level',
+    'normal',
+  )
+  expect(within(card).getByText('警告/未知 0')).toHaveAttribute(
+    'data-level',
+    'normal',
+  )
+  expect(within(card).queryByText('无严重')).not.toBeInTheDocument()
+  expect(within(card).queryByText('无警告/未知')).not.toBeInTheDocument()
 })
 
 it('Java 服务为空时显示中性空状态', async () => {
@@ -827,7 +837,7 @@ it('Java 服务为空时显示中性空状态', async () => {
   expect(within(emptyCard).getByText('暂无 Java 服务')).toBeVisible()
 })
 
-it('其他模块已加载时独立显示 Java 服务加载状态', async () => {
+it('Java 初始加载只显示局部状态，不改变前六卡全局刷新状态', async () => {
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
     if (path === '/api/v1/java/overview') {
@@ -853,14 +863,18 @@ it('其他模块已加载时独立显示 Java 服务加载状态', async () => {
   renderOverview()
 
   expect(
-    await screen.findByRole('link', { name: '查看 Linux 主机板块' }),
+    await screen.findByRole('link', { name: '查看 RabbitMQ 板块' }),
   ).toBeVisible()
   expect(
     screen.getByRole('status', { name: 'Java 服务板块加载中' }),
   ).toBeVisible()
+  const controls = screen.getByRole('group', { name: '总览控制' })
+  expect(within(controls).getByRole('button', { name: '刷新' })).toBeEnabled()
+  expect(within(controls).getByText(/上次刷新 \d{2}:\d{2}:\d{2}/)).toBeVisible()
+  expect(within(controls).queryByText('正在刷新…')).not.toBeInTheDocument()
 })
 
-it('Java 服务首次 503 不阻塞旧模块且重试只刷新独立查询', async () => {
+it('Java 首次 503 保持全局刷新状态且重试只刷新独立查询', async () => {
   const pathCounts = new Map<string, number>()
   vi.mocked(globalThis.fetch).mockImplementation((input) => {
     const path = requestedPath(input)
@@ -905,6 +919,10 @@ it('Java 服务首次 503 不阻塞旧模块且重试只刷新独立查询', asy
   ).toBeVisible()
   const error = screen.getByRole('alert', { name: 'Java 服务板块加载失败' })
   expect(error).toHaveTextContent('Java 数据源暂时不可用')
+  const controls = screen.getByRole('group', { name: '总览控制' })
+  expect(within(controls).getByRole('button', { name: '刷新' })).toBeEnabled()
+  expect(within(controls).getByText(/上次刷新 \d{2}:\d{2}:\d{2}/)).toBeVisible()
+  expect(within(controls).queryByText('正在刷新…')).not.toBeInTheDocument()
   await user.click(within(error).getByRole('button', { name: '重试' }))
 
   expect(
