@@ -2,13 +2,49 @@
 
 最后更新：2026-08-07
 
-## 当前隔离工作树 / Java 展示优化恢复入口
+## 当前隔离工作树 / 旧模块列表统一恢复入口
 
-当前工作目录为 `/root/github/InfraView/.worktrees/list-table-consistency`，分支为 `feature/list-table-consistency`。Java 展示功能基准为 `4b564b8 feat: polish Java status presentation`；继续前先读取本节与 `docs/PROJECT_STATUS.md`、`docs/TODO.md`，再执行 `git status --short --branch`、`git log -3 --oneline`、`git diff --check` 和 `git diff --cached --check`，以实时 Git 结果为准，不能把下方 `main` 的历史交接当作本工作树的当前状态。
+当前工作目录为 `/root/github/InfraView/.worktrees/list-table-consistency`，分支为 `feature/list-table-consistency`。Task 1–6 实现基线为 `5a3625f test: isolate list sort page reset cases`；继续前先完整阅读本节、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/superpowers/specs/2026-08-07-list-table-consistency-and-java-presentation-design.md` 和 `docs/superpowers/plans/2026-08-07-list-table-consistency.md`，再只读执行 `git status --short --branch`、`git log -3 --oneline`、`git diff --check` 与 `git diff --cached --check`。必须以实时 Git 结果为准，不能将下方 `main` 的历史交接当作本工作树的当前状态。
 
-本次仅完成离线展示验证与文档交接：健康检查、端口状态、进程状态分别用绿色“正常”、红色“异常”、灰色“暂无数据”三类徽标；`tikbee`、`rider`、`mch`、`saas`、`mch_saas` 显示为“用户端、骑手端、商家端、管理后台端、商家 PC 端”。未知业务端原样显示，筛选选项及 URL/API 参数仍传递原始代码，保证已有链接和筛选兼容。容器门禁通过 16 个前端测试文件、275 项测试、typecheck、生产构建和 Playwright 27 项静态清单；Java 页面静态扫描仅见固定 `GET`，未发现写方法、命令执行、重启、删除或任意 PromQL，whitespace 检查无输出。
+主机、硬盘、MySQL、Redis 固定为 12、10、14、13 个紧凑单行列。主机网络发送/接收拆列；硬盘保留“错误摘要”单列；MySQL 拆开版本、角色、QPS、TPS、Buffer Pool 容量/使用率、复制状态/延迟；Redis 拆开阻塞连接、QPS、命中率、复制链路。MySQL/Redis 的连接列仍显示“当前连接/最大连接”，不再把阻塞连接塞入连接单元格。四页每个可见列均为无箭头排序按钮，实际排序始终在服务端完整筛选结果上执行；缺失值始终末置，相同主值以稳定实体 ID 升序收口，排序状态通过 URL、`aria-label`、`title` 与 `data-active` 保存，切换后回到第 1 页。
 
-未启动服务或浏览器，未发布端口，未部署、推送、访问上游或读取私密环境；文档不记录真实标识与现场数据。后续若要进行动态浏览器、部署、推送或任何远端操作，均需取得独立明确授权。
+Java 展示优化仍属于本工作树已保留的交付：13 列不变，健康检查、端口状态、进程状态分别复用正常/异常/暂无数据三类等级色；五项业务端仅改变中文可见标签，筛选 option 值、URL `name` 和 API 参数继续使用原始代码。不得用本次文档覆盖该契约。
+
+已新鲜完成以下可复现的一次性容器门禁：
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e npm_config_cache=/tmp/npm-cache -v "$PWD:/src" -v /src/web/node_modules -w /src/web node:22-alpine sh -c 'npm ci --ignore-scripts >/dev/null && npm run test:run && npm run typecheck && npm run build && npx playwright test --list'
+docker run --rm --user "$(id -u):$(id -g)" -e GOCACHE=/tmp/go-cache -e GOMODCACHE=/tmp/go-mod -v "$PWD:/src" -w /src golang:1.24-bookworm sh -c 'files="$(find cmd internal -type f -name "*.go")"; test -z "$(gofmt -l $files)" && go vet ./... && go test ./... -count=1 && go test -race ./... -count=1 && CGO_ENABLED=0 GOOS=linux go build -trimpath -o /tmp/infraview ./cmd/infraview'
+```
+
+前端结果为 Vitest 16 个文件/303 项、Playwright 27 项静态发现，Go 全仓普通/race 测试均通过，所有门禁 exit 0。只读/敏感扫描与 `git diff --check` 同样通过；生产页面没有直接 `fetch/apiRequest`、写方法、命令执行、重启、删除、故障转移或任意 PromQL。
+
+本 Task 仅获本地提交授权；不得 merge、push、部署、重启、启动服务/浏览器、创建端口、连接上游或读取私密环境。文档与报告不得记录 Token、Cookie、认证头、Base URL、真实标识、地址、数量、容量、指标值或上游正文。
+
+在新账号或新对话中直接粘贴：
+
+```text
+继续完成或审阅 InfraView 的旧模块列表统一。请始终使用简体中文回复。
+
+工作目录：/root/github/InfraView/.worktrees/list-table-consistency
+分支：feature/list-table-consistency
+
+先完整阅读：
+1. docs/HANDOFF.md
+2. docs/PROJECT_STATUS.md
+3. docs/TODO.md
+4. docs/superpowers/specs/2026-08-07-list-table-consistency-and-java-presentation-design.md
+5. docs/superpowers/plans/2026-08-07-list-table-consistency.md
+6. .superpowers/sdd/2026-08-07-list-table-consistency/task-7-brief.md
+
+然后只读执行：
+git status --short --branch
+git log -3 --oneline
+git diff --check
+git diff --cached --check
+
+四页列表列数依次为主机 12、硬盘 10、MySQL 14、Redis 13；所有可见列均服务端排序、缺失值始终末置、稳定 ID 收口，表头无可见排序箭头。Java 13 列和中文业务端显示保持，查询仍用原始代码。产品始终只读；禁止输出或读取私密环境、认证信息、真实现场数据和上游正文。未获独立授权不得启动服务或浏览器、创建端口、连接上游、merge、push、部署或重启。
+```
 
 ## 当前数据时间与 Elasticsearch 容错恢复入口（已合并、已推送、已部署）
 

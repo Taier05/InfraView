@@ -4,6 +4,14 @@
 
 ## 当前阶段
 
+### 2026-08-07 旧模块列表统一与 Java 展示收口（隔离工作树，已完成本地验证）
+
+本记录对应隔离工作树 `feature/list-table-consistency`，Task 1–6 的实现基线为 `5a3625f test: isolate list sort page reset cases`。主机、硬盘、MySQL、Redis 已统一为紧凑单行列表：固定列数依次为 12、10、14、13；主机的网络发送/接收拆列，MySQL 的版本、角色、QPS、TPS、Buffer Pool 容量/使用率、复制状态/延迟拆列，Redis 的阻塞连接、QPS、命中率与复制链路拆列。经确认保留的例外只有硬盘“错误摘要”单列，以及 MySQL/Redis 的“当前连接/最大连接”单元格。
+
+四页所有可见列均走服务端升降序，缺失值无论方向都置后，相同值以稳定实体 ID 收口；页面只保留 URL、`aria-label`、`title` 和 `data-active` 的排序状态，不显示排序箭头，切换排序会回到第 1 页。Java 的 13 列、三类状态颜色和五项业务端中文显示规则继续保留，筛选控件、URL 与 API 仍使用原始业务代码。
+
+新鲜容器门禁已完成：前端 Vitest 16 个文件、303 项测试，typecheck、production build 和 Playwright 27 项静态发现均 exit 0；Go 的 gofmt、vet、全仓普通/race 测试和 Linux 编译均 exit 0。源码扫描未发现生产页面直接 `fetch/apiRequest`、写方法、运维控件或任意 PromQL；初始关键词命中仅是拒绝写操作的测试断言。未启动服务或浏览器、未发布端口、未访问上游、未读取私密环境，也未执行 merge、push、部署或重启。
+
 ### 2026-08-07 Java 展示优化（隔离工作树，本地验证完成）
 
 本记录对应隔离工作树 `feature/list-table-consistency`：展示功能基准提交为 `4b564b8 feat: polish Java status presentation`。Java 列表的“健康检查”“端口状态”“进程状态”统一采用三类状态徽标：正常为绿色“正常”，异常为红色“异常”，缺失为灰色“暂无数据”。业务端仅改变显示标签：`tikbee`、`rider`、`mch`、`saas`、`mch_saas` 分别显示为“用户端、骑手端、商家端、管理后台端、商家 PC 端”；未知值仍原样显示，筛选控件、URL 与 API 始终保留原始代码值，避免改变既有筛选契约。
