@@ -424,16 +424,17 @@ func TestRabbitMQNodesPageSize500PaginatesAfterDescendingSort(t *testing.T) {
 	snapshot := rabbitmq.Snapshot{Clusters: []rabbitmq.Cluster{{ID: "cluster-a", Name: "cluster-a", UnreachablePeers: rabbitMQInt64(0)}}}
 	for index := 1; index <= 501; index++ {
 		id := fmt.Sprintf("fixture-%03d", index)
-		node := rabbitMQHealthyNode(id, "node-"+fmt.Sprintf("%03d", index), "cluster-a", "fixture-address-"+id)
+		node := rabbitMQHealthyNode(id, "fixture-node", "cluster-a", "fixture-address")
+		node.UptimeSeconds = rabbitMQInt64(int64(index))
 		snapshot.Nodes = append(snapshot.Nodes, node)
 	}
 	service := newRabbitMQTestService(snapshot)
-	first := mustRabbitMQPage(t, service, RabbitMQQuery{Sort: "node", Order: "desc", Page: 1, PageSize: 500})
-	if first.Total != 501 || len(first.Nodes) != 500 || first.Nodes[499].Name != "node-002" {
+	first := mustRabbitMQPage(t, service, RabbitMQQuery{Sort: "uptime", Order: "desc", Page: 1, PageSize: 500})
+	if first.Total != 501 || len(first.Nodes) != 500 || first.Nodes[499].ID != "fixture-002" {
 		t.Fatalf("first page = %#v", first)
 	}
-	second := mustRabbitMQPage(t, service, RabbitMQQuery{Sort: "node", Order: "desc", Page: 2, PageSize: 500})
-	if len(second.Nodes) != 1 || second.Nodes[0].Name != "node-001" {
+	second := mustRabbitMQPage(t, service, RabbitMQQuery{Sort: "uptime", Order: "desc", Page: 2, PageSize: 500})
+	if len(second.Nodes) != 1 || second.Nodes[0].ID != "fixture-001" {
 		t.Fatalf("second page = %#v", second)
 	}
 }

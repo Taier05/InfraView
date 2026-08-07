@@ -653,17 +653,18 @@ func TestElasticsearchNodesNormalizesDefaultsAndValidatesPageSizes(t *testing.T)
 func TestElasticsearchNodesPageSize500PaginatesAfterDescendingSort(t *testing.T) {
 	snapshot := elasticsearch.Snapshot{Clusters: []elasticsearch.Cluster{healthyElasticsearchCluster("fixture-cluster-a")}}
 	for index := 1; index <= 501; index++ {
-		name := fmt.Sprintf("fixture-node-%03d", index)
-		node := healthyElasticsearchNode("fixture-cluster-a", name)
+		node := healthyElasticsearchNode("fixture-cluster-a", "fixture-node")
+		node.ID = fmt.Sprintf("fixture-%03d", index)
+		node.UptimeSeconds = elasticsearchInt64Ptr(int64(index))
 		snapshot.Nodes = append(snapshot.Nodes, node)
 	}
 	service := newElasticsearchServiceWithSnapshot(snapshot)
-	first, _, err := service.Nodes(context.Background(), ElasticsearchQuery{Sort: "node", Order: "desc", Page: 1, PageSize: 500})
-	if err != nil || first.Total != 501 || len(first.Nodes) != 500 || first.Nodes[499].Name != "fixture-node-002" {
+	first, _, err := service.Nodes(context.Background(), ElasticsearchQuery{Sort: "uptime", Order: "desc", Page: 1, PageSize: 500})
+	if err != nil || first.Total != 501 || len(first.Nodes) != 500 || first.Nodes[499].ID != "fixture-002" {
 		t.Fatalf("first page = %#v, err = %v", first, err)
 	}
-	second, _, err := service.Nodes(context.Background(), ElasticsearchQuery{Sort: "node", Order: "desc", Page: 2, PageSize: 500})
-	if err != nil || len(second.Nodes) != 1 || second.Nodes[0].Name != "fixture-node-001" {
+	second, _, err := service.Nodes(context.Background(), ElasticsearchQuery{Sort: "uptime", Order: "desc", Page: 2, PageSize: 500})
+	if err != nil || len(second.Nodes) != 1 || second.Nodes[0].ID != "fixture-001" {
 		t.Fatalf("second page = %#v, err = %v", second, err)
 	}
 }

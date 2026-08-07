@@ -755,20 +755,20 @@ func TestMySQLInstancesAcceptsOnlySupportedPageSizesAndHandlesOverflow(t *testin
 func TestMySQLInstancesPageSize500PaginatesAfterDescendingSort(t *testing.T) {
 	svc := newMySQLServiceWithSnapshot(pagedMySQLFixtureSnapshot())
 	first, _, err := svc.Instances(context.Background(), MySQLQuery{
-		Sort: "instance", Order: "desc", Page: 1, PageSize: 500,
+		Sort: "uptime", Order: "desc", Page: 1, PageSize: 500,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	second, _, err := svc.Instances(context.Background(), MySQLQuery{
-		Sort: "instance", Order: "desc", Page: 2, PageSize: 500,
+		Sort: "uptime", Order: "desc", Page: 2, PageSize: 500,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.Total != 501 || len(first.Instances) != 500 || first.Instances[499].Name != "fixture-mysql-002" ||
+	if first.Total != 501 || len(first.Instances) != 500 || first.Instances[499].ID != "fixture-mysql-002" ||
 		second.Total != 501 || len(second.Instances) != 1 ||
-		second.Instances[0].Name != "fixture-mysql-001" {
+		second.Instances[0].ID != "fixture-mysql-001" {
 		t.Fatalf("first = %#v, second = %#v", first, second)
 	}
 }
@@ -888,12 +888,13 @@ func pagedMySQLFixtureSnapshot() mysql.Snapshot {
 	for i := range instances {
 		name := fmt.Sprintf("fixture-mysql-%03d", i+1)
 		instances[i] = mysql.Instance{
-			ID:           name,
-			Name:         name,
-			Address:      fmt.Sprintf("fixture-address-%03d", i+1),
-			Host:         fmt.Sprintf("fixture-host-%03d", i+1),
-			Availability: mysql.AvailabilityUp,
-			Role:         mysql.RoleWritable,
+			ID:            name,
+			Name:          name,
+			Address:       "fixture-address",
+			Host:          fmt.Sprintf("fixture-host-%03d", i+1),
+			Availability:  mysql.AvailabilityUp,
+			Role:          mysql.RoleWritable,
+			UptimeSeconds: floatPointer(float64(i + 1)),
 		}
 	}
 	return mysql.Snapshot{Instances: instances}

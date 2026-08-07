@@ -212,14 +212,16 @@ func TestRedisInstancesPageSize500PaginatesAfterDescendingSort(t *testing.T) {
 	snapshot := redis.Snapshot{Instances: make([]redis.Instance, 0, 501)}
 	for index := 1; index <= 501; index++ {
 		value := fmt.Sprintf("fixture-%03d", index)
-		snapshot.Instances = append(snapshot.Instances, healthyRedisMaster(value, value))
+		instance := healthyRedisMaster(value, "fixture-address")
+		instance.UptimeSeconds = redisInt64Pointer(int64(index))
+		snapshot.Instances = append(snapshot.Instances, instance)
 	}
 	service := newRedisServiceWithSnapshot(snapshot)
-	first, _, err := service.Instances(context.Background(), RedisQuery{Sort: "instance", Order: "desc", Page: 1, PageSize: 500})
+	first, _, err := service.Instances(context.Background(), RedisQuery{Sort: "uptime", Order: "desc", Page: 1, PageSize: 500})
 	if err != nil || first.Total != 501 || len(first.Instances) != 500 || first.Instances[499].ID != "fixture-002" {
 		t.Fatalf("first page = %#v, err = %v", first, err)
 	}
-	second, _, err := service.Instances(context.Background(), RedisQuery{Sort: "instance", Order: "desc", Page: 2, PageSize: 500})
+	second, _, err := service.Instances(context.Background(), RedisQuery{Sort: "uptime", Order: "desc", Page: 2, PageSize: 500})
 	if err != nil || len(second.Instances) != 1 || second.Instances[0].ID != "fixture-001" {
 		t.Fatalf("second page = %#v, err = %v", second, err)
 	}

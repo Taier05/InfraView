@@ -653,16 +653,16 @@ func TestHostsPageSize500PaginatesAfterDescendingSort(t *testing.T) {
 	for index := 1; index <= 501; index++ {
 		value := fmt.Sprintf("fixture-host-%03d", index)
 		provider.hosts = append(provider.hosts, datasource.Host{
-			ID: value, Name: value, Status: datasource.StatusOnline, StatusTime: clock.Now(),
+			ID: value, Name: "fixture-host", Status: datasource.StatusOnline, StatusTime: clock.Now(), Uptime: time.Duration(index) * time.Second,
 		})
 	}
 	svc := newService(provider, clock)
-	first, _, err := svc.Hosts(context.Background(), service.HostQuery{Sort: "name", Order: "desc", Page: 1, PageSize: 500})
-	if err != nil || first.Total != 501 || len(first.Hosts) != 500 || first.Hosts[499].Name != "fixture-host-002" {
+	first, _, err := svc.Hosts(context.Background(), service.HostQuery{Sort: "uptime", Order: "desc", Page: 1, PageSize: 500})
+	if err != nil || first.Total != 501 || len(first.Hosts) != 500 || first.Hosts[499].ID != "fixture-host-002" {
 		t.Fatalf("first page = %#v, err = %v", first, err)
 	}
-	second, _, err := svc.Hosts(context.Background(), service.HostQuery{Sort: "name", Order: "desc", Page: 2, PageSize: 500})
-	if err != nil || len(second.Hosts) != 1 || second.Hosts[0].Name != "fixture-host-001" {
+	second, _, err := svc.Hosts(context.Background(), service.HostQuery{Sort: "uptime", Order: "desc", Page: 2, PageSize: 500})
+	if err != nil || len(second.Hosts) != 1 || second.Hosts[0].ID != "fixture-host-001" {
 		t.Fatalf("second page = %#v, err = %v", second, err)
 	}
 }
