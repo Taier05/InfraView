@@ -20,6 +20,33 @@ const exactHeaders = [
   '状态',
 ] as const
 
+const javaServiceRequestKeys = [
+  'search',
+  'name',
+  'status',
+  'sort',
+  'direction',
+  'page',
+  'page_size',
+] as const
+
+type JavaServiceRequest = Record<
+  (typeof javaServiceRequestKeys)[number],
+  string | null
+>
+
+const businessMappings = [
+  { name: 'tikbee', business: '用户端' },
+  { name: 'rider', business: '骑手端' },
+  { name: 'mch', business: '商家端' },
+  { name: 'saas', business: '管理后台端' },
+  { name: 'mch_saas', business: '商家 PC 端' },
+  {
+    name: 'future_synthetic_service_code',
+    business: 'future_synthetic_service_code',
+  },
+] as const
+
 const overviewFixture = {
   data: {
     status: 'warning',
@@ -41,8 +68,7 @@ const overviewFixture = {
 const syntheticServices = [
   {
     id: 'synthetic-java-service-a',
-    name: 'tikbee',
-    business: '用户端',
+    ...businessMappings[0],
     address: 'synthetic-java-address-a.fixture.invalid:18080',
     health_up: true,
     health_latency_ms: 12.5,
@@ -60,8 +86,7 @@ const syntheticServices = [
   },
   {
     id: 'synthetic-java-service-b',
-    name: 'rider',
-    business: '骑手端',
+    ...businessMappings[1],
     address: 'synthetic-java-address-b.fixture.invalid:18080',
     health_up: true,
     health_latency_ms: 18,
@@ -79,8 +104,7 @@ const syntheticServices = [
   },
   {
     id: 'synthetic-java-service-c',
-    name: 'mch',
-    business: '商家端',
+    ...businessMappings[2],
     address: 'synthetic-java-address-c.fixture.invalid:18080',
     health_up: true,
     health_latency_ms: 8,
@@ -98,8 +122,7 @@ const syntheticServices = [
   },
   {
     id: 'synthetic-java-service-d',
-    name: 'saas',
-    business: '管理后台端',
+    ...businessMappings[3],
     address: 'synthetic-java-address-d.fixture.invalid:18080',
     health_up: true,
     health_latency_ms: 30,
@@ -117,8 +140,7 @@ const syntheticServices = [
   },
   {
     id: 'synthetic-java-service-e',
-    name: 'mch_saas',
-    business: '商家 PC 端',
+    ...businessMappings[4],
     address: 'synthetic-java-address-e.fixture.invalid:18080',
     health_up: true,
     health_latency_ms: 25,
@@ -136,8 +158,7 @@ const syntheticServices = [
   },
   {
     id: 'synthetic-java-service-f',
-    name: 'future_synthetic_service_code',
-    business: 'future_synthetic_service_code',
+    ...businessMappings[5],
     address:
       'synthetic-java-address-with-a-deliberately-long-value.fixture.invalid:18080',
     health_up: null,
@@ -161,12 +182,16 @@ function servicePageFixture(
   services: readonly Record<string, unknown>[] = syntheticServices,
   stale = false,
 ) {
+  const requestedName = parameters.get('name')
+  const matchingServices = requestedName === null
+    ? services
+    : services.filter((service) => service.name === requestedName)
   const page = Number(parameters.get('page') ?? '1')
   const pageSize = Number(parameters.get('page_size') ?? '20')
-  const total = services.length === 0 ? 0 : Math.max(services.length, 45)
+  const total = matchingServices.length === 0 ? 0 : Math.max(matchingServices.length, 45)
   return {
     data: {
-      services,
+      services: matchingServices,
       available_names: syntheticServices.map((service) => service.name),
       total,
       page,
@@ -181,12 +206,38 @@ function servicePageFixture(
   }
 }
 
+function captureServiceRequest(url: string): JavaServiceRequest {
+  const parameters = new URL(url).searchParams
+  const keys = [...parameters.keys()]
+  expect(keys).toEqual([...new Set(keys)])
+  expect(keys.every((key) => javaServiceRequestKeys.includes(
+    key as (typeof javaServiceRequestKeys)[number],
+  ))).toBe(true)
+  return {
+    search: parameters.get('search'),
+    name: parameters.get('name'),
+    status: parameters.get('status'),
+    sort: parameters.get('sort'),
+    direction: parameters.get('direction'),
+    page: parameters.get('page'),
+    page_size: parameters.get('page_size'),
+  }
+}
+
+async function expectLatestServiceRequest(
+  capturedServiceRequests: readonly JavaServiceRequest[],
+  expected: JavaServiceRequest,
+) {
+  await expect.poll(() => capturedServiceRequests.at(-1)).toEqual(expected)
+}
+
 async function mockJavaAPI(
   page: Page,
   options: {
     services?: readonly Record<string, unknown>[]
     stale?: boolean
     unavailable?: boolean
+    capturedServiceRequests?: JavaServiceRequest[]
   } = {},
 ) {
   await page.route('**/api/v1/java/overview', async (route) => {
@@ -213,6 +264,7 @@ async function mockJavaAPI(
       return
     }
     const parameters = new URL(route.request().url()).searchParams
+    options.capturedServiceRequests?.push(captureServiceRequest(route.request().url()))
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -273,36 +325,130 @@ test('侧边栏与第七张总览卡均进入只读 Java 业务服务页', async
   }
 })
 
-test('固定十三列表头并恢复搜索、业务端、状态、排序与分页 URL', async ({
+test('固定十三列表头，并以请求契约恢复和规范 URL 状态', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
-  await mockJavaAPI(page)
+  const capturedServiceRequests: JavaServiceRequest[] = []
+  await mockJavaAPI(page, { capturedServiceRequests })
   await login(page)
-  await page.goto('/java')
+  await page.goto(
+    '/java?search=tikbee&name=rider&status=warning&sort=cpu&direction=desc&page=2&page_size=50',
+  )
 
   const headers = page.getByRole('columnheader')
   await expect(headers).toHaveCount(exactHeaders.length)
   expect(await headers.allTextContents()).toEqual(exactHeaders)
+  await expectLatestServiceRequest(capturedServiceRequests, {
+    search: 'tikbee',
+    name: 'rider',
+    status: 'warning',
+    sort: 'cpu',
+    direction: 'desc',
+    page: '2',
+    page_size: '50',
+  })
+  await expect(
+    page.getByRole('searchbox', { name: '搜索业务端、服务名称或地址' }),
+  ).toHaveValue('tikbee')
+  await expect(page.getByRole('combobox', { name: '业务端' })).toHaveValue('rider')
+  await expect(page.getByRole('combobox', { name: '服务状态' })).toHaveValue('warning')
+  await expect(page.getByRole('combobox', { name: '每页数量' })).toHaveValue('50')
+
+  await page.goto(
+    '/java?search=%20%20&name=%20%20&status=invalid&sort=invalid&direction=invalid&page=0&page_size=30',
+  )
+  await expectLatestServiceRequest(capturedServiceRequests, {
+    search: null,
+    name: null,
+    status: null,
+    sort: 'business',
+    direction: 'asc',
+    page: '1',
+    page_size: '20',
+  })
 
   await page.getByRole('button', { name: '下一页' }).click()
   await expect(page).toHaveURL(/page=2/)
+  await expectLatestServiceRequest(capturedServiceRequests, {
+    search: null,
+    name: null,
+    status: null,
+    sort: 'business',
+    direction: 'asc',
+    page: '2',
+    page_size: '20',
+  })
   await page
     .getByRole('searchbox', { name: '搜索业务端、服务名称或地址' })
     .fill('tikbee')
   await expect(page).toHaveURL(/search=tikbee/)
   await expect(page).toHaveURL(/page=1/)
+  await expectLatestServiceRequest(capturedServiceRequests, {
+    search: 'tikbee',
+    name: null,
+    status: null,
+    sort: 'business',
+    direction: 'asc',
+    page: '1',
+    page_size: '20',
+  })
   await page.getByRole('combobox', { name: '业务端' }).selectOption('rider')
   await expect(page).toHaveURL(/name=rider/)
+  await expectLatestServiceRequest(capturedServiceRequests, {
+    search: 'tikbee',
+    name: 'rider',
+    status: null,
+    sort: 'business',
+    direction: 'asc',
+    page: '1',
+    page_size: '20',
+  })
   await page.getByRole('combobox', { name: '服务状态' }).selectOption('warning')
   await expect(page).toHaveURL(/status=warning/)
+  await expectLatestServiceRequest(capturedServiceRequests, {
+    search: 'tikbee',
+    name: 'rider',
+    status: 'warning',
+    sort: 'business',
+    direction: 'asc',
+    page: '1',
+    page_size: '20',
+  })
   await page.getByRole('button', { name: /^CPU 使用率排序/ }).click()
   await expect(page).toHaveURL(/sort=cpu/)
   await expect(page).toHaveURL(/direction=asc/)
+  await expectLatestServiceRequest(capturedServiceRequests, {
+    search: 'tikbee',
+    name: 'rider',
+    status: 'warning',
+    sort: 'cpu',
+    direction: 'asc',
+    page: '1',
+    page_size: '20',
+  })
   await page.getByRole('button', { name: /^CPU 使用率排序/ }).click()
   await expect(page).toHaveURL(/direction=desc/)
+  await expectLatestServiceRequest(capturedServiceRequests, {
+    search: 'tikbee',
+    name: 'rider',
+    status: 'warning',
+    sort: 'cpu',
+    direction: 'desc',
+    page: '1',
+    page_size: '20',
+  })
   await page.getByRole('combobox', { name: '每页数量' }).selectOption('50')
   await expect(page).toHaveURL(/page_size=50/)
+  await expectLatestServiceRequest(capturedServiceRequests, {
+    search: 'tikbee',
+    name: 'rider',
+    status: 'warning',
+    sort: 'cpu',
+    direction: 'desc',
+    page: '1',
+    page_size: '50',
+  })
 
   await page.reload()
   await expect(
@@ -314,35 +460,45 @@ test('固定十三列表头并恢复搜索、业务端、状态、排序与分�
   await expectNoDestructiveControls(page)
 })
 
-test('五项业务端映射、未知透传、缺失格式和原生完整提示保持稳定', async ({
+test('route fixture 的 raw name 与业务端映射逐对保持稳定', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
-  await mockJavaAPI(page)
+  const capturedServiceRequests: JavaServiceRequest[] = []
+  await mockJavaAPI(page, { capturedServiceRequests })
   await login(page)
-  await page.goto('/java')
+  for (const [index, mapping] of businessMappings.entries()) {
+    expect(syntheticServices[index]).toMatchObject(mapping)
+    await page.goto(`/java?name=${encodeURIComponent(mapping.name)}`)
+    await expectLatestServiceRequest(capturedServiceRequests, {
+      search: null,
+      name: mapping.name,
+      status: null,
+      sort: 'business',
+      direction: 'asc',
+      page: '1',
+      page_size: '20',
+    })
+    const row = page.locator('.java-table tbody tr').first()
+    await expect(row).toBeVisible()
+    await expect(row.locator('td').first()).toHaveText(mapping.business)
+    await expect(row.locator('.java-identity').first()).toHaveAttribute(
+      'title',
+      mapping.business,
+    )
+  }
 
-  const rows = page.locator('.java-table tbody tr')
-  await expect(rows).toHaveCount(syntheticServices.length)
-  await expect(rows.nth(0).locator('td').first()).toHaveText('用户端')
-  await expect(rows.nth(1).locator('td').first()).toHaveText('骑手端')
-  await expect(rows.nth(2).locator('td').first()).toHaveText('商家端')
-  await expect(rows.nth(3).locator('td').first()).toHaveText('管理后台端')
-  await expect(rows.nth(4).locator('td').first()).toHaveText('商家 PC 端')
-  await expect(rows.nth(5).locator('td').first()).toHaveText(
-    'future_synthetic_service_code',
-  )
-
-  const unknownValues = rows.nth(5).locator('.java-value')
+  const unknownRow = page.locator('.java-table tbody tr').first()
+  const unknownValues = unknownRow.locator('.java-value')
   await expect(unknownValues).toHaveCount(10)
   await expect(unknownValues).toHaveText(
     Array.from({ length: 10 }, () => '暂无数据'),
   )
-  await expect(rows.nth(5).locator('.java-identity').first()).toHaveAttribute(
+  await expect(unknownRow.locator('.java-identity').first()).toHaveAttribute(
     'title',
     'future_synthetic_service_code',
   )
-  await expect(rows.nth(5).locator('.java-identity').nth(1)).toHaveAttribute(
+  await expect(unknownRow.locator('.java-identity').nth(1)).toHaveAttribute(
     'title',
     'synthetic-java-address-with-a-deliberately-long-value.fixture.invalid:18080',
   )
@@ -390,25 +546,34 @@ test('窄视口仅 Java 表格滚动容器允许横向溢出', async ({ page }) 
 
   const geometry = await page.evaluate(() => {
     const scroll = document.querySelector<HTMLElement>('.java-table-scroll')!
-    const controls = document
-      .querySelector<HTMLElement>('.java-table')!
-      .closest('section')!
-      .querySelector<HTMLElement>('.host-list-controls')!
-    const controlBox = controls.getBoundingClientRect()
+    const visibleHorizontalScrollContainers = [document.body, ...document.querySelectorAll<HTMLElement>('body *')]
+      .filter((element) => {
+        const box = element.getBoundingClientRect()
+        const style = getComputedStyle(element)
+        return box.width > 0 && box.height > 0 && ['auto', 'scroll'].includes(style.overflowX)
+      })
+      .map((element) => ({
+        selector: element === scroll ? '.java-table-scroll' : element.tagName.toLowerCase(),
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+      }))
     return {
-      documentOverflow:
+      documentHasHorizontalOverflow:
         document.documentElement.scrollWidth > document.documentElement.clientWidth,
-      controlsOverflow: controls.scrollWidth > controls.clientWidth,
-      controlsOutsideViewport:
-        controlBox.left < 0 || controlBox.right > document.documentElement.clientWidth,
-      tableIsOnlyOverflowRegion: scroll.scrollWidth > scroll.clientWidth,
+      visibleHorizontalScrollContainers,
+      overflowingHorizontalScrollContainers: visibleHorizontalScrollContainers
+        .filter((container) => container.scrollWidth > container.clientWidth)
+        .map((container) => container.selector),
     }
   })
 
-  expect(geometry.documentOverflow).toBe(false)
-  expect(geometry.controlsOverflow).toBe(false)
-  expect(geometry.controlsOutsideViewport).toBe(false)
-  expect(geometry.tableIsOnlyOverflowRegion).toBe(true)
+  expect(geometry.documentHasHorizontalOverflow).toBe(false)
+  expect(geometry.visibleHorizontalScrollContainers).toContainEqual(
+    expect.objectContaining({ selector: '.java-table-scroll' }),
+  )
+  expect(geometry.overflowingHorizontalScrollContainers).toEqual([
+    '.java-table-scroll',
+  ])
   await expectNoDestructiveControls(page)
 })
 
