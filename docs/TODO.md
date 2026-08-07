@@ -13,7 +13,8 @@
 - [x] 最终修复后完成容器化前端 273 项、typecheck/build、Go gofmt/vet/普通/race/编译、Playwright 6 项静态发现与敏感/只读/whitespace/diff 扫描；原 Task 8 的 E2E safety 与无缓存镜像仍为历史通过证据，本轮按边界未重跑。
 - [x] 收口精确 `int64` 字符串 transport、前端 BigInt 展示、单次响应 UTC Clock、百分比严格范围、fixture 扩展敏感扫描，以及 process/consistency/collection 总览组合测试。
 - [x] 按明确授权完成本地提交；提交信息为 `docs: record Java service monitoring delivery`。
-- [ ] push、合并 `main`、现有 8080 重建/部署与动态 Playwright/浏览器验收均未执行，分别需要新的明确授权。
+- [x] 按明确授权将功能快进合并到 `main`、推送到 `origin/main`，并原位重建仍连接测试 Nightingale 的现有 8080；未创建额外端口。
+- [ ] 动态 Playwright/浏览器验收尚未执行，仍需单独明确授权。
 
 ## Mock MVP
 

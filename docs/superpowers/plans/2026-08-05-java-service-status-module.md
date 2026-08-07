@@ -771,6 +771,8 @@ Expected: PID metrics and `ident` JSON exposure have no matches; only test asser
 
 Do not execute any Compose or Playwright browser command until the user explicitly authorizes both the existing 8080 rebuild and dynamic acceptance. After authorization, first verify that the configured data source is the test Nightingale without printing `.env` or any private value, then rebuild only the existing project/service in place. Point Playwright at `http://127.0.0.1:8080`; do not invoke `scripts/e2e.sh`, because it owns and creates a separate Compose project.
 
+2026-08-07 后续状态：用户已单独授权并完成现有 8080 原位重建，未创建其他项目或端口；动态 Playwright/浏览器仍未授权、未执行。
+
 - [x] **Step 7: Commit only if explicitly authorized; push remains separate**
 
 ```bash
@@ -779,3 +781,5 @@ git commit -m "docs: record Java service monitoring delivery"
 ```
 
 Do not run `git push` without a new, explicit push authorization.
+
+2026-08-07 后续状态：用户已明确授权，功能已快进合并到 `main` 并推送到 `origin/main`。

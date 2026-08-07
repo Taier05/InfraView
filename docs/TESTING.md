@@ -8,7 +8,9 @@
 - 原 Task 8 已执行 `./scripts/e2e-safety.test.sh` 与 `docker build --no-cache --tag infraview:java-verify .`，镜像只构建不运行。最终修复波按明确边界不再运行会间接调用 `scripts/e2e.sh` 的 safety 脚本，也不重建镜像；本轮重新通过 `git diff --check`、`git diff --cached --check`、Java 范围 whitespace、只读能力、旧 transport 残留、PROJECT_STATUS 日期和 IPv4/IPv6/hostname/URL fixture 扫描。
 - 最终审查修复全部按 RED→GREEN：HTTP JSON 首次把 `9007199254740993` 舍入为浮点且负值产生带符号字符串，修复后三个精确整数字段固定为规范十进制字符串或 `null`；前端旧 validator 拒绝字符串，修复后以 BigInt 无损校验/格式化并拒绝 number、科学计数、符号、前导零和超 `MaxInt64`。首次响应 Clock 计数从 2 次降为 1 次并复用于 freshness、状态和 uptime；另锁定百分比有限 `0..100`、2/5 阈值前后边界、process/consistency 同级去重及与 collection warning/critical 组合，以及 fixture 对 IPv6、非保留 hostname/URL、Cookie、Base URL、upstream 的扫描。
 - 已知非阻断告警：`npm ci` 报告锁文件的 1 个 moderate、2 个 high；前端测试中 Java/RabbitMQ POST 未注册 MSW handler 的预期拒绝日志；Vite 对第三方 `"use client"` 指令的忽略提示。它们均为既有依赖或只读安全契约提示，本轮未改依赖、未执行 `npm audit fix`。
-- 未运行 `make verify`、`scripts/e2e.sh`、Compose、动态 Playwright 或浏览器；未访问现有 8080、未发布端口、未读取私密环境、未连接外部或生产数据源。push、`main` 合并、8080 重建/部署和动态验收需分别重新授权。
+- 随后经用户单独授权，执行 `INFRAVIEW_ENV_FILE=/root/github/InfraView/.env INFRAVIEW_PORT=8080 docker compose --project-name infraview up -d --build --force-recreate infraview` 原位重建现有服务。镜像内前端 273 项、typecheck/build、Go 普通/race/编译通过；服务 healthy、仅发布原 8080，并保持 `10001:10001`、只读根文件系统、cap drop `ALL` 与禁止提权。Java API 未认证拒绝为 401。未输出环境内容、Base URL、认证信息或现场数据。
+- 合并后 `main` 前端 273 项、typecheck/build 通过；Go 全量首轮触发一次既有 Nightingale 并发失败测试的低概率时序波动，相关生产/测试文件不在 Java diff 内。该 focused 测试默认重复 100 次及 `-cpu=1,2,4,8` 共 400 次均通过，随后 fresh Go gofmt/vet/普通/race/编译全量退出 0。功能提交 `5ed392a` 已快进合并并推送到 `origin/main`。
+- 未运行动态 Playwright/浏览器、`make verify` 或会创建 18080 的 `scripts/e2e.sh`；未创建额外端口，未连接或探测生产 Nightingale/Java 服务。动态验收仍需单独授权。
 
 ## 标准入口
 

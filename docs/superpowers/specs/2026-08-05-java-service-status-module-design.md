@@ -224,4 +224,4 @@ Java 服务是总览第七张独立卡，继续使用共享网格与 `ModuleStat
 
 ## 2026-08-07 交付状态
 
-本设计的 Java 服务实现、脱敏测试与本地提交均已完成。交付保持固定 11 查询、`name + server_ip` 身份、`ident` 对外排除、五项完整精确业务端映射、13 列单值单行列表和默认 15 秒周期的 2/5 freshness。静态 E2E 使用完全合成 route fixture，只执行 Playwright `--list`；动态浏览器验收、现有 8080 重建/部署、`main` 合并和 push 均未执行，且每项需要新的单独授权。
+本设计的 Java 服务实现、脱敏测试与本地提交均已完成。交付保持固定 11 查询、`name + server_ip` 身份、`ident` 对外排除、五项完整精确业务端映射、13 列单值单行列表和默认 15 秒周期的 2/5 freshness。静态 E2E 使用完全合成 route fixture，只执行 Playwright `--list`。后续经单独授权，功能已快进合并到 `main`、推送到 `origin/main`，现有 8080 已原位重建并继续只连接测试 Nightingale；动态浏览器验收仍未执行。
