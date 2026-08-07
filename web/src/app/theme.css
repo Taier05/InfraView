@@ -1038,7 +1038,8 @@ h1 {
   overflow-x: hidden;
 }
 
-.mysql-table-compact,
+.mysql-table-compact th,
+.mysql-table-compact td,
 .redis-table th,
 .redis-table td {
   overflow: hidden;

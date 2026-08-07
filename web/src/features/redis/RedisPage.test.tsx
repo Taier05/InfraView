@@ -247,9 +247,36 @@ it("严格渲染 Redis 十三列及拆分后的指标语义", async () => {
   ).not.toBeInTheDocument();
 });
 
-it("所有 Redis 表头排序按钮写入展示键且不渲染箭头", async () => {
+it("所有 Redis 表头从非首页首击升序、再击降序，并发送精确参数", async () => {
   const user = userEvent.setup();
-  renderPage();
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const raw =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    const url = new URL(raw, "http://localhost");
+    requests.push(url);
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          ...fixture,
+          data: {
+            ...fixture.data,
+            page: Number(url.searchParams.get("page")),
+            page_size: Number(url.searchParams.get("page_size")),
+            total: 64,
+            total_pages: 4,
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+  });
+  renderPage(
+    "/redis?role=slave&status=warning&sort=instance&order=desc&page=3&page_size=50",
+  );
   await screen.findByText("192.0.2.40:6379");
 
   const expectations = [
@@ -272,10 +299,55 @@ it("所有 Redis 表头排序按钮写入展示键且不渲染箭头", async () 
     const button = screen.getByRole("button", { name: `${label}排序` });
     expect(button).not.toHaveTextContent(/[⇅↑↓]/);
     await user.click(button);
-    await waitFor(() =>
-      expect(window.location.search).toContain(`sort=${sort}`),
-    );
+    await waitFor(() => {
+      const parameters = new URLSearchParams(window.location.search);
+      expect(parameters.get("sort")).toBe(sort);
+      expect(parameters.get("order")).toBe("asc");
+      expect(parameters.get("page")).toBe("1");
+      expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+        role: "slave",
+        status: "warning",
+        sort,
+        order: "asc",
+        page: "1",
+        page_size: "50",
+      });
+    });
+
+    await user.click(screen.getByRole("button", { name: `${label}排序` }));
+    await waitFor(() => {
+      const parameters = new URLSearchParams(window.location.search);
+      expect(parameters.get("sort")).toBe(sort);
+      expect(parameters.get("order")).toBe("desc");
+      expect(parameters.get("page")).toBe("1");
+      expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+        role: "slave",
+        status: "warning",
+        sort,
+        order: "desc",
+        page: "1",
+        page_size: "50",
+      });
+    });
   }
+});
+
+it("将 evicted 排序规范为 instance 且不发送 evicted", async () => {
+  renderPage("/redis?sort=evicted&order=desc&page=1&page_size=50");
+  await screen.findByText("192.0.2.40:6379");
+
+  await waitFor(() => {
+    const parameters = new URLSearchParams(window.location.search);
+    expect(parameters.get("sort")).toBe("instance");
+    expect(parameters.get("order")).toBe("desc");
+    expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+      sort: "instance",
+      order: "desc",
+      page: "1",
+      page_size: "50",
+    });
+    expect(requests.some((request) => request.searchParams.get("sort") === "evicted")).toBe(false);
+  });
 });
 
 it("复用现有列表控制栏并展示最新数据时间", async () => {
@@ -312,9 +384,14 @@ it("把角色状态排序和分页写入 URL 与固定 GET 参数", async () => 
   await waitFor(() =>
     expect(requests.at(-1)?.pathname).toBe("/api/v1/redis/instances"),
   );
-  expect([...requests.at(-1)!.searchParams.keys()].sort()).toEqual(
-    ["order", "page", "page_size", "role", "sort", "status"].sort(),
-  );
+  expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+    role: "slave",
+    status: "warning",
+    sort: "memory",
+    order: "asc",
+    page: "1",
+    page_size: "20",
+  });
 });
 
 it("搜索防抖后重置页码并仅发送固定参数", async () => {

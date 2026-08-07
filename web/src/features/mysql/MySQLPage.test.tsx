@@ -166,9 +166,11 @@ it('renders the fourteen independent MySQL metric columns', async () => {
   expect(table.closest('.mysql-table-scroll')).not.toBeNull()
 })
 
-it('sorts every MySQL header without rendering arrows', async () => {
+it('sorts every MySQL header from a later page with exact URL and request parameters', async () => {
   const user = userEvent.setup()
-  renderMySQLPage()
+  renderMySQLPage(
+    '/mysql?label=tier-fixture&status=warning&role=read_only&sort=instance&order=desc&page=3&page_size=50',
+  )
   await screen.findByText('192.0.2.101:3306')
 
   const expectations = [
@@ -192,7 +194,38 @@ it('sorts every MySQL header without rendering arrows', async () => {
     const button = screen.getByRole('button', { name: `${label}排序` })
     expect(button).not.toHaveTextContent(/[⇅↑↓]/)
     await user.click(button)
-    expect(window.location.search).toContain(`sort=${sort}`)
+    await waitFor(() => {
+      const parameters = new URLSearchParams(window.location.search)
+      expect(parameters.get('sort')).toBe(sort)
+      expect(parameters.get('order')).toBe('asc')
+      expect(parameters.get('page')).toBe('1')
+      expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+        label: 'tier-fixture',
+        status: 'warning',
+        role: 'read_only',
+        sort,
+        order: 'asc',
+        page: '1',
+        page_size: '50',
+      })
+    })
+
+    await user.click(screen.getByRole('button', { name: `${label}排序` }))
+    await waitFor(() => {
+      const parameters = new URLSearchParams(window.location.search)
+      expect(parameters.get('sort')).toBe(sort)
+      expect(parameters.get('order')).toBe('desc')
+      expect(parameters.get('page')).toBe('1')
+      expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+        label: 'tier-fixture',
+        status: 'warning',
+        role: 'read_only',
+        sort,
+        order: 'desc',
+        page: '1',
+        page_size: '50',
+      })
+    })
   }
 })
 
@@ -281,7 +314,7 @@ it('writes filters sort and pagination to the URL', async () => {
   expect(window.location.search).toContain('role=read_only')
   expect(window.location.search).toContain('label=tier-fixture')
   expect(window.location.search).toContain('page_size=50')
-  expect(window.location.search).toContain('sort=qps')
+  expect(new URLSearchParams(window.location.search).get('sort')).toBe('qps')
   expect(window.location.search).toContain('page=1')
 
   await waitFor(() => {
