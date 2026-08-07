@@ -27,6 +27,7 @@ import {
 } from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
 import { StatusBadge } from '../../components/StatusBadge'
+import { formatDurationSeconds } from '../../formatters/duration'
 
 const pageSizes = [20, 50, 100, 500] as const
 const sortFields = [
@@ -289,13 +290,7 @@ function byteSize(value: string | null) {
 }
 
 function uptime(value: string | null) {
-  if (value === null) return '暂无数据'
-  const seconds = BigInt(value)
-  const days = seconds / 86_400n
-  const hours = (seconds % 86_400n) / 3_600n
-  if (days > 0n && hours > 0n) return `${days}天 ${hours}小时`
-  if (days > 0n) return `${days}天`
-  return `${hours}小时`
+  return formatDurationSeconds(value === null ? null : BigInt(value))
 }
 
 function serviceStatus(service: JavaService) {

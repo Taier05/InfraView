@@ -322,6 +322,19 @@ it('十六个表头都使用精确排序字段并可切换升降序', async () =
   )
 })
 
+it('运行时间排序仍使用 uptime 并回到第一页', async () => {
+  respondWithRequestedPage()
+  const user = userEvent.setup()
+  renderPage('/elasticsearch?page=3')
+  await screen.findByText('fixture-es-node-a')
+
+  await user.click(screen.getByRole('button', { name: /^运行时间排序/ }))
+  await waitFor(() => {
+    expect(requests.at(-1)?.searchParams.get('sort')).toBe('uptime')
+    expect(requests.at(-1)?.searchParams.get('page')).toBe('1')
+  })
+})
+
 it('规范非法 URL 参数并按服务端结果修正越界页码', async () => {
   responseBody = elasticsearchNodePageFixture({
     data: { page: 2, total: 40, total_pages: 2 },
@@ -371,7 +384,7 @@ it('按既定规则格式化角色、空值、比例、速率、整数、IEC 与
           store_size_bytes: 2 * 1024 ** 3,
           thread_pool_queue: 3,
           rejected_rate: 0.02,
-          uptime_seconds: 90_000,
+          uptime_seconds: 90,
         },
         {
           ...base,
@@ -394,7 +407,7 @@ it('按既定规则格式化角色、空值、比例、速率、整数、IEC 与
           ...base,
           id: 'elasticsearch-fixture-node-003',
           name: 'fixture-es-node-days',
-          uptime_seconds: 172_800,
+          uptime_seconds: 43_912_800,
         },
         {
           ...base,
@@ -425,7 +438,7 @@ it('按既定规则格式化角色、空值、比例、速率、整数、IEC 与
     '2 GiB',
     '3',
     '0.02/s',
-    '1天 1小时',
+    '1分钟',
     '磁盘',
   ])
   expect(within(rows[1]).getAllByRole('cell').slice(2, 15).map((cell) => cell.textContent))
@@ -444,7 +457,15 @@ it('按既定规则格式化角色、空值、比例、速率、整数、IEC 与
       '暂无数据',
       '暂无数据',
     ])
-  expect(within(rows[2]).getAllByRole('cell')[14]).toHaveTextContent('2天')
+  for (const [row, value] of [
+    [rows[0], '1分钟'],
+    [rows[1], '暂无数据'],
+    [rows[2], '1年 143天 6小时'],
+  ] as const) {
+    const uptimeCell = within(row).getAllByRole('cell')[14]
+    expect(uptimeCell).toHaveTextContent(value)
+    expect(uptimeCell.querySelector('[title]')).toHaveAttribute('title', value)
+  }
   expect(within(rows[3]).getAllByRole('cell')[14]).toHaveTextContent('2小时')
 })
 

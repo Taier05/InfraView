@@ -380,6 +380,19 @@ it('十五个表头使用精确排序白名单并切换 direction', async () => 
   )
 })
 
+it('运行时间排序仍使用 uptime 并回到第一页', async () => {
+  respondWithRequestedPage()
+  const user = userEvent.setup()
+  renderPage('/rabbitmq?page=3')
+  await screen.findByText('fixture-rabbit-node-normal')
+
+  await user.click(screen.getByRole('button', { name: /^运行时间排序/ }))
+  await waitFor(() => {
+    expect(requests.at(-1)?.searchParams.get('sort')).toBe('uptime')
+    expect(requests.at(-1)?.searchParams.get('page')).toBe('1')
+  })
+})
+
 it('规范非法 URL 参数并按服务端结果修正越界页码', async () => {
   responseBody = rabbitMQNodePageFixture({
     data: { page: 2, total: 40, total_pages: 2 },
@@ -427,7 +440,7 @@ it('按约定格式化百分比 IEC 计数速率空值与运行时间', async ()
           messages: 1_200,
           publish_rate: 14.25,
           deliver_rate: 28,
-          uptime_seconds: 90_000,
+          uptime_seconds: 90,
         },
         {
           ...base,
@@ -448,7 +461,7 @@ it('按约定格式化百分比 IEC 计数速率空值与运行时间', async ()
           ...base,
           id: 'rabbitmq-fixture-node-days',
           name: 'fixture-rabbit-node-days',
-          uptime_seconds: 172_800,
+          uptime_seconds: 43_912_800,
         },
         {
           ...base,
@@ -477,13 +490,16 @@ it('按约定格式化百分比 IEC 计数速率空值与运行时间', async ()
     '1,200',
     '14.25/s',
     '28/s',
-    '1天 1小时',
+    '1分钟',
     '正常',
   ])
   expect(
     within(rows[1]).getAllByRole('cell').slice(4, 14).map((cell) => cell.textContent),
   ).toEqual(Array.from({ length: 10 }, () => '暂无数据'))
-  expect(within(rows[2]).getAllByRole('cell')[13]).toHaveTextContent('2天')
+  expect(within(rows[0]).getAllByRole('cell')[13].querySelector('[title]')).toHaveAttribute('title', '1分钟')
+  expect(within(rows[1]).getAllByRole('cell')[13].querySelector('[title]')).toHaveAttribute('title', '暂无数据')
+  expect(within(rows[2]).getAllByRole('cell')[13]).toHaveTextContent('1年 143天 6小时')
+  expect(within(rows[2]).getAllByRole('cell')[13].querySelector('[title]')).toHaveAttribute('title', '1年 143天 6小时')
   expect(within(rows[3]).getAllByRole('cell')[13]).toHaveTextContent('2小时')
 })
 

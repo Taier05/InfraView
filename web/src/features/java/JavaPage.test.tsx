@@ -181,16 +181,20 @@ it('按约定格式化延迟百分比 IEC 字节进程数与运行时间', async
   const base = cloneFixture().data.services[0]
   responseBody = javaServicePageFixture({
     data: {
-      services: [{
-        ...base,
-        health_latency_ms: 12.5,
-        process_count: '12345',
-        cpu_usage_percent: 72.55,
-        memory_bytes: '2147483648',
-        memory_usage_percent: 36,
-        uptime_seconds: '90000',
-      }],
-      total: 1,
+      services: [
+        {
+          ...base,
+          health_latency_ms: 12.5,
+          process_count: '12345',
+          cpu_usage_percent: 72.55,
+          memory_bytes: '2147483648',
+          memory_usage_percent: 36,
+          uptime_seconds: '90',
+        },
+        { ...base, id: 'java-year', uptime_seconds: '43912800' },
+        { ...base, id: 'java-missing', uptime_seconds: null },
+      ],
+      total: 3,
       total_pages: 1,
     },
   })
@@ -199,8 +203,17 @@ it('按约定格式化延迟百分比 IEC 字节进程数与运行时间', async
   const cells = within((await screen.findAllByRole('row'))[1]).getAllByRole('cell')
   expect(cells.map((cell) => cell.textContent)).toEqual([
     'fixture-business-a', 'fixture-address-a', '正常', '12.5 ms', '正常',
-    '正常', '12,345', '正常', '72.5%', '2 GiB', '36.0%', '1天 1小时', '正常',
+    '正常', '12,345', '正常', '72.5%', '2 GiB', '36.0%', '1分钟', '正常',
   ])
+  const rows = await screen.findAllByRole('row')
+  for (const [row, value] of [
+    [rows[1], '1分钟'],
+    [rows[2], '1年 143天 6小时'],
+    [rows[3], '暂无数据'],
+  ] as const) {
+    expect(within(row).getAllByRole('cell')[11]).toHaveTextContent(value)
+    expect(within(row).getAllByRole('cell')[11].querySelector('[title]')).toHaveAttribute('title', value)
+  }
 })
 
 it('无损校验并格式化超过 JS 安全整数和 MaxInt64 边界', async () => {
@@ -211,7 +224,7 @@ it('无损校验并格式化超过 JS 安全整数和 MaxInt64 边界', async ()
         ...base,
         process_count: '9007199254740993',
         memory_bytes: '9223372036854775807',
-        uptime_seconds: '9223372036854775807',
+        uptime_seconds: '9007199254741019',
       }],
       total: 1,
       total_pages: 1,
@@ -222,7 +235,8 @@ it('无损校验并格式化超过 JS 安全整数和 MaxInt64 边界', async ()
   const cells = within((await screen.findAllByRole('row'))[1]).getAllByRole('cell')
   expect(cells[6]).toHaveTextContent('9,007,199,254,740,993')
   expect(cells[9]).toHaveTextContent('8 EiB')
-  expect(cells[11]).toHaveTextContent('106751991167300天 15小时')
+  expect(cells[11]).toHaveTextContent('285616414年 264天 7小时 36分钟')
+  expect(cells[11].querySelector('[title]')).toHaveAttribute('title', '285616414年 264天 7小时 36分钟')
 })
 
 it('从白名单 URL 恢复筛选排序分页并规范非法参数', async () => {
