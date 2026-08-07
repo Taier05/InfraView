@@ -15,6 +15,22 @@ import { mysqlInstancePageFixture } from '../../test/fixtures'
 import { MySQLPage } from './MySQLPage'
 
 const requestedURLs: URL[] = []
+const mysqlSortFields = [
+  ['实例地址', 'instance'],
+  ['版本', 'version'],
+  ['角色', 'role'],
+  ['连接', 'connections'],
+  ['活跃线程', 'threads_running'],
+  ['QPS', 'qps'],
+  ['TPS', 'tps'],
+  ['慢查询', 'slow_queries'],
+  ['Buffer Pool 容量', 'buffer_pool_size'],
+  ['Buffer Pool 使用率', 'buffer_pool_usage'],
+  ['复制状态', 'replication_state'],
+  ['复制延迟', 'replication_lag'],
+  ['运行时间', 'uptime'],
+  ['状态', 'status'],
+] as const
 
 function requestURL(input: RequestInfo | URL) {
   const rawURL =
@@ -166,67 +182,48 @@ it('renders the fourteen independent MySQL metric columns', async () => {
   expect(table.closest('.mysql-table-scroll')).not.toBeNull()
 })
 
-it('sorts every MySQL header from a later page with exact URL and request parameters', async () => {
+it.each(mysqlSortFields)('sorts MySQL %s from a fresh later page with exact URL and request parameters', async (label, sort) => {
   const user = userEvent.setup()
   renderMySQLPage(
-    '/mysql?label=tier-fixture&status=warning&role=read_only&sort=instance&order=desc&page=3&page_size=50',
+    '/mysql?label=tier-fixture&status=warning&role=read_only&sort=instance&order=desc&page=3&page_size=20',
   )
   await screen.findByText('192.0.2.101:3306')
 
-  const expectations = [
-    ['实例地址', 'instance'],
-    ['版本', 'version'],
-    ['角色', 'role'],
-    ['连接', 'connections'],
-    ['活跃线程', 'threads_running'],
-    ['QPS', 'qps'],
-    ['TPS', 'tps'],
-    ['慢查询', 'slow_queries'],
-    ['Buffer Pool 容量', 'buffer_pool_size'],
-    ['Buffer Pool 使用率', 'buffer_pool_usage'],
-    ['复制状态', 'replication_state'],
-    ['复制延迟', 'replication_lag'],
-    ['运行时间', 'uptime'],
-    ['状态', 'status'],
-  ] as const
-
-  for (const [label, sort] of expectations) {
-    const button = screen.getByRole('button', { name: `${label}排序` })
-    expect(button).not.toHaveTextContent(/[⇅↑↓]/)
-    await user.click(button)
-    await waitFor(() => {
-      const parameters = new URLSearchParams(window.location.search)
-      expect(parameters.get('sort')).toBe(sort)
-      expect(parameters.get('order')).toBe('asc')
-      expect(parameters.get('page')).toBe('1')
-      expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
-        label: 'tier-fixture',
-        status: 'warning',
-        role: 'read_only',
-        sort,
-        order: 'asc',
-        page: '1',
-        page_size: '50',
-      })
+  const button = screen.getByRole('button', { name: `${label}排序` })
+  expect(button).not.toHaveTextContent(/[⇅↑↓]/)
+  await user.click(button)
+  await waitFor(() => {
+    const parameters = new URLSearchParams(window.location.search)
+    expect(parameters.get('sort')).toBe(sort)
+    expect(parameters.get('order')).toBe('asc')
+    expect(parameters.get('page')).toBe('1')
+    expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+      label: 'tier-fixture',
+      status: 'warning',
+      role: 'read_only',
+      sort,
+      order: 'asc',
+      page: '1',
+      page_size: '20',
     })
+  })
 
-    await user.click(screen.getByRole('button', { name: `${label}排序` }))
-    await waitFor(() => {
-      const parameters = new URLSearchParams(window.location.search)
-      expect(parameters.get('sort')).toBe(sort)
-      expect(parameters.get('order')).toBe('desc')
-      expect(parameters.get('page')).toBe('1')
-      expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
-        label: 'tier-fixture',
-        status: 'warning',
-        role: 'read_only',
-        sort,
-        order: 'desc',
-        page: '1',
-        page_size: '50',
-      })
+  await user.click(screen.getByRole('button', { name: `${label}排序` }))
+  await waitFor(() => {
+    const parameters = new URLSearchParams(window.location.search)
+    expect(parameters.get('sort')).toBe(sort)
+    expect(parameters.get('order')).toBe('desc')
+    expect(parameters.get('page')).toBe('1')
+    expect(Object.fromEntries(lastRequest().searchParams)).toEqual({
+      label: 'tier-fixture',
+      status: 'warning',
+      role: 'read_only',
+      sort,
+      order: 'desc',
+      page: '1',
+      page_size: '20',
     })
-  }
+  })
 })
 
 it('renders missing and unknown versions as Chinese unknown in their own column', async () => {

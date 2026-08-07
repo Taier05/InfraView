@@ -7,6 +7,21 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { RedisPage } from "./RedisPage";
 
 const requests: URL[] = [];
+const redisSortFields = [
+  ["实例地址", "instance"],
+  ["角色", "role"],
+  ["内存上限", "memory_limit"],
+  ["内存使用率", "memory"],
+  ["连接", "connections"],
+  ["阻塞连接", "blocked_connections"],
+  ["QPS", "qps"],
+  ["命中率", "hit_rate"],
+  ["key 总数", "keys"],
+  ["复制链路", "replication_link"],
+  ["延迟", "replication_lag"],
+  ["运行时间", "uptime"],
+  ["状态", "status"],
+] as const;
 const fixture = {
   data: {
     instances: [
@@ -164,6 +179,34 @@ function renderPage(entry = "/redis") {
   return client;
 }
 
+function mockPaginatedRedisRequests() {
+  vi.mocked(globalThis.fetch).mockImplementation((input) => {
+    const raw =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+    const url = new URL(raw, "http://localhost");
+    requests.push(url);
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          ...fixture,
+          data: {
+            ...fixture.data,
+            page: Number(url.searchParams.get("page")),
+            page_size: Number(url.searchParams.get("page_size")),
+            total: 64,
+            total_pages: 4,
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+  });
+}
+
 beforeEach(() => {
   requests.length = 0;
   vi.restoreAllMocks();
@@ -247,89 +290,47 @@ it("严格渲染 Redis 十三列及拆分后的指标语义", async () => {
   ).not.toBeInTheDocument();
 });
 
-it("所有 Redis 表头从非首页首击升序、再击降序，并发送精确参数", async () => {
+it.each(redisSortFields)("从 fresh page 3 排序 Redis %s 时首击升序、再击降序，并发送精确参数", async (label, sort) => {
   const user = userEvent.setup();
-  vi.mocked(globalThis.fetch).mockImplementation((input) => {
-    const raw =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input.url;
-    const url = new URL(raw, "http://localhost");
-    requests.push(url);
-    return Promise.resolve(
-      new Response(
-        JSON.stringify({
-          ...fixture,
-          data: {
-            ...fixture.data,
-            page: Number(url.searchParams.get("page")),
-            page_size: Number(url.searchParams.get("page_size")),
-            total: 64,
-            total_pages: 4,
-          },
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
-    );
-  });
+  mockPaginatedRedisRequests();
   renderPage(
-    "/redis?role=slave&status=warning&sort=instance&order=desc&page=3&page_size=50",
+    "/redis?role=slave&status=warning&sort=instance&order=desc&page=3&page_size=20",
   );
   await screen.findByText("192.0.2.40:6379");
 
-  const expectations = [
-    ["实例地址", "instance"],
-    ["角色", "role"],
-    ["内存上限", "memory_limit"],
-    ["内存使用率", "memory"],
-    ["连接", "connections"],
-    ["阻塞连接", "blocked_connections"],
-    ["QPS", "qps"],
-    ["命中率", "hit_rate"],
-    ["key 总数", "keys"],
-    ["复制链路", "replication_link"],
-    ["延迟", "replication_lag"],
-    ["运行时间", "uptime"],
-    ["状态", "status"],
-  ] as const;
-
-  for (const [label, sort] of expectations) {
-    const button = screen.getByRole("button", { name: `${label}排序` });
-    expect(button).not.toHaveTextContent(/[⇅↑↓]/);
-    await user.click(button);
-    await waitFor(() => {
-      const parameters = new URLSearchParams(window.location.search);
-      expect(parameters.get("sort")).toBe(sort);
-      expect(parameters.get("order")).toBe("asc");
-      expect(parameters.get("page")).toBe("1");
-      expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
-        role: "slave",
-        status: "warning",
-        sort,
-        order: "asc",
-        page: "1",
-        page_size: "50",
-      });
+  const button = screen.getByRole("button", { name: `${label}排序` });
+  expect(button).not.toHaveTextContent(/[⇅↑↓]/);
+  await user.click(button);
+  await waitFor(() => {
+    const parameters = new URLSearchParams(window.location.search);
+    expect(parameters.get("sort")).toBe(sort);
+    expect(parameters.get("order")).toBe("asc");
+    expect(parameters.get("page")).toBe("1");
+    expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+      role: "slave",
+      status: "warning",
+      sort,
+      order: "asc",
+      page: "1",
+      page_size: "20",
     });
+  });
 
-    await user.click(screen.getByRole("button", { name: `${label}排序` }));
-    await waitFor(() => {
-      const parameters = new URLSearchParams(window.location.search);
-      expect(parameters.get("sort")).toBe(sort);
-      expect(parameters.get("order")).toBe("desc");
-      expect(parameters.get("page")).toBe("1");
-      expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
-        role: "slave",
-        status: "warning",
-        sort,
-        order: "desc",
-        page: "1",
-        page_size: "50",
-      });
+  await user.click(screen.getByRole("button", { name: `${label}排序` }));
+  await waitFor(() => {
+    const parameters = new URLSearchParams(window.location.search);
+    expect(parameters.get("sort")).toBe(sort);
+    expect(parameters.get("order")).toBe("desc");
+    expect(parameters.get("page")).toBe("1");
+    expect(Object.fromEntries(requests.at(-1)!.searchParams)).toEqual({
+      role: "slave",
+      status: "warning",
+      sort,
+      order: "desc",
+      page: "1",
+      page_size: "20",
     });
-  }
+  });
 });
 
 it("将 evicted 排序规范为 instance 且不发送 evicted", async () => {
