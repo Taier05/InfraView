@@ -9,7 +9,9 @@
 - [x] 完成 Node 22 全量测试、typecheck、production build、Playwright `--list`，以及 Go 1.24 gofmt/vet、全仓普通/race、Linux 编译、whitespace 和只读/敏感扫描；未启动服务或浏览器，未访问上游或私密环境。
 - [x] 经授权创建本地文档提交 `docs: record 500-row list delivery`，仅在 `feature/list-duration-disk-errors`；未 merge、push、deploy 或 restart。
 - [x] 共享运行时长 formatter 已供六个运行时间列和硬盘通电时间复用；硬盘仅将有限非负小时换算为秒，合法小数小时保留真实分钟，整数小时不伪造分钟，正文和 `title` 一致且不改变原始排序。
-- [ ] 硬盘错误摘要与 `smart_device_command_timeout` 属于独立后续范围，尚未实施或验证，不得因分页或时长交付标记完成。
+- [x] 硬盘错误摘要与固定 `smart_device_command_timeout` 已完成：只显示已知非零项、超过两项明确省略、全零/部分缺失/全缺失语义准确；命令超时只参与摘要和排序，不触发硬盘状态、`status_source` 或总览告警。
+- [x] 完成命令超时与错误摘要的 Go 1.24 全仓 gofmt/vet/普通/race/编译、Node 22 全量测试/typecheck/build/Playwright `--list`，以及固定 19 查询、单次 batch、无 N+1/写 API/敏感信息与 whitespace 静态检查；未启动服务或浏览器、未连接上游或输出现场数据。
+- [x] 经授权创建本地文档提交 `docs: record disk error summary delivery`；仅在 `feature/list-duration-disk-errors`，未 merge、push、deploy 或 restart。
 
 ## 数据时间与 Elasticsearch 瞬时过期修复
 
