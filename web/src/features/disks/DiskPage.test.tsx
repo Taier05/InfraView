@@ -277,6 +277,7 @@ it('型号缺失时独立显示暂无数据且不影响容量', async () => {
         uncorrectable_sectors: 0,
         udma_crc_errors: 0,
         media_integrity_errors: 0,
+        command_timeouts: 0,
         error_log_entries: 0,
         unsafe_shutdowns: 0,
       },
@@ -303,20 +304,56 @@ it('型号缺失时独立显示暂无数据且不影响容量', async () => {
 	  )
 })
 
-it('错误摘要最多展示两个非零项并在 title 保留全部已知非零项且不求和', async () => {
+it('错误摘要按固定优先级展示前两项、明确省略并在 title 保留全部非零项', async () => {
   renderDiskPage()
 
   const row = (await screen.findByText('node-alpha')).closest('tr')
   expect(row).not.toBeNull()
 	  const errorSummary = within(row!).getAllByRole('cell')[8]
-  expect(errorSummary).toHaveTextContent('待处理扇区 2 · 重映射扇区 1')
-  expect(errorSummary).not.toHaveTextContent('不可校正扇区 3')
+  expect(errorSummary).toHaveTextContent('待处理扇区 2 · 不可修复扇区 3 · …')
+  expect(errorSummary).not.toHaveTextContent('重映射扇区 1')
+  expect(errorSummary).not.toHaveTextContent('命令超时 4')
   expect(errorSummary).not.toHaveTextContent('异常断电 7 次')
   expect(errorSummary.firstElementChild).toHaveAttribute(
     'title',
-    '待处理扇区 2 · 重映射扇区 1 · 不可校正扇区 3 · 异常断电 7 次（累计次数，仅展示，不参与状态判断）',
+    '待处理扇区 2 · 不可修复扇区 3 · 重映射扇区 1 · 命令超时 4 · 异常断电 7 次（累计次数，仅展示，不参与状态判断）',
   )
   expect(errorSummary).not.toHaveTextContent('总计')
+})
+
+it('错误摘要展示两个非零项时包含命令超时且不省略', async () => {
+  const fixture = diskPageFixtureForDisplayTests()
+  fixture.data.devices = [
+    {
+      ...fixture.data.devices[0],
+      host: 'node-command-timeout',
+      errors: {
+        pending_sectors: 2,
+        reallocated_sectors: 0,
+        uncorrectable_sectors: 0,
+        udma_crc_errors: 0,
+        media_integrity_errors: 0,
+        command_timeouts: 5,
+        error_log_entries: 0,
+        unsafe_shutdowns: 0,
+      },
+    },
+  ]
+  vi.mocked(globalThis.fetch).mockImplementation(() =>
+    Promise.resolve(jsonResponse(fixture)),
+  )
+
+  renderDiskPage()
+
+  const row = (await screen.findByText('node-command-timeout')).closest('tr')
+  expect(row).not.toBeNull()
+  const errorSummary = within(row!).getAllByRole('cell')[8]
+  expect(errorSummary).toHaveTextContent('待处理扇区 2 · 命令超时 5')
+  expect(errorSummary).not.toHaveTextContent('…')
+  expect(errorSummary.firstElementChild).toHaveAttribute(
+    'title',
+    '待处理扇区 2 · 命令超时 5',
+  )
 })
 
 it('仅异常断电时以次数展示且不再使用非安全关机文案', async () => {
@@ -331,6 +368,7 @@ it('仅异常断电时以次数展示且不再使用非安全关机文案', asyn
         uncorrectable_sectors: 0,
         udma_crc_errors: 0,
         media_integrity_errors: 0,
+        command_timeouts: 0,
         error_log_entries: 0,
         unsafe_shutdowns: 12,
       },
@@ -363,14 +401,20 @@ it('错误摘要精确区分全零、全缺失和部分缺失', async () => {
   expect(allMissing).not.toBeNull()
   expect(partial).not.toBeNull()
 	  expect(within(allZero!).getAllByRole('cell')[8]).toHaveTextContent(
-    '无已报告错误',
+    '未发现错误',
   )
 	  expect(within(allMissing!).getAllByRole('cell')[8]).toHaveTextContent(
     '暂无数据',
   )
 	  expect(within(partial!).getAllByRole('cell')[8]).toHaveTextContent(
-    '未发现错误 · 部分暂无',
+    '未发现错误',
   )
+  expect(
+    within(allZero!).getAllByRole('cell')[8].firstElementChild,
+  ).toHaveAttribute('title', '未发现错误')
+  expect(
+    within(partial!).getAllByRole('cell')[8].firstElementChild,
+  ).toHaveAttribute('title', '未发现错误；部分指标暂无数据')
 })
 
 it('仅按 status_source 展示采集文案且设备来源赢得同级竞争', async () => {

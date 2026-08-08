@@ -480,6 +480,7 @@ export interface DiskErrorCounters {
   uncorrectable_sectors: number | null
   udma_crc_errors: number | null
   media_integrity_errors: number | null
+  command_timeouts: number | null
   error_log_entries: number | null
   unsafe_shutdowns: number | null
 }

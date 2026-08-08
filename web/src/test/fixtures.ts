@@ -400,6 +400,7 @@ export interface DiskDevicePageFixture {
         uncorrectable_sectors: number | null
         udma_crc_errors: number | null
         media_integrity_errors: number | null
+        command_timeouts: number | null
         error_log_entries: number | null
         unsafe_shutdowns: number | null
       }
@@ -1403,6 +1404,7 @@ export function diskDevicePageFixture(
             uncorrectable_sectors: 0,
             udma_crc_errors: 7,
             media_integrity_errors: 0,
+            command_timeouts: 4,
             error_log_entries: 0,
             unsafe_shutdowns: 0,
           },
@@ -1426,6 +1428,7 @@ export function diskDevicePageFixture(
             uncorrectable_sectors: 0,
             udma_crc_errors: 0,
             media_integrity_errors: 0,
+            command_timeouts: 0,
             error_log_entries: 0,
             unsafe_shutdowns: 0,
           },
@@ -1449,6 +1452,7 @@ export function diskDevicePageFixture(
             uncorrectable_sectors: null,
             udma_crc_errors: null,
             media_integrity_errors: null,
+            command_timeouts: null,
             error_log_entries: null,
             unsafe_shutdowns: null,
           },
@@ -1472,6 +1476,7 @@ export function diskDevicePageFixture(
             uncorrectable_sectors: 0,
             udma_crc_errors: null,
             media_integrity_errors: 0,
+            command_timeouts: null,
             error_log_entries: null,
             unsafe_shutdowns: 0,
           },
@@ -1495,6 +1500,7 @@ export function diskDevicePageFixture(
             uncorrectable_sectors: 0,
             udma_crc_errors: 0,
             media_integrity_errors: 0,
+            command_timeouts: 0,
             error_log_entries: 0,
             unsafe_shutdowns: 0,
           },
@@ -1518,6 +1524,7 @@ export function diskDevicePageFixture(
             uncorrectable_sectors: 0,
             udma_crc_errors: 0,
             media_integrity_errors: 0,
+            command_timeouts: 0,
             error_log_entries: 0,
             unsafe_shutdowns: 0,
           },

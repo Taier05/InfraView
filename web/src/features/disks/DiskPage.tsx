@@ -131,10 +131,11 @@ function powerOnTime(value: number | null) {
 function errorItems(errors: DiskErrorCounters): ErrorItem[] {
   return [
     { label: '待处理扇区', value: errors.pending_sectors },
+    { label: '不可修复扇区', value: errors.uncorrectable_sectors },
     { label: '重映射扇区', value: errors.reallocated_sectors },
-    { label: '不可校正扇区', value: errors.uncorrectable_sectors },
-    { label: 'UDMA CRC 错误', value: errors.udma_crc_errors },
     { label: '介质完整性错误', value: errors.media_integrity_errors },
+    { label: 'CRC 错误', value: errors.udma_crc_errors },
+    { label: '命令超时', value: errors.command_timeouts },
     { label: '错误日志', value: errors.error_log_entries },
     { label: '异常断电', value: errors.unsafe_shutdowns, suffix: ' 次' },
   ]
@@ -147,14 +148,16 @@ function errorItemText(item: ErrorItem) {
 function errorSummary(errors: DiskErrorCounters) {
   const items = errorItems(errors)
   const known = items.filter((item) => item.value !== null)
-  const nonZero = known.filter((item) => item.value !== 0)
+  const nonZero = known.filter((item) => item.value !== null && item.value > 0)
   if (nonZero.length > 0) {
     const labels = nonZero.map(errorItemText)
     const hasUnsafeShutdowns = nonZero.some(
       (item) => item.label === '异常断电',
     )
     return {
-      text: labels.slice(0, 2).join(' · '),
+      text: `${labels.slice(0, 2).join(' · ')}${
+        labels.length > 2 ? ' · …' : ''
+      }`,
       title: `${labels.join(' · ')}${
         hasUnsafeShutdowns ? '（累计次数，仅展示，不参与状态判断）' : ''
       }`,
@@ -162,11 +165,11 @@ function errorSummary(errors: DiskErrorCounters) {
   }
   if (known.length === 0) return { text: '暂无数据', title: '暂无数据' }
   if (known.length === items.length) {
-    return { text: '无已报告错误', title: '无已报告错误' }
+    return { text: '未发现错误', title: '未发现错误' }
   }
   return {
-    text: '未发现错误 · 部分暂无',
-    title: '未发现错误 · 部分暂无',
+    text: '未发现错误',
+    title: '未发现错误；部分指标暂无数据',
   }
 }
 
