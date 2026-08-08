@@ -2,7 +2,7 @@
 
 最后更新：2026-08-08
 
-## 列表 500 条与共享运行时长恢复入口（隔离 feature 分支本地交付，未合并/未推送/未部署）
+## 列表 500 条、共享运行时长与硬盘错误摘要恢复入口（隔离 feature 分支本地交付，未合并/未推送/未部署）
 
 恢复目录为 `/root/github/InfraView/.worktrees/list-duration-disk-errors`，分支为 `feature/list-duration-disk-errors`，从 `7ff1cea` 分叉。本分支已完成七个只读列表的单页最多 500 条：允许值固定为 `20|50|100|500`，共享控件显示“全部（最多500条）”，切换回第 1 页且 URL 可恢复；完整筛选结果始终先在服务端排序、再分页。超过 500 条继续正常翻页，不截断、不客户端逐页拼接、不增加请求或虚拟滚动；响应结构、15 秒刷新和只读边界保持不变。
 
@@ -10,7 +10,7 @@
 
 本节对应的分页、时长与硬盘错误摘要交付均仅存在于该 feature 分支；未 merge、push、deploy 或 restart。本轮仅完成离线验证，未启动服务或浏览器、未连接上游，也未输出现场数据。继续前必须以实时 Git 结果为准。
 
-继续时先完整阅读本节、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/superpowers/specs/2026-08-07-list-all-duration-and-disk-error-summary-design.md`、`docs/superpowers/plans/2026-08-07-shared-duration-formatting.md`，再只读运行 `git status --short --branch`、`git log --reverse 7ff1cea..HEAD --oneline`、`git diff --check` 与 `git diff --cached --check`。保留任何新差异，不得 reset、clean 或把本 feature 分支的本地状态写成 main/远端状态。
+继续时先完整阅读本节、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/superpowers/specs/2026-08-07-list-all-duration-and-disk-error-summary-design.md`、`docs/superpowers/plans/2026-08-07-list-page-size-500.md`、`docs/superpowers/plans/2026-08-07-shared-duration-formatting.md`、`docs/superpowers/plans/2026-08-07-disk-command-timeout-and-error-summary.md`，再只读运行 `git status --short --branch`、`git log --reverse 7ff1cea..HEAD --oneline`、`git diff --check` 与 `git diff --cached --check`。保留任何新差异，不得 reset、clean 或把本 feature 分支的本地状态写成 main/远端状态。
 
 ## 当前 main / 旧模块列表、七页排版与 Elasticsearch inventory 稳定性恢复入口
 

@@ -4,7 +4,7 @@
 
 ## 当前 feature 分支状态
 
-### 2026-08-08 列表单页最多 500 条与共享运行时长（隔离 feature 分支本地交付，未合并/未推送/未部署）
+### 2026-08-08 列表单页最多 500 条、共享运行时长与硬盘错误摘要（隔离 feature 分支本地交付，未合并/未推送/未部署）
 
 本节仅说明隔离工作树 `/root/github/InfraView/.worktrees/list-duration-disk-errors` 的 `feature/list-duration-disk-errors`。七个只读列表（主机、硬盘、MySQL、Redis、Elasticsearch、RabbitMQ、Java）现共同接受 `20|50|100|500` 的 `page_size`；页面新增“全部（最多500条）”，切换后回到第 1 页并通过 URL 恢复。服务端仍对完整筛选结果排序后分页，超过 500 条仍继续分页，不做客户端拼接、静默截断、额外请求或虚拟滚动；API 响应结构、15 秒刷新和只读边界不变。
 
