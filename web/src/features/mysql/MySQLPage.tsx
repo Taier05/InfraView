@@ -27,7 +27,7 @@ import {
   ListTablePanel,
 } from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
-import { formatDurationSeconds } from '../../formatters/duration'
+import { formatDurationDisplay } from '../../formatters/duration'
 
 const pageSizes = [20, 50, 100, 500] as const
 type PageSize = (typeof pageSizes)[number]
@@ -449,10 +449,10 @@ export function MySQLPage() {
       id: 'uptime',
       header: () => sortButton('uptime', '运行时间'),
       cell: ({ row }) => {
-        const value = formatDurationSeconds(row.original.uptime_seconds)
+        const value = formatDurationDisplay(row.original.uptime_seconds)
         return (
-          <span className="mysql-uptime" title={value}>
-            {value}
+          <span className="mysql-uptime" title={value.title}>
+            {value.text}
           </span>
         )
       },

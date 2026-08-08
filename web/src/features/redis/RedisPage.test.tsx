@@ -289,13 +289,13 @@ it("严格渲染 Redis 十三列及拆分后的指标语义", async () => {
   expect(disconnectedSlave[2]).toHaveTextContent("暂无数据");
   expect(disconnectedSlave[9]).toHaveTextContent("断开");
   expect(disconnectedSlave[10]).toHaveTextContent("7s");
-  expect(disconnectedSlave[11]).toHaveTextContent("1天 1小时 3分钟");
+  expect(disconnectedSlave[11].textContent).toBe("1天 1小时");
   expect(disconnectedSlave[11].firstElementChild).toHaveAttribute(
     "title",
     "1天 1小时 3分钟",
   );
   expect(unknown[9]).toHaveTextContent("未知");
-  expect(unknown[11]).toHaveTextContent("1年 143天 6小时");
+  expect(unknown[11].textContent).toBe("1年 143天");
   expect(unknown[11].firstElementChild).toHaveAttribute(
     "title",
     "1年 143天 6小时",

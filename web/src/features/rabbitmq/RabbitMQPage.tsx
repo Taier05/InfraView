@@ -27,7 +27,7 @@ import {
 } from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
 import { StatusBadge } from '../../components/StatusBadge'
-import { formatDurationSeconds } from '../../formatters/duration'
+import { formatDurationDisplay } from '../../formatters/duration'
 
 const pageSizes = [20, 50, 100, 500] as const
 const sortFields = [
@@ -286,13 +286,15 @@ function nodeStatus(node: RabbitMQNode) {
 
 function TitledValue({
   value,
+  title,
   className,
 }: {
   value: string
+  title?: string
   className?: string
 }) {
   return (
-    <span className={className ?? 'rabbitmq-value'} title={value}>
+    <span className={className ?? 'rabbitmq-value'} title={title ?? value}>
       {value}
     </span>
   )
@@ -546,7 +548,10 @@ export function RabbitMQPage() {
     {
       id: 'uptime',
       header: () => sortButton('uptime', '运行时间'),
-      cell: ({ row }) => <TitledValue value={formatDurationSeconds(row.original.uptime_seconds)} />,
+      cell: ({ row }) => {
+        const value = formatDurationDisplay(row.original.uptime_seconds)
+        return <TitledValue value={value.text} title={value.title} />
+      },
     },
     {
       id: 'status',

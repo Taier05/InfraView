@@ -261,17 +261,17 @@ it('使用共享时长文本显示主机运行时间并保留完整 title', asyn
 
   renderHostList()
 
-  for (const [name, text] of [
-    ['duration-host-minute', '1分钟'],
-    ['duration-host-day', '1天 1小时 3分钟'],
-    ['duration-host-year', '1年 143天 6小时'],
-    ['duration-host-missing', '暂无数据'],
+  for (const [name, text, title] of [
+    ['duration-host-minute', '1分钟', '1分钟'],
+    ['duration-host-day', '1天 1小时', '1天 1小时 3分钟'],
+    ['duration-host-year', '1年 143天', '1年 143天 6小时'],
+    ['duration-host-missing', '暂无数据', '暂无数据'],
   ]) {
     const row = (await screen.findByText(name)).closest('tr')
     expect(row).not.toBeNull()
     const uptimeCell = within(row!).getAllByRole('cell')[10]
-    expect(uptimeCell).toHaveTextContent(text)
-    expect(uptimeCell.firstElementChild).toHaveAttribute('title', text)
+    expect(uptimeCell.textContent).toBe(text)
+    expect(uptimeCell.firstElementChild).toHaveAttribute('title', title)
   }
 })
 

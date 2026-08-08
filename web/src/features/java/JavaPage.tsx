@@ -27,7 +27,7 @@ import {
 } from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
 import { StatusBadge } from '../../components/StatusBadge'
-import { formatDurationSeconds } from '../../formatters/duration'
+import { formatDurationDisplay } from '../../formatters/duration'
 
 const pageSizes = [20, 50, 100, 500] as const
 const sortFields = [
@@ -290,7 +290,7 @@ function byteSize(value: string | null) {
 }
 
 function uptime(value: string | null) {
-  return formatDurationSeconds(value === null ? null : BigInt(value))
+  return formatDurationDisplay(value === null ? null : BigInt(value))
 }
 
 function serviceStatus(service: JavaService) {
@@ -299,8 +299,8 @@ function serviceStatus(service: JavaService) {
   return sourceText[service.status_source] ?? service.status_source
 }
 
-function TitledValue({ value, className }: { value: string; className?: string }) {
-  return <span className={className ?? 'java-value'} title={value}>{value}</span>
+function TitledValue({ value, title, className }: { value: string; title?: string; className?: string }) {
+  return <span className={className ?? 'java-value'} title={title ?? value}>{value}</span>
 }
 
 export function JavaPage() {
@@ -410,7 +410,10 @@ export function JavaPage() {
     { id: 'cpu', header: () => sortButton('cpu', 'CPU 使用率'), cell: ({ row }) => <TitledValue value={percentage(row.original.cpu_usage_percent)} /> },
     { id: 'memory', header: () => sortButton('memory', '内存占用'), cell: ({ row }) => <TitledValue value={byteSize(row.original.memory_bytes)} /> },
     { id: 'memory-percent', header: () => sortButton('memory_percent', '内存使用率'), cell: ({ row }) => <TitledValue value={percentage(row.original.memory_usage_percent)} /> },
-    { id: 'uptime', header: () => sortButton('uptime', '运行时间'), cell: ({ row }) => <TitledValue value={uptime(row.original.uptime_seconds)} /> },
+    { id: 'uptime', header: () => sortButton('uptime', '运行时间'), cell: ({ row }) => {
+      const value = uptime(row.original.uptime_seconds)
+      return <TitledValue value={value.text} title={value.title} />
+    } },
     { id: 'status', header: () => sortButton('status', '状态'), cell: ({ row }) => {
       const label = serviceStatus(row.original)
       return <span className="java-status" title={`状态来源：${label}`}><StatusBadge level={row.original.status} label={label} /></span>

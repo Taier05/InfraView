@@ -226,17 +226,17 @@ it('uses shared duration text and matching native titles for MySQL uptime', asyn
 
   renderMySQLPage()
 
-  for (const [address, text] of [
-    ['192.0.2.201:3306', '1分钟'],
-    ['192.0.2.202:3306', '1天 1小时 3分钟'],
-    ['192.0.2.203:3306', '1年 143天 6小时'],
-    ['192.0.2.204:3306', '暂无数据'],
+  for (const [address, text, title] of [
+    ['192.0.2.201:3306', '1分钟', '1分钟'],
+    ['192.0.2.202:3306', '1天 1小时', '1天 1小时 3分钟'],
+    ['192.0.2.203:3306', '1年 143天', '1年 143天 6小时'],
+    ['192.0.2.204:3306', '暂无数据', '暂无数据'],
   ]) {
     const row = (await screen.findByText(address)).closest('tr')
     expect(row).not.toBeNull()
     const uptime = within(row!).getAllByRole('cell')[12].firstElementChild
-    expect(uptime).toHaveTextContent(text)
-    expect(uptime).toHaveAttribute('title', text)
+    expect(uptime?.textContent).toBe(text)
+    expect(uptime).toHaveAttribute('title', title)
   }
 })
 

@@ -28,7 +28,7 @@ import {
 } from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
 import { StatusBadge } from '../../components/StatusBadge'
-import { formatDurationSeconds } from '../../formatters/duration'
+import { formatDurationDisplay } from '../../formatters/duration'
 
 const pageSizes = [20, 50, 100, 500] as const
 type PageSize = (typeof pageSizes)[number]
@@ -123,9 +123,9 @@ function lifetime(value: number | null) {
 
 function powerOnTime(value: number | null) {
   if (value === null || !Number.isFinite(value) || value < 0) {
-    return formatDurationSeconds(null)
+    return formatDurationDisplay(null)
   }
-  return formatDurationSeconds(value * 3_600)
+  return formatDurationDisplay(value * 3_600)
 }
 
 function commandTimeouts(value: unknown): number | null {
@@ -428,8 +428,8 @@ export function DiskPage() {
       cell: ({ row }) => {
         const value = powerOnTime(row.original.power_on_hours)
         return (
-          <span className="disk-cell-value" title={value}>
-            {value}
+          <span className="disk-cell-value" title={value.title}>
+            {value.text}
           </span>
         )
       },

@@ -468,14 +468,14 @@ it('按既定规则格式化角色、空值、比例、速率、整数、IEC 与
       '暂无数据',
       '暂无数据',
     ])
-  for (const [row, value] of [
-    [rows[0], '1分钟'],
-    [rows[1], '暂无数据'],
-    [rows[2], '1年 143天 6小时'],
+  for (const [row, text, title] of [
+    [rows[0], '1分钟', '1分钟'],
+    [rows[1], '暂无数据', '暂无数据'],
+    [rows[2], '1年 143天', '1年 143天 6小时'],
   ] as const) {
     const uptimeCell = within(row).getAllByRole('cell')[14]
-    expect(uptimeCell).toHaveTextContent(value)
-    expect(uptimeCell.querySelector('[title]')).toHaveAttribute('title', value)
+    expect(uptimeCell.textContent).toBe(text)
+    expect(uptimeCell.querySelector('[title]')).toHaveAttribute('title', title)
   }
   expect(within(rows[3]).getAllByRole('cell')[14]).toHaveTextContent('2小时')
 })

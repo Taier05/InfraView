@@ -25,7 +25,7 @@ import {
   ListTablePanel,
 } from '../../components/ListPage'
 import { StaleBanner } from '../../components/StaleBanner'
-import { formatDurationSeconds } from '../../formatters/duration'
+import { formatDurationDisplay } from '../../formatters/duration'
 import { useRefreshIntervalMs } from '../../app/runtime'
 
 const pageSizes = [20, 50, 100, 500] as const
@@ -380,8 +380,8 @@ export function HostListPage() {
       id: 'uptime',
       header: () => sortButton('uptime', '运行时间'),
       cell: ({ row }) => {
-        const value = formatDurationSeconds(row.original.uptime_seconds)
-        return <span title={value}>{value}</span>
+        const value = formatDurationDisplay(row.original.uptime_seconds)
+        return <span title={value.title}>{value.text}</span>
       },
     },
     {

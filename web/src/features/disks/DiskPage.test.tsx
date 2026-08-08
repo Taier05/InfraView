@@ -250,7 +250,7 @@ it('严格渲染十个可排序单值单行列，并使用共享列表壳', asyn
 
 it('以共享时长格式显示通电小时、保留完整 title，并保持原始排序参数', async () => {
   const fixture = diskPageFixtureForDisplayTests()
-  const powerOnHours = [50, 1.5, 8_766, 0, null] as const
+  const powerOnHours = [50, 1.5, 8_766.5, 0, null] as const
   fixture.data.devices = fixture.data.devices.slice(0, powerOnHours.length).map(
     (device, index) => ({
       ...device,
@@ -267,18 +267,18 @@ it('以共享时长格式显示通电小时、保留完整 title，并保持原�
   renderDiskPage('/disks?sort=host&order=asc&page=3&page_size=20')
 
   const expected = [
-    ['node-duration-1', '2天 2小时'],
-    ['node-duration-2', '1小时 30分钟'],
-    ['node-duration-3', '1年 6小时'],
-    ['node-duration-4', '不足1分钟'],
-    ['node-duration-5', '暂无数据'],
+    ['node-duration-1', '2天 2小时', '2天 2小时'],
+    ['node-duration-2', '1小时 30分钟', '1小时 30分钟'],
+    ['node-duration-3', '1年 6小时', '1年 6小时 30分钟'],
+    ['node-duration-4', '不足1分钟', '不足1分钟'],
+    ['node-duration-5', '暂无数据', '暂无数据'],
   ] as const
-  for (const [host, duration] of expected) {
+  for (const [host, text, title] of expected) {
     const row = (await screen.findByText(host)).closest('tr')
     expect(row).not.toBeNull()
     const cell = within(row!).getAllByRole('cell')[7]
-    expect(cell).toHaveTextContent(duration)
-    expect(cell.firstElementChild).toHaveAttribute('title', duration)
+    expect(cell.textContent).toBe(text)
+    expect(cell.firstElementChild).toHaveAttribute('title', title)
   }
 
   await user.click(screen.getByRole('button', { name: '通电时间排序，当前未排序' }))

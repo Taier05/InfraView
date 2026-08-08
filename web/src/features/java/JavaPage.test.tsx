@@ -207,13 +207,13 @@ it('按约定格式化延迟百分比 IEC 字节进程数与运行时间', async
     '正常', '12,345', '正常', '72.5%', '2 GiB', '36.0%', '1分钟', '正常',
   ])
   const rows = await screen.findAllByRole('row')
-  for (const [row, value] of [
-    [rows[1], '1分钟'],
-    [rows[2], '1年 143天 6小时'],
-    [rows[3], '暂无数据'],
+  for (const [row, text, title] of [
+    [rows[1], '1分钟', '1分钟'],
+    [rows[2], '1年 143天', '1年 143天 6小时'],
+    [rows[3], '暂无数据', '暂无数据'],
   ] as const) {
-    expect(within(row).getAllByRole('cell')[11]).toHaveTextContent(value)
-    expect(within(row).getAllByRole('cell')[11].querySelector('[title]')).toHaveAttribute('title', value)
+    expect(within(row).getAllByRole('cell')[11].textContent).toBe(text)
+    expect(within(row).getAllByRole('cell')[11].querySelector('[title]')).toHaveAttribute('title', title)
   }
 })
 
@@ -236,7 +236,7 @@ it('无损校验并格式化超过 JS 安全整数和 MaxInt64 边界', async ()
   const cells = within((await screen.findAllByRole('row'))[1]).getAllByRole('cell')
   expect(cells[6]).toHaveTextContent('9,007,199,254,740,993')
   expect(cells[9]).toHaveTextContent('8 EiB')
-  expect(cells[11]).toHaveTextContent('285616414年 264天 7小时 36分钟')
+  expect(cells[11].textContent).toBe('285616414年 264天')
   expect(cells[11].querySelector('[title]')).toHaveAttribute('title', '285616414年 264天 7小时 36分钟')
 })
 

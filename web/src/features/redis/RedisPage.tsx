@@ -26,7 +26,7 @@ import {
   ListTablePanel,
 } from "../../components/ListPage";
 import { StaleBanner } from "../../components/StaleBanner";
-import { formatDurationSeconds } from "../../formatters/duration";
+import { formatDurationDisplay } from "../../formatters/duration";
 
 const pageSizes = [20, 50, 100, 500] as const;
 const sortFields = [
@@ -358,8 +358,8 @@ export function RedisPage() {
       id: "uptime",
       header: () => sortButton("uptime", "运行时间"),
       cell: ({ row }) => {
-        const value = formatDurationSeconds(row.original.uptime_seconds);
-        return <span title={value}>{value}</span>;
+        const value = formatDurationDisplay(row.original.uptime_seconds);
+        return <span title={value.title}>{value.text}</span>;
       },
     },
     {

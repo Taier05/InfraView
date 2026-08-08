@@ -20,6 +20,11 @@ export function formatDurationSeconds(value: DurationSeconds): string {
   return parts.join(" ")
 }
 
+export function formatDurationDisplay(value: DurationSeconds): { text: string; title: string } {
+  const title = formatDurationSeconds(value)
+  return { text: title.split(" ").slice(0, 2).join(" "), title }
+}
+
 function durationSeconds(value: DurationSeconds): bigint | null {
   if (value === null) return null
   if (typeof value === "bigint") return value >= 0n ? value : null
