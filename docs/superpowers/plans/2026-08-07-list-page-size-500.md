@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 为七个只读列表增加“全部（最多500条）”，保持完整结果先排序后分页且不改变响应结构。
+**Goal:** 为七个只读列表增加普通“500 条”选项，保持完整结果先排序后分页且不改变响应结构。
 
 **Architecture:** Service 共享固定分页白名单 `20|50|100|500`，七个查询在排序完成后继续使用原分页切片。HTTP 只透传数值 `page_size`，前端共享分页控件负责 500 的中文标签，各模块继续使用自己的 URL 状态与查询缓存。
 
@@ -165,7 +165,7 @@ git commit -m "test: cover 500-row list APIs"
 
 - [ ] **Step 1: 写前端 RED 测试**
 
-共享控件断言第四项可见名称严格为“全部（最多500条）”、值为 `500`。七页分别切换并断言 URL `page_size=500&page=1`、最后一次 GET 参数为 500、响应校验接受 500；非法 499/501 规范化为 20。至少一个页面用 `total=501,total_pages=2` 证明仍分页而非截断。
+共享控件断言第四项可见名称严格为“500 条”、值为 `500`。七页分别切换并断言 URL `page_size=500&page=1`、最后一次 GET 参数为 500、响应校验接受 500；非法 499/501 规范化为 20。至少一个页面用 `total=501,total_pages=2` 证明仍分页而非截断。
 
 - [ ] **Step 2: 运行 RED**
 
@@ -177,7 +177,7 @@ Expected: FAIL，500 选项不存在或校验拒绝响应。
 
 - [ ] **Step 3: 最小实现**
 
-七页统一 `const pageSizes = [20, 50, 100, 500] as const`。共享控件用 `size === 500 ? '全部（最多500条）' : \`${size} 条\`` 渲染标签，不增加页面专属分支。
+七页统一 `const pageSizes = [20, 50, 100, 500] as const`。共享控件统一用 `` `${size} 条` `` 渲染标签，不增加页面专属分支。
 
 - [ ] **Step 4: GREEN/typecheck 并提交**
 

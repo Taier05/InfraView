@@ -76,9 +76,10 @@ describe("ListPage shared template", () => {
     expect(within(controls).queryByRole("button", { name: /刷新/ })).not.toBeInTheDocument();
     expect(within(controls).queryByText(/上次刷新|自动刷新/)).not.toBeInTheDocument();
     expect(within(controls).getByText("2026/08/06 13:50:52")).toBeVisible();
-    for (const label of ["20 条", "50 条", "100 条", "全部（最多500条）"]) {
+    for (const label of ["20 条", "50 条", "100 条", "500 条"]) {
       expect(within(controls).getByRole("option", { name: label })).toBeVisible();
     }
+    expect(within(controls).queryByText("全部（最多500条）")).not.toBeInTheDocument();
   });
 
   it("keeps table empty state and pagination in one panel", () => {

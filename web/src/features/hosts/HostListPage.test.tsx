@@ -143,7 +143,7 @@ it('按固定顺序渲染十二个单值单行列，并使用共享列表壳', a
     within(screen.getByRole('combobox', { name: '每页数量' }))
       .getAllByRole('option')
       .map((option) => option.textContent),
-  ).toEqual(['20 条', '50 条', '100 条', '全部（最多500条）'])
+  ).toEqual(['20 条', '50 条', '100 条', '500 条'])
 
   const appName = await screen.findByText('linux-app-01')
 
