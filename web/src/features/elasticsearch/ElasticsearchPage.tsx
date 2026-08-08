@@ -700,7 +700,7 @@ export function ElasticsearchPage() {
                   ? '暂无节点'
                   : `第 ${nodes.data.data.page} / ${nodes.data.data.total_pages} 页，共 ${nodes.data.data.total} 个节点`}
               </span>
-              <div>
+              {nodes.data.data.total_pages > 1 && <div>
                 <button
                   className="secondary-button"
                   type="button"
@@ -740,7 +740,7 @@ export function ElasticsearchPage() {
                 >
                   下一页
                 </button>
-              </div>
+              </div>}
             </>
           }
         >

@@ -16,6 +16,7 @@ import { diskDevicePageFixture } from '../../test/fixtures'
 import { DiskPage } from './DiskPage'
 
 const requestedURLs: URL[] = []
+let pageSize500Total = 1001
 
 const expectedDiskHeaders = [
   '主机',
@@ -134,13 +135,14 @@ function diskPageFixtureForDisplayTests() {
 
 beforeEach(() => {
   requestedURLs.length = 0
+  pageSize500Total = 1001
   window.history.replaceState({}, '', '/')
   vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
     const url = requestURL(input)
     requestedURLs.push(url)
     const page = Number(url.searchParams.get('page') ?? '1')
     const pageSize = Number(url.searchParams.get('page_size') ?? '20')
-    const total = pageSize === 500 ? 1001 : 45
+    const total = pageSize === 500 ? pageSize500Total : 45
     return Promise.resolve(
       jsonResponse(
         (() => {
@@ -702,6 +704,15 @@ it('从第 3 页恢复 500 条多页契约并在排序后保留页大小', async
       page_size: '500',
     })
   })
+})
+
+it('500 条单页保留页数和总数文本但不渲染翻页按钮', async () => {
+  pageSize500Total = 500
+  renderDiskPage('/disks?page=1&page_size=500')
+
+  expect(await screen.findByText('第 1 / 1 页，共 500 块')).toBeVisible()
+  expect(screen.queryByRole('button', { name: '上一页' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '下一页' })).toBeNull()
 })
 
 it.each([499, 501])('将非法 page_size=%i 规范为 20 且回到第一页', async (pageSize) => {

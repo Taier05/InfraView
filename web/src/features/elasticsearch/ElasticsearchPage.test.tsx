@@ -64,6 +64,7 @@ let responseBody: unknown
 let responseStatus: number
 let responseDelay: number
 const requests: URL[] = []
+let pageSize500Total = 1001
 
 function renderPage(entry = '/elasticsearch') {
   window.history.replaceState({}, '', entry)
@@ -99,7 +100,7 @@ function respondWithRequestedPage() {
       const url = new URL(request.url)
       requests.push(url)
       const pageSize = Number(url.searchParams.get('page_size'))
-      const total = pageSize === 500 ? 1001 : 60
+      const total = pageSize === 500 ? pageSize500Total : 60
       return HttpResponse.json(
         elasticsearchNodePageFixture({
           data: {
@@ -282,6 +283,16 @@ it('通过每页数量下拉切换到 500 并发送最后 GET', async () => {
       page_size: '500',
     })
   })
+})
+
+it('500 条单页保留页数和总数文本但不渲染翻页按钮', async () => {
+  pageSize500Total = 500
+  respondWithRequestedPage()
+  renderPage('/elasticsearch?page=1&page_size=500')
+
+  expect(await screen.findByText('第 1 / 1 页，共 500 个节点')).toBeVisible()
+  expect(screen.queryByRole('button', { name: '上一页' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '下一页' })).toBeNull()
 })
 
 it('搜索等待精确 300ms 后写入 URL 并重置页码', async () => {

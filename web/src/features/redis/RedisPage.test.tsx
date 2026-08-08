@@ -7,6 +7,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { RedisPage } from "./RedisPage";
 
 const requests: URL[] = [];
+let pageSize500Total = 1001;
 const redisSortFields = [
   ["实例地址", "instance"],
   ["角色", "role"],
@@ -190,7 +191,7 @@ function mockPaginatedRedisRequests() {
     const url = new URL(raw, "http://localhost");
     requests.push(url);
     const pageSize = Number(url.searchParams.get("page_size"));
-    const total = pageSize === 500 ? 1001 : 64;
+    const total = pageSize === 500 ? pageSize500Total : 64;
     return Promise.resolve(
       new Response(
         JSON.stringify({
@@ -455,6 +456,16 @@ it("通过每页数量下拉切换到 500 并发送最后 GET", async () => {
       page_size: "500",
     });
   });
+});
+
+it("500 条单页保留页数和总数文本但不渲染翻页按钮", async () => {
+  pageSize500Total = 500;
+  mockPaginatedRedisRequests();
+  renderPage("/redis?page=1&page_size=500");
+
+  expect(await screen.findByText("第 1 / 1 页，共 500 个实例")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "上一页" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "下一页" })).toBeNull();
 });
 
 it("搜索防抖后重置页码并仅发送固定参数", async () => {

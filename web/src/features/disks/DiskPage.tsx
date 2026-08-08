@@ -559,7 +559,7 @@ export function DiskPage() {
                 第 {devices.data.data.page} / {devices.data.data.total_pages}{' '}
                 页，共 {devices.data.data.total} 块
               </span>
-              <div>
+              {devices.data.data.total_pages > 1 && <div>
                 <button
                   className="secondary-button"
                   type="button"
@@ -588,7 +588,7 @@ export function DiskPage() {
                 >
                   下一页
                 </button>
-              </div>
+              </div>}
             </>
           }
         >

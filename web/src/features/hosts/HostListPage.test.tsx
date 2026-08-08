@@ -15,6 +15,7 @@ import { hostPageFixture } from '../../test/fixtures'
 import { HostListPage } from './HostListPage'
 
 const requestedURLs: URL[] = []
+let pageSize500Total = 1001
 
 const expectedHostHeaders = [
   '主机名',
@@ -99,13 +100,14 @@ function expectRequestParameters(
 
 beforeEach(() => {
   requestedURLs.length = 0
+  pageSize500Total = 1001
   window.history.replaceState({}, '', '/')
   vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
     const url = requestURL(input)
     requestedURLs.push(url)
     const page = Number(url.searchParams.get('page') ?? '1')
     const pageSize = Number(url.searchParams.get('page_size') ?? '20')
-    const total = pageSize === 500 ? 1001 : 41
+    const total = pageSize === 500 ? pageSize500Total : 41
     return Promise.resolve(
       jsonResponse(
         hostPageFixture({
@@ -385,6 +387,15 @@ it('搜索等待 300ms 后请求并把页码重置为 1', async () => {
   expect(window.location.search).toContain('page=1')
 })
 
+it('500 条单页保留页数和总数文本但不渲染翻页按钮', async () => {
+  pageSize500Total = 500
+  renderHostList('/hosts?page=1&page_size=500')
+
+  expect(await screen.findByText('第 1 / 1 页，共 500 台')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: '上一页' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '下一页' })).toBeNull()
+})
+
 it.each(expectedHostSorts)(
   '从 fresh page 3 排序主机 %s 时首击升序、再击降序，并发送精确参数',
   async (label, field) => {
@@ -602,8 +613,8 @@ it('零结果时规范为第一页并显示空状态而不是 1/0 页', async ()
   expect(window.location.search).toContain('page=1')
   expect(window.history.length).toBe(historyLength)
   expect(screen.queryByText(/第 1 \/ 0 页/)).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: '上一页' })).toBeDisabled()
-  expect(screen.getByRole('button', { name: '下一页' })).toBeDisabled()
+  expect(screen.queryByRole('button', { name: '上一页' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '下一页' })).toBeNull()
 })
 
 it('用 replace 规范非法 URL 参数并保留搜索词', async () => {

@@ -590,7 +590,7 @@ export function MySQLPage() {
                   第 {instances.data.data.page} / {instances.data.data.total_pages}{' '}
                   页，共 {instances.data.data.total} 个实例
                 </span>
-                <div>
+                {instances.data.data.total_pages > 1 && <div>
                   <button
                     className="secondary-button"
                     type="button"
@@ -619,7 +619,7 @@ export function MySQLPage() {
                   >
                     下一页
                   </button>
-                </div>
+                </div>}
               </>
             )
           }

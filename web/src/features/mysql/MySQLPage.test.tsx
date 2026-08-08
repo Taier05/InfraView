@@ -442,6 +442,15 @@ it('uses the page-size control for the exact 501-row boundary without truncation
   })
 })
 
+it('500 条单页保留页数和总数文本但不渲染翻页按钮', async () => {
+  pageSize500Total = 500
+  renderMySQLPage('/mysql?page=1&page_size=500')
+
+  expect(await screen.findByText('第 1 / 1 页，共 500 个实例')).toBeVisible()
+  expect(screen.queryByRole('button', { name: '上一页' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '下一页' })).toBeNull()
+})
+
 it('places instance labels before status and restores labels from the URL', async () => {
   renderMySQLPage('/mysql?label=%20legacy-fixture%20')
   await screen.findByText('192.0.2.101:3306')

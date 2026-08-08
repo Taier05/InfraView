@@ -489,7 +489,7 @@ export function HostListPage() {
                   页，共 {hosts.data.data.total} 台
                 </span>
               )}
-              <div>
+              {hosts.data.data.total_pages > 1 && <div>
                 <button
                   className="secondary-button"
                   type="button"
@@ -522,7 +522,7 @@ export function HostListPage() {
                 >
                   下一页
                 </button>
-              </div>
+              </div>}
             </>
           }
         >
