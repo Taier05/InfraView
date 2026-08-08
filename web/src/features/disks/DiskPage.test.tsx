@@ -11,6 +11,7 @@ import userEvent from '@testing-library/user-event'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
+import type { DiskErrorCounters } from '../../api/types'
 import { diskDevicePageFixture } from '../../test/fixtures'
 import { DiskPage } from './DiskPage'
 
@@ -57,6 +58,31 @@ function jsonResponse(body: unknown, status = 200) {
     status,
     headers: { 'Content-Type': 'application/json' },
   })
+}
+
+function runtimeJsonResponse(body: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers({ 'Content-Type': 'application/json' }),
+    json: () => Promise.resolve(body),
+  } as Response
+}
+
+function diskErrors(
+  overrides: Partial<DiskErrorCounters> = {},
+): DiskErrorCounters {
+  return {
+    pending_sectors: null,
+    reallocated_sectors: null,
+    uncorrectable_sectors: null,
+    udma_crc_errors: null,
+    media_integrity_errors: null,
+    command_timeouts: null,
+    error_log_entries: null,
+    unsafe_shutdowns: null,
+    ...overrides,
+  }
 }
 
 function renderDiskPage(initialEntry = '/disks') {
@@ -354,6 +380,136 @@ it('错误摘要展示两个非零项时包含命令超时且不省略', async (
     'title',
     '待处理扇区 2 · 命令超时 5',
   )
+})
+
+it('错误摘要完整 title 按固定顺序列出全部八项正数', async () => {
+  const fixture = diskDevicePageFixture()
+  fixture.data.devices = [
+    {
+      ...fixture.data.devices[0],
+      host: 'node-all-error-types',
+      errors: diskErrors({
+        pending_sectors: 1,
+        uncorrectable_sectors: 2,
+        reallocated_sectors: 3,
+        media_integrity_errors: 4,
+        udma_crc_errors: 5,
+        command_timeouts: 6,
+        error_log_entries: 7,
+        unsafe_shutdowns: 8,
+      }),
+    },
+  ]
+  vi.mocked(globalThis.fetch).mockImplementation(() =>
+    Promise.resolve(jsonResponse(fixture)),
+  )
+
+  renderDiskPage()
+
+  const row = (await screen.findByText('node-all-error-types')).closest('tr')
+  expect(row).not.toBeNull()
+  const errorSummary = within(row!).getAllByRole('cell')[8]
+  expect(errorSummary).toHaveTextContent('待处理扇区 1 · 不可修复扇区 2 · …')
+  expect(errorSummary.firstElementChild).toHaveAttribute(
+    'title',
+    '待处理扇区 1 · 不可修复扇区 2 · 重映射扇区 3 · 介质完整性错误 4 · CRC 错误 5 · 命令超时 6 · 错误日志 7 · 异常断电 8 次（累计次数，仅展示，不参与状态判断）',
+  )
+})
+
+it('把缺失和非法命令超时视为缺失，保留全量与部分缺失语义', async () => {
+  const fixture = diskDevicePageFixture()
+  const knownZeroCounters = {
+    pending_sectors: 0,
+    reallocated_sectors: 0,
+    uncorrectable_sectors: 0,
+    udma_crc_errors: 0,
+    media_integrity_errors: 0,
+    error_log_entries: 0,
+    unsafe_shutdowns: 0,
+  } satisfies Partial<DiskErrorCounters>
+  const missingCommandTimeouts = diskErrors(knownZeroCounters)
+  delete (missingCommandTimeouts as Partial<DiskErrorCounters>).command_timeouts
+  const invalidCommandTimeouts = [
+    ['node-command-string-with-zeros', '0' as unknown as number],
+    ['node-command-negative-with-zeros', -1],
+    ['node-command-nan-with-zeros', Number.NaN],
+    ['node-command-infinity-with-zeros', Number.POSITIVE_INFINITY],
+  ] as const
+  fixture.data.devices = [
+    {
+      ...fixture.data.devices[0],
+      host: 'node-command-missing',
+      errors: missingCommandTimeouts,
+    },
+    {
+      ...fixture.data.devices[1],
+      host: 'node-command-string',
+      errors: diskErrors({ command_timeouts: '0' as unknown as number }),
+    },
+    {
+      ...fixture.data.devices[2],
+      host: 'node-command-negative',
+      errors: diskErrors({ command_timeouts: -1 }),
+    },
+    {
+      ...fixture.data.devices[3],
+      host: 'node-command-nan',
+      errors: diskErrors({ command_timeouts: Number.NaN }),
+    },
+    {
+      ...fixture.data.devices[4],
+      host: 'node-command-infinity',
+      errors: diskErrors({ command_timeouts: Number.POSITIVE_INFINITY }),
+    },
+    ...invalidCommandTimeouts.map(([host, commandTimeouts], index) => ({
+      ...fixture.data.devices[index],
+      host,
+      errors: diskErrors({
+        ...knownZeroCounters,
+        command_timeouts: commandTimeouts,
+      }),
+    })),
+  ]
+  vi.mocked(globalThis.fetch).mockImplementation(() =>
+    Promise.resolve(runtimeJsonResponse(fixture)),
+  )
+
+  renderDiskPage()
+
+  const missingRow = (await screen.findByText('node-command-missing')).closest(
+    'tr',
+  )
+  expect(missingRow).not.toBeNull()
+  const missingSummary = within(missingRow!).getAllByRole('cell')[8]
+  expect(missingSummary).toHaveTextContent('未发现错误')
+  expect(missingSummary.firstElementChild).toHaveAttribute(
+    'title',
+    '未发现错误；部分指标暂无数据',
+  )
+
+  for (const host of [
+    'node-command-string',
+    'node-command-negative',
+    'node-command-nan',
+    'node-command-infinity',
+  ]) {
+    const row = screen.getByText(host).closest('tr')
+    expect(row).not.toBeNull()
+    const summary = within(row!).getAllByRole('cell')[8]
+    expect(summary).toHaveTextContent('暂无数据')
+    expect(summary.firstElementChild).toHaveAttribute('title', '暂无数据')
+  }
+
+  for (const [host] of invalidCommandTimeouts) {
+    const row = screen.getByText(host).closest('tr')
+    expect(row).not.toBeNull()
+    const summary = within(row!).getAllByRole('cell')[8]
+    expect(summary).toHaveTextContent('未发现错误')
+    expect(summary.firstElementChild).toHaveAttribute(
+      'title',
+      '未发现错误；部分指标暂无数据',
+    )
+  }
 })
 
 it('仅异常断电时以次数展示且不再使用非安全关机文案', async () => {

@@ -128,6 +128,12 @@ function powerOnTime(value: number | null) {
   return formatDurationSeconds(value * 3_600)
 }
 
+function commandTimeouts(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : null
+}
+
 function errorItems(errors: DiskErrorCounters): ErrorItem[] {
   return [
     { label: '待处理扇区', value: errors.pending_sectors },
@@ -135,7 +141,7 @@ function errorItems(errors: DiskErrorCounters): ErrorItem[] {
     { label: '重映射扇区', value: errors.reallocated_sectors },
     { label: '介质完整性错误', value: errors.media_integrity_errors },
     { label: 'CRC 错误', value: errors.udma_crc_errors },
-    { label: '命令超时', value: errors.command_timeouts },
+    { label: '命令超时', value: commandTimeouts(errors.command_timeouts) },
     { label: '错误日志', value: errors.error_log_entries },
     { label: '异常断电', value: errors.unsafe_shutdowns, suffix: ' 次' },
   ]
