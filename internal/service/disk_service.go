@@ -412,6 +412,7 @@ func diskErrorSortValue(errors disk.ErrorCounters) (float64, bool) {
 		errors.UncorrectableSectors,
 		errors.UDMACRCErrors,
 		errors.MediaIntegrityErrors,
+		errors.CommandTimeouts,
 		errors.ErrorLogEntries,
 	}
 	var total float64
@@ -560,6 +561,7 @@ func cloneDiskErrors(source disk.ErrorCounters) disk.ErrorCounters {
 		UDMACRCErrors:        cloneFloat(source.UDMACRCErrors),
 		MediaIntegrityErrors: cloneFloat(source.MediaIntegrityErrors),
 		ErrorLogEntries:      cloneFloat(source.ErrorLogEntries),
+		CommandTimeouts:      cloneFloat(source.CommandTimeouts),
 		UnsafeShutdowns:      cloneFloat(source.UnsafeShutdowns),
 	}
 }

@@ -676,12 +676,14 @@ func TestDiskServiceErrorSortUsesDisplayedCountersKeepsMissingLastAndUsesIDTieBr
 	one := float64(1)
 	two := float64(2)
 	unsafe := float64(999)
+	commandTimeouts := float64(3)
 	devices := []disk.Device{
 		{ID: "id-missing", HostID: "host", Device: "disk0", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{UnsafeShutdowns: &unsafe}},
 		{ID: "id-two-b", HostID: "host", Device: "disk1", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{PendingSectors: &two}},
 		{ID: "id-one", HostID: "host", Device: "disk2", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{PendingSectors: &one, UnsafeShutdowns: &unsafe}},
 		{ID: "id-zero", HostID: "host", Device: "disk3", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{PendingSectors: &zero}},
-		{ID: "id-two-a", HostID: "host", Device: "disk4", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{ReallocatedSectors: &one, ErrorLogEntries: &one}},
+		{ID: "id-three", HostID: "host", Device: "disk4", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{CommandTimeouts: &commandTimeouts, UnsafeShutdowns: &unsafe}},
+		{ID: "id-two-a", HostID: "host", Device: "disk5", SMARTHealth: disk.HealthHealthy, Errors: disk.ErrorCounters{ReallocatedSectors: &one, ErrorLogEntries: &one}},
 	}
 	service := NewDisk(&diskTestProvider{snapshot: disk.Snapshot{Devices: devices}}, nil, DiskOptions{})
 
@@ -689,8 +691,8 @@ func TestDiskServiceErrorSortUsesDisplayedCountersKeepsMissingLastAndUsesIDTieBr
 		order string
 		want  string
 	}{
-		{order: "asc", want: "[id-zero id-one id-two-a id-two-b id-missing]"},
-		{order: "desc", want: "[id-two-a id-two-b id-one id-zero id-missing]"},
+		{order: "asc", want: "[id-zero id-one id-two-a id-two-b id-three id-missing]"},
+		{order: "desc", want: "[id-three id-two-a id-two-b id-one id-zero id-missing]"},
 	} {
 		page, _, err := service.Devices(context.Background(), DiskQuery{
 			Sort: "errors", Order: test.order, Page: 1, PageSize: 20,
@@ -716,6 +718,7 @@ func TestDiskServiceErrorSortIncludesEveryDisplayedCounter(t *testing.T) {
 		{name: "uncorrectable sectors", set: func(errors *disk.ErrorCounters, value *float64) { errors.UncorrectableSectors = value }},
 		{name: "udma crc errors", set: func(errors *disk.ErrorCounters, value *float64) { errors.UDMACRCErrors = value }},
 		{name: "media integrity errors", set: func(errors *disk.ErrorCounters, value *float64) { errors.MediaIntegrityErrors = value }},
+		{name: "command timeouts", set: func(errors *disk.ErrorCounters, value *float64) { errors.CommandTimeouts = value }},
 		{name: "error log entries", set: func(errors *disk.ErrorCounters, value *float64) { errors.ErrorLogEntries = value }},
 	}
 	for _, test := range tests {
@@ -843,6 +846,7 @@ func TestDiskServiceReturnsDeepCopiesOfSnapshotAndSummaries(t *testing.T) {
 	spare := float64(50)
 	threshold := float64(10)
 	errorValue := float64(60)
+	commandTimeouts := float64(61)
 	source := disk.Snapshot{Devices: []disk.Device{{
 		ID: "fixture", HostID: "host", Device: "disk", Model: "model",
 		CapacityBytes: &capacity, SMARTHealth: disk.HealthHealthy,
@@ -851,7 +855,7 @@ func TestDiskServiceReturnsDeepCopiesOfSnapshotAndSummaries(t *testing.T) {
 		Errors: disk.ErrorCounters{
 			PendingSectors: &errorValue, ReallocatedSectors: &errorValue, UncorrectableSectors: &errorValue,
 			UDMACRCErrors: &errorValue, MediaIntegrityErrors: &errorValue, ErrorLogEntries: &errorValue,
-			UnsafeShutdowns: &errorValue,
+			CommandTimeouts: &commandTimeouts, UnsafeShutdowns: &errorValue,
 		},
 	}}}
 	service := NewDisk(&diskTestProvider{snapshot: source}, nil, DiskOptions{})
@@ -859,6 +863,9 @@ func TestDiskServiceReturnsDeepCopiesOfSnapshotAndSummaries(t *testing.T) {
 	firstSnapshot, _, err := service.snapshot(context.Background())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if firstSnapshot.Devices[0].Errors.CommandTimeouts == nil || *firstSnapshot.Devices[0].Errors.CommandTimeouts != commandTimeouts {
+		t.Fatalf("snapshot command timeouts = %v, want %v", firstSnapshot.Devices[0].Errors.CommandTimeouts, commandTimeouts)
 	}
 	mutateDiskPointers(&firstSnapshot.Devices[0])
 	secondSnapshot, _, err := service.snapshot(context.Background())
@@ -870,6 +877,9 @@ func TestDiskServiceReturnsDeepCopiesOfSnapshotAndSummaries(t *testing.T) {
 	firstPage, _, err := service.Devices(context.Background(), DiskQuery{Page: 1, PageSize: 20})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if firstPage.Devices[0].Errors.CommandTimeouts == nil || *firstPage.Devices[0].Errors.CommandTimeouts != commandTimeouts {
+		t.Fatalf("summary command timeouts = %v, want %v", firstPage.Devices[0].Errors.CommandTimeouts, commandTimeouts)
 	}
 	mutateDiskSummaryPointers(&firstPage.Devices[0])
 	secondPage, _, err := service.Devices(context.Background(), DiskQuery{Page: 1, PageSize: 20})
@@ -997,6 +1007,7 @@ func mutateDiskPointers(device *disk.Device) {
 	*device.Errors.UDMACRCErrors = 999
 	*device.Errors.MediaIntegrityErrors = 999
 	*device.Errors.ErrorLogEntries = 999
+	*device.Errors.CommandTimeouts = 999
 	*device.Errors.UnsafeShutdowns = 999
 }
 
@@ -1009,6 +1020,7 @@ func assertDiskPointersNotMutated(t *testing.T, device disk.Device) {
 		*device.Errors.PendingSectors == 999 || *device.Errors.ReallocatedSectors == 999 ||
 		*device.Errors.UncorrectableSectors == 999 || *device.Errors.UDMACRCErrors == 999 ||
 		*device.Errors.MediaIntegrityErrors == 999 || *device.Errors.ErrorLogEntries == 999 ||
+		*device.Errors.CommandTimeouts == 999 ||
 		*device.Errors.UnsafeShutdowns == 999 {
 		t.Fatalf("cached snapshot was mutated: %#v", device)
 	}
@@ -1025,6 +1037,7 @@ func mutateDiskSummaryPointers(device *DiskDeviceSummary) {
 	*device.Errors.UDMACRCErrors = 999
 	*device.Errors.MediaIntegrityErrors = 999
 	*device.Errors.ErrorLogEntries = 999
+	*device.Errors.CommandTimeouts = 999
 	*device.Errors.UnsafeShutdowns = 999
 }
 
@@ -1035,6 +1048,7 @@ func assertDiskSummaryPointersNotMutated(t *testing.T, device DiskDeviceSummary)
 		*device.Errors.PendingSectors == 999 || *device.Errors.ReallocatedSectors == 999 ||
 		*device.Errors.UncorrectableSectors == 999 || *device.Errors.UDMACRCErrors == 999 ||
 		*device.Errors.MediaIntegrityErrors == 999 || *device.Errors.ErrorLogEntries == 999 ||
+		*device.Errors.CommandTimeouts == 999 ||
 		*device.Errors.UnsafeShutdowns == 999 {
 		t.Fatalf("returned summary was mutated: %#v", device)
 	}

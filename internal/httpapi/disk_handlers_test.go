@@ -205,6 +205,7 @@ func TestDiskDevicesReturnsFixedViewDefaultsAndPreservesNulls(t *testing.T) {
 		"udma_crc_errors",
 		"media_integrity_errors",
 		"error_log_entries",
+		"command_timeouts",
 		"unsafe_shutdowns",
 	)
 	if got := jsonPathValue(t, body, "data.devices.0.capacity_bytes"); got != float64(1_234_567_890) {
@@ -218,6 +219,9 @@ func TestDiskDevicesReturnsFixedViewDefaultsAndPreservesNulls(t *testing.T) {
 	}
 	if got := jsonPathValue(t, body, "data.devices.0.errors.reallocated_sectors"); got != float64(2) {
 		t.Fatalf("reallocated_sectors = %#v", got)
+	}
+	if got := jsonPathValue(t, body, "data.devices.0.errors.command_timeouts"); got != float64(7) {
+		t.Fatalf("command_timeouts = %#v", got)
 	}
 	if !jsonPathIsNull(t, body, "data.devices.0.errors.pending_sectors") {
 		t.Fatal("pending_sectors is not null")
@@ -233,6 +237,7 @@ func TestDiskDevicesReturnsFixedViewDefaultsAndPreservesNulls(t *testing.T) {
 		"data.devices.1.temperature_celsius",
 		"data.devices.1.lifetime_used_percent",
 		"data.devices.1.power_on_hours",
+		"data.devices.1.errors.command_timeouts",
 		"data.devices.1.errors.unsafe_shutdowns",
 	} {
 		if !jsonPathIsNull(t, body, path) {
@@ -242,7 +247,7 @@ func TestDiskDevicesReturnsFixedViewDefaultsAndPreservesNulls(t *testing.T) {
 	assertDiskResponseMetaSchema(t, body)
 
 	lowerBody := strings.ToLower(response.Body.String())
-	for _, forbidden := range []string{"serial_no", "wwn", "labels", "promql", "upstream-test-secret"} {
+	for _, forbidden := range []string{"serial_no", "wwn", "labels", "promql", "upstream-test-secret", "commandtimeouts"} {
 		if strings.Contains(lowerBody, forbidden) {
 			t.Fatalf("response leaked %q: %s", forbidden, response.Body.String())
 		}
@@ -383,6 +388,7 @@ func fixtureDiskSnapshot() disk.Snapshot {
 	temperature := 31.5
 	powerOnHours := float64(2400)
 	reallocatedSectors := float64(2)
+	commandTimeouts := float64(7)
 	return disk.Snapshot{Devices: []disk.Device{
 		{
 			ID:                 "public-device-id-a",
@@ -395,6 +401,7 @@ func fixtureDiskSnapshot() disk.Snapshot {
 			PowerOnHours:       &powerOnHours,
 			Errors: disk.ErrorCounters{
 				ReallocatedSectors: &reallocatedSectors,
+				CommandTimeouts:    &commandTimeouts,
 			},
 			ReportedAt: time.Date(2026, time.July, 30, 8, 0, 0, 0, time.UTC),
 		},

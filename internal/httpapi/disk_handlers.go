@@ -34,6 +34,7 @@ type diskErrorsView struct {
 	UDMACRCErrors        *float64 `json:"udma_crc_errors"`
 	MediaIntegrityErrors *float64 `json:"media_integrity_errors"`
 	ErrorLogEntries      *float64 `json:"error_log_entries"`
+	CommandTimeouts      *float64 `json:"command_timeouts"`
 	UnsafeShutdowns      *float64 `json:"unsafe_shutdowns"`
 }
 
@@ -179,6 +180,7 @@ func diskDeviceViewFrom(value service.DiskDeviceSummary) diskDeviceView {
 			UDMACRCErrors:        value.Errors.UDMACRCErrors,
 			MediaIntegrityErrors: value.Errors.MediaIntegrityErrors,
 			ErrorLogEntries:      value.Errors.ErrorLogEntries,
+			CommandTimeouts:      value.Errors.CommandTimeouts,
 			UnsafeShutdowns:      value.Errors.UnsafeShutdowns,
 		},
 		Status:          value.Status,
