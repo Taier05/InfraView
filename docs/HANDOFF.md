@@ -2,13 +2,13 @@
 
 最后更新：2026-08-08
 
-## 列表 500 条、共享运行时长与硬盘错误摘要恢复入口（隔离 feature 分支本地交付，未合并/未推送/未部署）
+## 列表 500 条、共享运行时长与硬盘错误摘要恢复入口（已部署测试 8080，未合并/未推送）
 
 恢复目录为 `/root/github/InfraView/.worktrees/list-duration-disk-errors`，分支为 `feature/list-duration-disk-errors`，从 `7ff1cea` 分叉。本分支已完成七个只读列表的单页最多 500 条：允许值固定为 `20|50|100|500`，共享控件显示普通“500 条”，切换回第 1 页且 URL 可恢复；完整筛选结果始终先在服务端排序、再分页。超过 500 条继续正常翻页，不截断、不客户端逐页拼接、不增加请求或虚拟滚动；响应结构、15 秒刷新和只读边界保持不变。
 
 共享运行时长格式化已完成：六个运行时间列和硬盘通电时间统一显示年、天、小时、分钟；硬盘仅对有限非负 `power_on_hours` 换算秒数后复用共享 formatter，合法小数小时保留实际分钟，整数小时不伪造分钟。显示不改变 API、后端排序或 `sort=power_on_hours`，单元格正文和原生 `title` 使用同一文本。硬盘错误摘要与固定 `smart_device_command_timeout` 已完成：仅显示已知非零项、超过两项明确省略、全零/部分缺失/全缺失语义准确；命令超时只参与摘要与排序，不触发硬盘状态、`status_source` 或总览告警。
 
-本节对应的分页、时长与硬盘错误摘要交付均仅存在于该 feature 分支；未 merge、push、deploy 或 restart。本轮仅完成离线验证，未启动服务或浏览器、未连接上游，也未输出现场数据。继续前必须以实时 Git 结果为准。
+本节对应的分页、时长与硬盘错误摘要交付均仅存在于该 feature 分支，已原位重建现有测试 8080；未 merge 或 push。镜像构建门禁以及部署健康/安全核验通过，未创建额外端口、未启动浏览器，也未输出现场数据。继续前必须以实时 Git 结果为准。
 
 继续时先完整阅读本节、`docs/PROJECT_STATUS.md`、`docs/TODO.md`、`docs/superpowers/specs/2026-08-07-list-all-duration-and-disk-error-summary-design.md`、`docs/superpowers/plans/2026-08-07-list-page-size-500.md`、`docs/superpowers/plans/2026-08-07-shared-duration-formatting.md`、`docs/superpowers/plans/2026-08-07-disk-command-timeout-and-error-summary.md`，再只读运行 `git status --short --branch`、`git log --reverse 7ff1cea..HEAD --oneline`、`git diff --check` 与 `git diff --cached --check`。保留任何新差异，不得 reset、clean 或把本 feature 分支的本地状态写成 main/远端状态。
 
