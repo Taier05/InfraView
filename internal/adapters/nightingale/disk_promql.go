@@ -17,6 +17,7 @@ var fixedDiskPromQL = []string{
 	`smart_attribute_media_and_data_integrity_errors`,
 	`smart_attribute_error_information_log_entries`,
 	`smart_attribute_unsafe_shutdowns`,
+	`smart_device_command_timeout`,
 	`smart_disk_capacity_bytes`,
 	`tlast_over_time(smart_device_health_ok[24h])`,
 }

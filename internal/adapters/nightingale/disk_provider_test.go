@@ -34,6 +34,7 @@ var wantDiskPromQL = []string{
 	`smart_attribute_media_and_data_integrity_errors`,
 	`smart_attribute_error_information_log_entries`,
 	`smart_attribute_unsafe_shutdowns`,
+	`smart_device_command_timeout`,
 	`smart_disk_capacity_bytes`,
 	`tlast_over_time(smart_device_health_ok[24h])`,
 }
@@ -94,7 +95,7 @@ func TestSMARTSnapshotMapsAnonymizedFixture(t *testing.T) {
 		case "/api/n9e/query-instant-batch":
 			assertDiskBatchRequest(t, request)
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write(fixture)
+			_, _ = w.Write(withDiskCommandTimeoutGroup(t, fixture))
 		default:
 			t.Fatal("disk fixture server received an unexpected path")
 		}
@@ -171,6 +172,9 @@ func TestSMARTSnapshotMapsAnonymizedFixture(t *testing.T) {
 	assertDiskFloat(t, nvme.Errors.MediaIntegrityErrors, 2)
 	assertDiskFloat(t, nvme.Errors.ErrorLogEntries, 4)
 	assertDiskFloat(t, nvme.Errors.UnsafeShutdowns, 6)
+	if ata.Errors.CommandTimeouts != nil || nvme.Errors.CommandTimeouts != nil {
+		t.Fatal("fixture without command timeout data must retain missing semantics")
+	}
 
 	encoded, err := json.Marshal(snapshot)
 	if err != nil {
@@ -185,7 +189,7 @@ func TestSMARTSnapshotMapsAnonymizedFixture(t *testing.T) {
 
 func TestSMARTSnapshotUsesCapacityMetricAsOnlySource(t *testing.T) {
 	groups := validDiskBatch()
-	groups[17][0].Metric["capacity"] = "999999999"
+	groups[18][0].Metric["capacity"] = "999999999"
 
 	snapshot, err := runDiskBatch(t, groups)
 	if err != nil {
@@ -194,6 +198,76 @@ func TestSMARTSnapshotUsesCapacityMetricAsOnlySource(t *testing.T) {
 	device := diskDeviceByName(t, snapshot, "/dev/fixture-a")
 	if device.CapacityBytes == nil || *device.CapacityBytes != 1000000000 {
 		t.Fatalf("CapacityBytes = %#v, want capacity metric value", device.CapacityBytes)
+	}
+}
+
+func TestSMARTSnapshotMergesCommandTimeoutsOnlyWhenCurrentAndValid(t *testing.T) {
+	conflictingSerial := diskLabels()
+	conflictingSerial["serial_no"] = "fixture-serial-conflict"
+	conflictingWWN := diskLabels()
+	conflictingWWN["wwn"] = "fixture-wwn-conflict"
+	missingIdent := diskLabels()
+	missingIdent["ident"] = ""
+	missingDevice := diskLabels()
+	missingDevice["device"] = ""
+	unknownDevice := diskLabels()
+	unknownDevice["device"] = "/dev/fixture-unknown"
+
+	tests := []struct {
+		name            string
+		series          []instantSeries
+		noCurrentHealth bool
+		want            float64
+		hasValue        bool
+	}{
+		{name: "latest valid", series: []instantSeries{
+			diskSeries(diskLabels(), 1785123200, "3"),
+			diskSeries(diskLabels(), 1785123300, "6"),
+		}, want: 6, hasValue: true},
+		{name: "zero", series: []instantSeries{diskSeries(diskLabels(), 1785123300, "0")}, hasValue: true},
+		{name: "negative", series: []instantSeries{diskSeries(diskLabels(), 1785123300, "-1")}},
+		{name: "invalid", series: []instantSeries{diskSeries(diskLabels(), 1785123300, "NaN")}},
+		{name: "older value", series: []instantSeries{
+			diskSeries(diskLabels(), 1785123300, "8"),
+			diskSeries(diskLabels(), 1785123200, "2"),
+		}, want: 8, hasValue: true},
+		{name: "same time same value", series: []instantSeries{
+			diskSeries(diskLabels(), 1785123300, "9"),
+			diskSeries(diskLabels(), 1785123300, "9"),
+		}, want: 9, hasValue: true},
+		{name: "same time conflict", series: []instantSeries{
+			diskSeries(diskLabels(), 1785123300, "10"),
+			diskSeries(diskLabels(), 1785123300, "11"),
+		}},
+		{name: "missing ident", series: []instantSeries{diskSeries(missingIdent, 1785123300, "12")}},
+		{name: "missing device", series: []instantSeries{diskSeries(missingDevice, 1785123300, "12")}},
+		{name: "serial conflict", series: []instantSeries{diskSeries(conflictingSerial, 1785123300, "12")}},
+		{name: "wwn conflict", series: []instantSeries{diskSeries(conflictingWWN, 1785123300, "12")}},
+		{name: "unknown device", series: []instantSeries{diskSeries(unknownDevice, 1785123300, "12")}},
+		{name: "no current health", series: []instantSeries{diskSeries(diskLabels(), 1785123300, "12")}, noCurrentHealth: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			groups := validDiskBatch()
+			groups[16] = tt.series
+			if tt.noCurrentHealth {
+				groups[0] = []instantSeries{}
+			}
+
+			snapshot, err := runDiskBatch(t, groups)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := diskDeviceByName(t, snapshot, "/dev/fixture-a").Errors.CommandTimeouts
+			if !tt.hasValue {
+				if got != nil {
+					t.Fatalf("CommandTimeouts = %v, want nil", *got)
+				}
+				return
+			}
+			assertDiskFloat(t, got, tt.want)
+		})
 	}
 }
 
@@ -221,7 +295,7 @@ func TestSMARTSnapshotKeepsInvalidOrConflictingCapacityMissing(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			groups := validDiskBatch()
-			groups[16] = tt.series
+			groups[17] = tt.series
 
 			snapshot, err := runDiskBatch(t, groups)
 			if err != nil {
@@ -246,7 +320,7 @@ func TestSMARTSnapshotPreservesExactLargeCapacity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			groups := validDiskBatch()
-			groups[16] = []instantSeries{diskSeries(diskLabels(), 1785123900, tt.value)}
+			groups[17] = []instantSeries{diskSeries(diskLabels(), 1785123900, tt.value)}
 
 			snapshot, err := runDiskBatch(t, groups)
 			if err != nil {
@@ -262,7 +336,7 @@ func TestSMARTSnapshotPreservesExactLargeCapacity(t *testing.T) {
 
 func TestSMARTSnapshotSelectsLatestCapacityWithoutChangingReportedAt(t *testing.T) {
 	groups := validDiskBatch()
-	groups[16] = []instantSeries{
+	groups[17] = []instantSeries{
 		diskSeries(diskLabels(), 1785123900, "1000000000"),
 		diskSeries(diskLabels(), 1785123800, "500000000"),
 		diskSeries(diskLabels(), 1785123950, "2000000000"),
@@ -287,7 +361,7 @@ func TestSMARTSnapshotCapacityHonorsIdentityAndKnownInventory(t *testing.T) {
 	conflict["serial_no"] = "fixture-serial-conflict"
 	unknown := diskLabels()
 	unknown["device"] = "/dev/fixture-unknown"
-	groups[16] = []instantSeries{
+	groups[17] = []instantSeries{
 		diskSeries(conflict, 1785123900, "2000000000"),
 		diskSeries(unknown, 1785123900, "3000000000"),
 	}
@@ -306,9 +380,9 @@ func TestSMARTSnapshotCapacityHonorsIdentityAndKnownInventory(t *testing.T) {
 
 func TestSMARTSnapshotCoalescesCompatibleDuplicateInventoryAtLatestReportedTime(t *testing.T) {
 	groups := validDiskBatch()
-	duplicate := cloneDiskSeries(groups[17][0])
+	duplicate := cloneDiskSeries(groups[18][0])
 	duplicate.Value[1] = json.RawMessage(`"1785123055.5"`)
-	groups[17] = append(groups[17], duplicate)
+	groups[18] = append(groups[18], duplicate)
 
 	snapshot, err := runDiskBatch(t, groups)
 	if err != nil {
@@ -330,7 +404,7 @@ func TestSMARTSnapshotCoalescesComplementaryDuplicateInventoryIdentity(t *testin
 	for _, reverse := range []bool{false, true} {
 		t.Run(map[bool]string{false: "older first", true: "newer first"}[reverse], func(t *testing.T) {
 			groups := validDiskBatch()
-			older := cloneDiskSeries(groups[17][0])
+			older := cloneDiskSeries(groups[18][0])
 			older.Metric["serial_no"] = ""
 			older.Metric["wwn"] = ""
 			newer := cloneDiskSeries(older)
@@ -339,9 +413,9 @@ func TestSMARTSnapshotCoalescesComplementaryDuplicateInventoryIdentity(t *testin
 			newer.Metric["model"] = ""
 			newer.Metric["capacity"] = ""
 			newer.Value[1] = json.RawMessage(`"1785123055.5"`)
-			groups[17] = []instantSeries{older, newer}
+			groups[18] = []instantSeries{older, newer}
 			if reverse {
-				groups[17] = []instantSeries{newer, older}
+				groups[18] = []instantSeries{newer, older}
 			}
 
 			snapshot, err := runDiskBatch(t, groups)
@@ -366,45 +440,45 @@ func TestSMARTSnapshotRejectsMalformedPrimaryStructure(t *testing.T) {
 	}{
 		{name: "wrong outer count", mutate: func(groups [][]instantSeries) [][]instantSeries { return groups[:17] }},
 		{name: "null current group", mutate: func(groups [][]instantSeries) [][]instantSeries { groups[0] = nil; return groups }},
-		{name: "null inventory group", mutate: func(groups [][]instantSeries) [][]instantSeries { groups[17] = nil; return groups }},
+		{name: "null inventory group", mutate: func(groups [][]instantSeries) [][]instantSeries { groups[18] = nil; return groups }},
 		{name: "missing required inventory identity", mutate: func(groups [][]instantSeries) [][]instantSeries {
-			groups[17][0].Metric["device"] = ""
+			groups[18][0].Metric["device"] = ""
 			return groups
 		}},
 		{name: "duplicate inventory serial conflict", mutate: func(groups [][]instantSeries) [][]instantSeries {
-			conflict := cloneDiskSeries(groups[17][0])
+			conflict := cloneDiskSeries(groups[18][0])
 			conflict.Metric["serial_no"] = "fixture-serial-conflict"
-			groups[17] = append(groups[17], conflict)
+			groups[18] = append(groups[18], conflict)
 			return groups
 		}},
 		{name: "stable identity conflict", mutate: func(groups [][]instantSeries) [][]instantSeries {
-			conflict := cloneDiskSeries(groups[17][0])
+			conflict := cloneDiskSeries(groups[18][0])
 			conflict.Metric["device"] = "/dev/fixture-conflict"
 			conflict.Metric["serial_no"] = "fixture-serial-conflict"
-			groups[17] = append(groups[17], conflict)
+			groups[18] = append(groups[18], conflict)
 			return groups
 		}},
 		{name: "duplicate inventory WWN conflict", mutate: func(groups [][]instantSeries) [][]instantSeries {
-			conflict := cloneDiskSeries(groups[17][0])
+			conflict := cloneDiskSeries(groups[18][0])
 			conflict.Metric["wwn"] = "fixture-wwn-conflict"
-			groups[17] = append(groups[17], conflict)
+			groups[18] = append(groups[18], conflict)
 			return groups
 		}},
 		{name: "cross-device serial conflict", mutate: func(groups [][]instantSeries) [][]instantSeries {
-			conflict := cloneDiskSeries(groups[17][0])
+			conflict := cloneDiskSeries(groups[18][0])
 			conflict.Metric["device"] = "/dev/fixture-conflict"
 			conflict.Metric["wwn"] = "fixture-wwn-conflict"
-			groups[17] = append(groups[17], conflict)
+			groups[18] = append(groups[18], conflict)
 			return groups
 		}},
 		{name: "same-time model conflict", mutate: func(groups [][]instantSeries) [][]instantSeries {
-			conflict := cloneDiskSeries(groups[17][0])
+			conflict := cloneDiskSeries(groups[18][0])
 			conflict.Metric["model"] = "Conflicting Fixture Disk"
-			groups[17] = append(groups[17], conflict)
+			groups[18] = append(groups[18], conflict)
 			return groups
 		}},
 		{name: "invalid raw tlast", mutate: func(groups [][]instantSeries) [][]instantSeries {
-			groups[17][0].Value[1] = json.RawMessage(`"not-a-time"`)
+			groups[18][0].Value[1] = json.RawMessage(`"not-a-time"`)
 			return groups
 		}},
 	}
@@ -435,8 +509,8 @@ func TestSMARTSnapshotMatchesOptionalSerialAndWWNSymmetrically(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			groups := validDiskBatch()
-			groups[17][0].Metric["serial_no"] = tt.primarySerial
-			groups[17][0].Metric["wwn"] = tt.primaryWWN
+			groups[18][0].Metric["serial_no"] = tt.primarySerial
+			groups[18][0].Metric["wwn"] = tt.primaryWWN
 			candidateLabels := diskLabels()
 			candidateLabels["serial_no"] = tt.candidateSerial
 			candidateLabels["wwn"] = tt.candidateWWN
@@ -625,12 +699,37 @@ func runDiskBatch(t *testing.T, groups [][]instantSeries) (disk.Snapshot, error)
 }
 
 func validDiskBatch() [][]instantSeries {
-	groups := make([][]instantSeries, 18)
+	groups := make([][]instantSeries, 19)
 	labels := diskLabels()
 	groups[0] = []instantSeries{diskSeries(labels, 1785123100, "1")}
-	groups[16] = []instantSeries{diskSeries(labels, 1785123900, "1000000000")}
-	groups[17] = []instantSeries{diskSeries(labels, 1785124000, "1785123000.25")}
+	groups[17] = []instantSeries{diskSeries(labels, 1785123900, "1000000000")}
+	groups[18] = []instantSeries{diskSeries(labels, 1785124000, "1785123000.25")}
 	return groups
+}
+
+func withDiskCommandTimeoutGroup(t *testing.T, fixture []byte) []byte {
+	t.Helper()
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(fixture, &envelope); err != nil {
+		t.Fatal("cannot decode anonymized disk fixture")
+	}
+	var groups []json.RawMessage
+	if err := json.Unmarshal(envelope["dat"], &groups); err != nil || len(groups) != 18 {
+		t.Fatal("anonymized disk fixture does not contain 18 metric groups")
+	}
+	groups = append(groups, nil)
+	copy(groups[17:], groups[16:])
+	groups[16] = json.RawMessage("[]")
+	data, err := json.Marshal(groups)
+	if err != nil {
+		t.Fatal("cannot extend anonymized disk fixture")
+	}
+	envelope["dat"] = data
+	result, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatal("cannot encode anonymized disk fixture")
+	}
+	return result
 }
 
 func diskLabels() map[string]string {

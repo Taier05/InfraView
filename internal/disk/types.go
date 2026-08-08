@@ -26,6 +26,7 @@ type ErrorCounters struct {
 	UDMACRCErrors        *float64
 	MediaIntegrityErrors *float64
 	ErrorLogEntries      *float64
+	CommandTimeouts      *float64
 	UnsafeShutdowns      *float64
 }
 

@@ -30,6 +30,7 @@ const (
 	diskMediaIntegrityErrorsQuery
 	diskErrorLogEntriesQuery
 	diskUnsafeShutdownsQuery
+	diskCommandTimeoutsQuery
 	diskCapacityQuery
 	diskInventoryQuery
 	diskQueryCount
@@ -67,6 +68,7 @@ type diskDeviceState struct {
 	udmaCRCErrors           diskScalarState
 	mediaIntegrityErrors    diskScalarState
 	errorLogEntries         diskScalarState
+	commandTimeouts         diskScalarState
 	unsafeShutdowns         diskScalarState
 }
 
@@ -305,7 +307,7 @@ func parseDiskCapacity(raw []json.RawMessage) (int64, time.Time, bool) {
 }
 
 func mergeDiskAuxiliary(states map[string]*diskDeviceState, results [][]instantSeries) {
-	for queryIndex := diskDeviceTemperatureQuery; queryIndex < diskInventoryQuery; queryIndex++ {
+	for queryIndex := diskDeviceTemperatureQuery; queryIndex < diskCapacityQuery; queryIndex++ {
 		for _, series := range results[queryIndex] {
 			state, ok := diskStateForSeries(states, series)
 			if !ok || !state.reporting {
@@ -340,6 +342,8 @@ func mergeDiskAuxiliary(states map[string]*diskDeviceState, results [][]instantS
 				mergeDiskScalar(&state.errorLogEntries, series, diskNonNegative)
 			case diskUnsafeShutdownsQuery:
 				mergeDiskScalar(&state.unsafeShutdowns, series, diskNonNegative)
+			case diskCommandTimeoutsQuery:
+				mergeDiskScalar(&state.commandTimeouts, series, diskNonNegative)
 			}
 		}
 	}
@@ -443,6 +447,7 @@ func finalizeDiskDevice(state *diskDeviceState) {
 		UDMACRCErrors:        state.udmaCRCErrors.value,
 		MediaIntegrityErrors: state.mediaIntegrityErrors.value,
 		ErrorLogEntries:      state.errorLogEntries.value,
+		CommandTimeouts:      state.commandTimeouts.value,
 		UnsafeShutdowns:      state.unsafeShutdowns.value,
 	}
 }
